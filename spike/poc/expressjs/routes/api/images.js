@@ -40,7 +40,7 @@ const upload = multer({
 });
 
 // read solution image (not found case)
-router.get("/:endpoint/:name", async (req, res) => {
+router.get("/:endpoint/:id/:name", async (req, res) => {
     // let pathed = `/../../assets/images/${req.params.endpoint}/${req.params.id}`
     // res.sendFile(path.resolve(__dirname + pathed + (req.query.step != undefined ? `/${req.query.step}.png` : '.png')),
     //     err => {
@@ -48,15 +48,16 @@ router.get("/:endpoint/:name", async (req, res) => {
     //     });
     console.log(mode);
     const folder = `images/${mode == "development" ? "developments" : "productions"
-        }/${req.params.endpoint}`;
+        }/${req.params.endpoint}/${req.params.id}`;
     const fileName = `${folder}/${req.params.name}`;
+    console.log(fileName)
     const file = bucket.file(fileName);
     file.download().then(
         (downloadResponse) => {
             return res.status(200).type("image/png").send(downloadResponse[0]);
         },
         (err) => {
-            console.log(err)
+            // console.log(err)
             return res.status(404).json(errorRes("File not found!!",req.originalUrl))
         }
     );

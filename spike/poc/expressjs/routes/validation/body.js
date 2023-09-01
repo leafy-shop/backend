@@ -1,4 +1,4 @@
-const crypto = require('crypto')
+
 const { validatError } = require('./../model/error/error')
 const argon2 = require("argon2")
 
@@ -92,8 +92,7 @@ let validatePassword = async (prop = '', value = '', atLeast = 0, atMost = 0) =>
         memoryCost: 64000, // 64 mb
         timeCost: 3 // number of itetations
     }
-    let salt = crypto.randomBytes(16)
-    return await argon2.hash(value.trim(), { ...hashingConfig, salt })
+    return await argon2.hash(value.trim(), { ...hashingConfig })
 }
 
 let validateRole = (prop = '', value = '', enumtype, isEmpty = false) => {
