@@ -11,11 +11,13 @@ datasource db {
 }
 
 model Products {
-  productId Int     @id @default(autoincrement())
-  product   String  @db.VarChar(100)
-  price     Int     @default(0)
-  stock     Int     @default(0)
+  productId Int      @id @default(autoincrement())
+  product   String   @db.VarChar(100)
+  price     Int      @default(0)
+  stock     Int      @default(0)
+  like      Int      @default(0)
   Cart      Carts[]
+  FavPrd    FavPrd[]
 }
 
 model Carts {
@@ -29,10 +31,22 @@ model Carts {
 }
 
 model Users {
-  userId   Int     @id @default(autoincrement())
-  name     String  @db.VarChar(100)
-  email    String  @unique @db.VarChar(100)
-  password String  @db.VarChar(100)
-  role     String  @default("user")
-  Cart     Carts[]
+  userId    Int      @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  email     String   @unique @db.VarChar(100)
+  password  String   @db.VarChar(100) 
+  role      String   @default("user")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt()
+  Cart      Carts[]
+  FavPrd    FavPrd[]
+}
+
+model FavPrd {
+  product   Products @relation(fields: [productId], references: [productId])
+  productId Int
+  user      Users    @relation(fields: [userEmail], references: [email])
+  userEmail String
+
+  @@id([productId, userEmail])
 }

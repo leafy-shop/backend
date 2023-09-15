@@ -5,7 +5,7 @@ const { validateStr, validateInt, validateBoolean, validateDouble } = require('.
 const { notFoundError, validatError } = require('./../model/error/error')
 const { JwtAuth } = require('./../../middleware/jwtAuth')
 
-const { PrismaClient } = require('@prisma/client')
+const { PrismaClient, Prisma } = require('@prisma/client')
 const prisma = new PrismaClient()
 
 // const product_db = [
@@ -25,6 +25,18 @@ const prisma = new PrismaClient()
 //         "price": 5000
 //     }
 // ]
+const userView = {
+    name: true,
+    email: true,
+    role: true,
+    FavPrd: {
+        select: {
+            product: true
+        }
+    },
+    createdAt: true,
+    updatedAt: true
+}
 
 router.get('/', JwtAuth, async (req, res, next) => {
     // let filter_pd = product_db.filter( p => {
@@ -34,16 +46,35 @@ router.get('/', JwtAuth, async (req, res, next) => {
     // })
     // filter_pd = filter_pd.sort( (a,b) => b[req.query.sort] - a[req.query.sort] )
     let sorting = req.query.sort == 'desc' ? 'desc' : 'asc'
+
+    let count_pd = await prisma.products.count()
+
+    // console.log(!! req.query.isFav)
+    // console.log(Boolean(req.query.isFav))
+
+    let favFilter = req.query.isFav.toLocaleLowerCase() === 'true'? {some: {userEmail : req.user.email}} : {}
+    let page = Number(req.query.page)
+    let limit = Number(req.query.limit)
+
     let filter_pd = await prisma.products.findMany({
+        skip: page > 0 ? (page - 1) * limit : 0,
+        take: limit > 1 ? limit : count_pd,
+        include: {
+            FavPrd: true,
+        },
         where: {
             AND: [{
                 product: {
                     contains: req.query.product
                 },
-                price: req.query.price
+                price: req.query.price,
+                FavPrd: favFilter
             }]
         },
-        orderBy: { price: sorting }
+        include: {
+            FavPrd: false,
+        },
+        orderBy: { stock: sorting }
     })
     return res.json(filter_pd)
 })
@@ -101,12 +132,13 @@ router.post('/addtocart', JwtAuth, async (req, res, next) => {
             },
             where: {
                 AND: [
-                    {productId: choosePd.productId},
-                    {isPaid: false}
+                    { productId: choosePd.productId },
+                    { isPaid: false }
                 ]
             }
         })
-        if(cart._sum.qty + validateInt("quantity",qty,true) > choosePd.stock) validatError(`product ${productId}:${choosePd.product} have quantity more than their stocks`)
+
+        if (cart._sum.qty + validateInt("quantity", qty, true) > choosePd.stock) validatError(`product ${productId}:${choosePd.product} have quantity more than their stocks`)
 
         let input = await prisma.carts.create({
             data: {
@@ -117,6 +149,39 @@ router.post('/addtocart', JwtAuth, async (req, res, next) => {
         })
         return res.status(201).json({ msg: `your product ${choosePd.productId} ${choosePd.product} - ${choosePd.price} baht that add in your cart` })
     } catch (err) {
+        next(err)
+    }
+})
+
+router.put('/isFav/:id', JwtAuth, async (req, res, next) => {
+    try {
+        let id = Number(req.params.id)
+        if (await findFavPdById(req.user.email, id) == null) {
+            let FavPrds = await prisma.FavPrd.create({
+                data: {
+                    userEmail: req.user.email,
+                    productId: id
+                }
+            })
+        } else {
+            let unFavPrds = await prisma.FavPrd.delete({
+                where: {
+                    productId_userEmail: {
+                        productId: id,
+                        userEmail: req.user.email
+                    }
+                }
+            })
+        }
+        return res.json(await verifyUserEmail(req.user.email))
+    } catch (err) {
+        console.log(err)
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.code === 'P2002') {
+                err.message = "product of user is duplicated"
+            }
+        }
         next(err)
     }
 })
@@ -134,12 +199,18 @@ router.patch('/:id', JwtAuth, async (req, res, next) => {
     try {
         let input = await prisma.products.update({
             where: {
-                productId: validateInt("productId", Number(req.params.id))
+                productId: Number(req.params.id)
             },
             data: mapData
         })
         return res.json(input)
     } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.code === 'P2025') {
+                err.message = "product id " + req.params.id + " does not exist"
+            }
+        }
         next(err)
     }
 })
@@ -153,6 +224,12 @@ router.delete('/:id', JwtAuth, async (req, res, next) => {
         })
         return res.json("product id" + req.params.id + " has deleted")
     } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.code === 'P2025') {
+                err.message = "product id " + req.params.id + " does not exist"
+            }
+        }
         next(err)
     }
 })
@@ -160,11 +237,34 @@ router.delete('/:id', JwtAuth, async (req, res, next) => {
 const verifyId = async (id) => {
     let filter_pd = await prisma.products.findFirst({
         where: {
-            productId: validateInt("productId", Number(id))
+            productId: validateInt("productId", id)
         }
     })
     if (filter_pd == null) notFoundError("product id " + id + " does not exist")
     return filter_pd
+}
+
+const verifyUserEmail = async (userEmail) => {
+    let filter_pd = await prisma.users.findFirst({
+        select: userView,
+        where: {
+            email: userEmail
+        }
+    })
+    if (filter_pd == null) notFoundError("product id " + id + " does not exist")
+    return filter_pd
+}
+
+const findFavPdById = async (email,id) => {
+    let fav_pd = await prisma.FavPrd.findFirst({
+        where: {
+            AND: [
+                {productId: validateInt("productId", id)},
+                {userEmail: email}
+            ]
+        }
+    })
+    return fav_pd
 }
 
 

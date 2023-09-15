@@ -15,13 +15,20 @@ const prisma = new PrismaClient()
 const user = {
     name: true,
     email: true,
-    role: true
+    role: true,
+    createdAt: true,
+    updatedAt: true
 }
 
 router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res) => {
     let sorting = req.query.sort == 'desc' ? 'desc' : 'asc'
     console.log(req.query.name)
+    let page = Number(req.query.page)
+    let limit = Number(req.query.limit)
+    let count_user = await prisma.users.count()
     let filter_u = await prisma.users.findMany({
+        skip: page > 0 ? (page - 1) * limit : 0,
+        take: limit > 1 ? limit : count_user,
         where: {
             AND: [
                 {
@@ -39,7 +46,7 @@ router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res) => {
             ]
         },
         select: user,
-        orderBy: { name: sorting }
+        orderBy: { updatedAt: sorting }
     })
     return res.json(filter_u)
 })
@@ -101,7 +108,7 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
         })
         return res.json(input)
     } catch (err) {
-        if (err instanceof prisma.PrismaClientKnownRequestError) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2002') {
                 err.message = "email is duplicated"
