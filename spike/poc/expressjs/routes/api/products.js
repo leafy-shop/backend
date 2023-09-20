@@ -158,14 +158,14 @@ router.put('/isFav/:id', JwtAuth, async (req, res, next) => {
     try {
         let id = Number(req.params.id)
         if (await findFavPdById(req.user.email, id) == null) {
-            let FavPrds = await prisma.FavPrd.create({
+            let FavPrds = await prisma.favprd.create({
                 data: {
                     userEmail: req.user.email,
                     productId: id
                 }
             })
         } else {
-            let unFavPrds = await prisma.FavPrd.delete({
+            let unFavPrds = await prisma.favprd.delete({
                 where: {
                     productId_userEmail: {
                         productId: id,
@@ -257,7 +257,7 @@ const verifyUserEmail = async (userEmail) => {
 }
 
 const findFavPdById = async (email,id) => {
-    let fav_pd = await prisma.FavPrd.findFirst({
+    let fav_pd = await prisma.favprd.findFirst({
         where: {
             AND: [
                 {productId: validateInt("productId", id)},
