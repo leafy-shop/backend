@@ -26,6 +26,7 @@ const prisma = new PrismaClient()
 //     }
 // ]
 const userView = {
+    userId: true,
     name: true,
     email: true,
     role: true,

@@ -21,14 +21,14 @@ router.post('/', async (req, res) => {
     const { email, password } = req.body;
 
     // เรียกข้อมูล user โดยใช้ email
-    let user = await prisma.users.findMany({
+    let user = await prisma.users.findFirst({
         where: {
-            email: req.query.email
+            email: email
         }
     })
 
     // ถ้า email หาไม่เจอก็จะส่งกลับไปเพื่อใช้ในการทำ reset password
-    if (user.length == 0) {
+    if (user == null) {
         return res.status(404).json(errorRes(`user email ${email} does not exist`, req.originalUrl))
     }
 
@@ -38,34 +38,34 @@ router.post('/', async (req, res) => {
         timeCost: 3 // number of itetations
     }
 
-    console.log(user[0].password)
+    console.log(user.password)
     // ตรวจสอบ password ที่ได้จาก mysql2 ว่าเป็น hash match กับ password ที่กรอกมาหรือป่าว
-    if (!(await argon2.verify(user[0].password,password,hashingConfig))) {
+    if (!(await argon2.verify(user.password,password,hashingConfig))) {
         return res.status(401).json(errorRes("user email or password is invalid please login again", req.originalUrl))
     }
 
     // // ตรวจสอบสถานะของ user
-    // else if (user[0].user_status !== 'active') {
+    // else if (user.user_status !== 'active') {
     //     return res.status(403).json(errorRes("this user is inactive!", req.originalUrl))
     // }
 
     // ลบ password ของ user ก่อน response กลับไป
-    delete user[0].password;
+    delete user.password;
 
-    console.log(user[0])
+    console.log(user)
 
     // สร้าง access token ภายใต้ method ที่กำหนด
     const token = getToken({
-        "name": user[0].name,
-        "email": user[0].email,
-        "role": user[0].role,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role,
     }, "30m");
 
     // และ refresh token แต่เวลาต่างกัน
     const refreshtoken = getToken({
-        "name": user[0].name,
-        "email": user[0].email,
-        "role": user[0].role,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role,
     }, "24h");
 
     // console.log(token)

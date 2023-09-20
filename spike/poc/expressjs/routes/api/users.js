@@ -13,6 +13,7 @@ const prisma = new PrismaClient()
 
 // Exclude keys from user
 const user = {
+    userId: true,
     name: true,
     email: true,
     role: true,
