@@ -2,13 +2,13 @@ const multerS3 = require("multer-s3")
 const AWS = require("aws-sdk")
 require('dotenv').config().parsed
 
-const bucket = "test"
+const bucket = process.env.S3_BUCKET
 const mode = process.env.NODE_ENV
 
 const s3 = new AWS.S3({
-  endpoint: "http://127.0.0.1:9000",
-  accessKeyId: "ROOTUSER",
-  secretAccessKey: "CHANGEME123",
+  endpoint: process.env.S3_ENDPOINT,
+  accessKeyId: process.env.S3_ACCESS_KEY,
+  secretAccessKey: process.env.S3_SECRET_KEY,
   sslEnabled: false,
   s3ForcePathStyle: true,
 });
