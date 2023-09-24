@@ -53,7 +53,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
     // console.log(!! req.query.isFav)
     // console.log(Boolean(req.query.isFav))
 
-    let favFilter = req.query.isFav.toLocaleLowerCase() === 'true'? {some: {userEmail : req.user.email}} : {}
+    let favFilter = req.query.isFav === undefined || req.query.isFav.toLocaleLowerCase() !== 'true'? {} : {some: {userEmail : req.user.email}}
     let page = Number(req.query.page)
     let limit = Number(req.query.limit)
 
@@ -61,7 +61,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
         skip: page > 0 ? (page - 1) * limit : 0,
         take: limit > 1 ? limit : count_pd,
         include: {
-            FavPrd: true,
+            favprd: true,
         },
         where: {
             AND: [{
@@ -69,11 +69,11 @@ router.get('/', JwtAuth, async (req, res, next) => {
                     contains: req.query.product
                 },
                 price: req.query.price,
-                FavPrd: favFilter
+                favprd: favFilter
             }]
         },
         include: {
-            FavPrd: false,
+            favprd: false,
         },
         orderBy: { stock: sorting }
     })

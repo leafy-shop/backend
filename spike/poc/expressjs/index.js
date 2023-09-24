@@ -6,11 +6,11 @@ const cookieParser = require('cookie-parser')
 const compression = require("compression"); // reduce loading of all site
 const {errorRes} = require("./routes/model/error/error")
 require('dotenv').config().parsed
-// let corsOptions = {
-//     origin: process.env.CLIENT_HOST||'http://localhost:5173',
-//     optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
-//     credentials:true
-// }
+let corsOptions = {
+    origin: process.env.CLIENT_HOST||'http://localhost:5173',
+    optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
+    credentials:true
+}
 
 const app = express()
 
@@ -26,7 +26,7 @@ app.use(limiter);
 
 // Init Middleware
 app.use(logger)
-// app.use(cors(corsOptions))
+app.use(cors(corsOptions))
 app.use(compression())
 
 app.use(cookieParser())
