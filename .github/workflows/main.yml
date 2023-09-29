@@ -21,10 +21,7 @@ jobs:
         known_hosts: 'leafy'
         script: |
            ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
-    
-    - name: Deploy with rsync
-      run: |
-        ls /.ssh/
+           ls
 
     # - name: Restart Server
     #   uses: appleboy/ssh-action@master
