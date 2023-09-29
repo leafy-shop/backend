@@ -1,25 +1,25 @@
+name: Deploy
+# Controls when the action will run. 
 on:
+  # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    branches:
-      - main
-  workflow_dispatch:
-  
+    branches: [ main ]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  run_pull:
-    name: run pull
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
     runs-on: ubuntu-latest
-    
-    steps:
-    - name: install ssh keys
-      # check this thread to understand why its needed:
-      # https://stackoverflow.com/a/70447517
-      run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan backend.github.com >> ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
-    - name: connect and pull
-      run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.WORK_DIR }} && git checkout ${{ secrets.MAIN_BRANCH }} && git pull && exit"
-    - name: cleanup
-      run: rm -rf ~/.ssh
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:       
+    - name: Deploy using ssh
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 22
+        script: |
+          ls
