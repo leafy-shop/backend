@@ -23,7 +23,8 @@ jobs:
            ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
     
     - name: Deploy with rsync
-      run: ls .ssh
+      run: |
+        ls /.ssh/
 
     # - name: Restart Server
     #   uses: appleboy/ssh-action@master
