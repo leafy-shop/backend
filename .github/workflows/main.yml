@@ -22,16 +22,16 @@ jobs:
         script: |
            ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
     
-    # - name: Deploy with rsync
-    #   run: rsync -avz ./dist/ ${{ secrets.USER }}@${{ secrets.HOST }}:/home/sysadmin
+    - name: Deploy with rsync
+      run: rsync -avz .spike/poc/expressjs/.env ${{ secrets.USER }}@${{ secrets.HOST }}:/home/sysadmin
 
-    - name: Restart Server
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        port: 22
-        script: |
-          cd /..
-          ls
+    # - name: Restart Server
+    #   uses: appleboy/ssh-action@master
+    #   with:
+    #     host: ${{ secrets.HOST }}
+    #     username: ${{ secrets.USER }}
+    #     key: ${{ secrets.SSH_PRIVATE_KEY }}
+    #     port: 22
+    #     script: |
+    #       cd /..
+    #       ls
