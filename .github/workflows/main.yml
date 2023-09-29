@@ -20,5 +20,5 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         known_hosts: 'leafy'
         script: |
-          cd ..
-          ls
+           ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+           
