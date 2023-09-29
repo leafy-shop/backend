@@ -2,13 +2,20 @@ name: GitHub Actions Demo
 run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
 on: [push]
 jobs:
-  Explore-GitHub-Actions:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Install SSH Client 🔑
-        uses: backend/ssh-agent@v0.7.0
-        with:
-          ssh-private-key: ${{ secrets.DEPLOY_KEY }}
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/backend/backend
+          chmod 600 ~/.ssh/backend
+          ssh-keyscan github.com >> ~/.ssh/backend/known_hosts
+          chmod 644 ~/.ssh/backend/known_hosts
+          ssh-keyscan backend.github.com >> ~/.ssh/backend/known_hosts  # Replace with your server's hostname
 #       - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
 #       - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
 #       - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
