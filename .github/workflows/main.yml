@@ -18,7 +18,7 @@ jobs:
       uses: shimataro/ssh-key-action@v2
       with:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
-        known_hosts: 'leafy'
+        known_hosts: ${{ secrets.HOST }}
         script: |
            ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
            ls .ssh
