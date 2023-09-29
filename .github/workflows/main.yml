@@ -21,7 +21,7 @@ jobs:
         known_hosts: 'leafy'
         script: |
            ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
-           ls
+           ls .ssh
 
     # - name: Restart Server
     #   uses: appleboy/ssh-action@master
