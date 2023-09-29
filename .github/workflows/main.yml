@@ -9,7 +9,7 @@ jobs:
         uses: actions/checkout@v2
         
       - name: Deploy with SSH
-        run: ssh sysadmin@cp23pl4.sit.kmutt.ac.th
+        run: ssh -T sysadmin@cp23pl4.sit.kmutt.ac.th
 #       - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
 #       - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
 #       - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
