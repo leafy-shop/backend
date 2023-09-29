@@ -23,6 +23,8 @@ jobs:
         script: |
            ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
            ls .ssh
+    - name: Restart Server
+      run: ssh sysadmin@${{ secrets.HOST }} "rm -f -R backend && git clone git@backend.github.com:leafy-shop/backend.git"
 
     # - name: Restart Server
     #   uses: appleboy/ssh-action@master
