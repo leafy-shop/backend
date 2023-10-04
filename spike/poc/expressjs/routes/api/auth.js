@@ -37,8 +37,7 @@ router.post('/', async (req, res) => {
         memoryCost: 64000, // 64 mb
         timeCost: 3 // number of itetations
     }
-
-    console.log(user.password)
+    
     // ตรวจสอบ password ที่ได้จาก mysql2 ว่าเป็น hash match กับ password ที่กรอกมาหรือป่าว
     if (!(await argon2.verify(user.password,password,hashingConfig))) {
         return res.status(401).json(errorRes("user email or password is invalid please login again", req.originalUrl))
