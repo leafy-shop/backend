@@ -87,6 +87,8 @@ router.post('/', async (req, res) => {
         "name": getUser(token).name,
         "email": getUser(token).email,
         "role": getUser(token).role,
+        "token": getUser(token).token,
+        "refreshToken": getUser(token).refreshToken
     })
 })
 
@@ -136,6 +138,8 @@ router.post('/refresh', async (req, res) => {
         "name": getUser(token).name,
         "email": getUser(token).email,
         "role": getUser(token).role,
+        "token": getUser(token).token,
+        "refreshToken": getUser(token).refreshToken
     })
 })
 
