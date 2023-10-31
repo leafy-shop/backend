@@ -21,10 +21,10 @@ module.exports.storage = multerS3({
   s3,
   bucket,
   contentType: multerS3.AUTO_CONTENT_TYPE,
-  metadata: (req, file, cb) => {
+  metadata: async (req, file, cb) => {
     cb(null, { fieldName: file.fieldname });
   },
   key: (req, file, cb) => {
     cb(null, `${mode == "development" ? "developments" : "productions"}/${req.params.endpoint}/${req.params.id}/${file.originalname}`);
-  },
+  }
 });

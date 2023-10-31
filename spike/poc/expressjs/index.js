@@ -43,6 +43,7 @@ app.use('/api/carts',require('./routes/api/carts.js'))
 // app.use('/api/problems',require('./routes/api/problem.js'))
 // app.use('/api/solutions',require('./routes/api/solution.js'))
 // app.use('/api/authentication',require('./routes/api/authen.js'))
+app.use('/api/image',require('./routes/api/image.js'))
 app.use('/api/images',require('./routes/api/images.js'))
 // app.use('/api/send-mail',require('./routes/api/mailer.js'))
 
