@@ -58,7 +58,7 @@ router.post('/', async (req, res) => {
         "name": user.name,
         "email": user.email,
         "role": user.role,
-    }, "30m");
+    }, "1h");
 
     // และ refresh token แต่เวลาต่างกัน
     const refreshtoken = getToken({
