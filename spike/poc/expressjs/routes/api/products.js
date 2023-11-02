@@ -89,7 +89,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
     // and return page that sorted by updateAt item
     let filter_pd = await prisma.items.findMany({
         skip: pageN > 0 ? (pageN - 1) * limitN : 0,
-        take: limitN > 1 ? limitN : count_pd,
+        take: limitN >= 1 ? limitN : count_pd,
         include: {
             favprd: true,
         },
@@ -112,7 +112,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
         include: {
             favprd: false,
         },
-        orderBy: { updatedAt: "asc" }
+        orderBy: { updatedAt: "desc" }
     })
     // filter includes array : complexity best case O(n), worst case O(n*(type+tag))
     filter_pd = filter_pd.filter(product =>
