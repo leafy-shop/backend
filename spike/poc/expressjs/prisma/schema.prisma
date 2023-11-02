@@ -10,45 +10,60 @@ datasource db {
 model carts {
   cartId    Int      @id @default(autoincrement())
   userEmail String   @db.VarChar(100)
-  productId Int
+  itemId    Int
   qty       Int      @default(0)
   isPaid    Boolean  @default(false)
-  products  products @relation(fields: [productId], references: [productId], map: "Carts_productId_fkey")
-  users     users    @relation(fields: [userEmail], references: [email], map: "Carts_userEmail_fkey")
+  items     items    @relation(fields: [itemId], references: [itemId], map: "Carts_itemId_fkey")
+  accounts  accounts @relation(fields: [userEmail], references: [email], map: "Carts_userEmail_fkey")
 
-  @@index([productId], map: "fk_carts_products_idx")
+  @@index([itemId], map: "fk_carts_items_idx")
   @@index([userEmail], map: "fk_carts_users_idx")
 }
 
 model favprd {
   userEmail String   @db.VarChar(100)
-  productId Int
-  products  products @relation(fields: [productId], references: [productId], map: "FavPrd_productId_fkey")
-  users     users    @relation(fields: [userEmail], references: [email], map: "FavPrd_userEmail_fkey")
+  itemId    Int
+  items     items    @relation(fields: [itemId], references: [itemId], map: "FavPrd_itemId_fkey")
+  accounts  accounts @relation(fields: [userEmail], references: [email], map: "FavPrd_userEmail_fkey")
 
-  @@id([productId, userEmail])
-  @@index([productId], map: "fk_FavPRD_products1_idx")
+  @@id([itemId, userEmail])
+  @@index([itemId], map: "fk_FavPRD_items1_idx")
   @@index([userEmail], map: "fk_FavPRD_users1_idx")
 }
 
-model products {
-  productId Int      @id @default(autoincrement())
-  product   String   @db.VarChar(100)
-  price     Int      @default(0)
-  stock     Int      @default(0)
-  like      Int      @default(0)
-  carts     carts[]
-  favprd    favprd[]
+model items {
+  itemId       Int      @id @default(autoincrement())
+  name         String   @db.VarChar(100)
+  description  String   @db.VarChar(500)
+  itemOwner    String
+  items        accounts @relation(fields: [itemOwner], references: [email], map: "Items_itemOwner_fkey")
+  type         String   @db.VarChar(20)
+  tag          String   @db.VarChar(500)
+  size         String   @db.VarChar(500)
+  style        String   @db.VarChar(50)
+  totalRating  Decimal  @default(0.0) @db.Decimal(2, 1)
+  sold         Int      @default(0)
+  isOutOfStock Boolean  @default(false)
+  price        Decimal  @default(0.00) @db.Decimal(32, 2)
+  images       String   @default("") @db.VarChar(500)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  carts        carts[]
+  favprd       favprd[]
+
+  @@index([itemId], map: "fk_items_users1_idx")
 }
 
-model users {
+model accounts {
   userId    Int      @id @default(autoincrement())
   name      String   @db.VarChar(100)
   email     String   @unique(map: "Users_email_key") @db.VarChar(100)
   password  String   @db.VarChar(100)
   role      String   @default("user") @db.VarChar(11)
+  status    Boolean  @default(true)
   createdAt DateTime @default(now())
-  updatedAt DateTime
+  updatedAt DateTime @updatedAt
   carts     carts[]
   favprd    favprd[]
+  items     items[]
 }

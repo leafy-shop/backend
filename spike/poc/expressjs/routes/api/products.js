@@ -1,30 +1,47 @@
 const express = require('express');
 const router = express.Router();
 
-const { validateStr, validateInt, validateBoolean, validateDouble } = require('../validation/body')
+const { validateStr, validateInt, validateBoolean, validateDouble, validateEmail, validateStrArray } = require('../validation/body')
 const { notFoundError, validatError } = require('./../model/error/error')
+const { dateTimeZoneNow } = require('./../model/class/datetimeUtils')
 const { JwtAuth } = require('./../../middleware/jwtAuth')
 
 const { PrismaClient, Prisma } = require('@prisma/client')
 const prisma = new PrismaClient()
 
-// const product_db = [
-//     {
-//         "id": 2,
-//         "product": "small graden",
-//         "price": 1000
-//     },
-//     {
-//         "id": 4,
-//         "product": "normal graden",
-//         "price": 3000
-//     },
-//     {
-//         "id": 5,
-//         "product": "large graden",
-//         "price": 5000
-//     }
-// ]
+// product demo
+const product_db = [
+    {
+        "name": "small zee cactus",
+        "description": "this is cactus create by zee",
+        "itemOwner": "piraphat123@gmail.com",
+        "type": "cactus",
+        "tag": ["cactus is amazing", "flower cactus", "cactus", "", "cactus", "Cactus"],
+        "size": ["XS", "S"],
+        "style": "light green cactus",
+        "price": 32,
+    },
+    {
+        "name": "lilac flower in beautiful jar",
+        "description": "this is lilac flower create by zee",
+        "itemOwner": "piraphat123@gmail.com",
+        "type": "flower",
+        "tag": ["lilac is relax", "levender flower", "", null, " "],
+        "size": ["S", "M", "l", "L"],
+        "style": "light purple flower",
+        "price": 149
+    },
+    {
+        "name": "golden rose",
+        "itemOwner": "piraphat123@gmail.com",
+        "type": "flower",
+        "tag": ["rose", "golden rose", "Rose", null, " "],
+        "size": ["S", "M", "l", "XL"],
+        "style": "golden",
+        "price": 289
+    }
+]
+
 const userView = {
     userId: true,
     name: true,
@@ -46,36 +63,65 @@ router.get('/', JwtAuth, async (req, res, next) => {
     //     (req.query.price == undefined ? true : req.query.price == p.price)
     // })
     // filter_pd = filter_pd.sort( (a,b) => b[req.query.sort] - a[req.query.sort] )
-    let sorting = req.query.sort == 'desc' ? 'desc' : 'asc'
+    // let sorting = req.query.sort == 'desc' ? 'desc' : 'asc'
 
-    let count_pd = await prisma.products.count()
+    // query params
+    let { page, limit,
+        isFav, product, min_price, max_price, rating,
+        type, tag } = req.query
+
+    // count items
+    let count_pd = await prisma.items.count()
+    // console.log(count_pd)
 
     // console.log(!! req.query.isFav)
     // console.log(Boolean(req.query.isFav))
 
-    let favFilter = req.query.isFav === undefined || req.query.isFav.toLocaleLowerCase() !== 'true'? {} : {some: {userEmail : req.user.email}}
-    let page = Number(req.query.page)
-    let limit = Number(req.query.limit)
+    // favFilter mode by show some user who are favorite
+    let favFilter = isFav === undefined || isFav.toLocaleLowerCase() !== 'true' ? {} : { some: { userEmail: req.user.email } }
 
-    let filter_pd = await prisma.products.findMany({
-        skip: page > 0 ? (page - 1) * limit : 0,
-        take: limit > 1 ? limit : count_pd,
+    // page number and page size
+    let pageN = Number(page)
+    let limitN = Number(limit)
+    console.log(limit)
+
+    // filter single and between value from name, price, rating and isFavPrd query
+    // and return page that sorted by updateAt item
+    let filter_pd = await prisma.items.findMany({
+        skip: pageN > 0 ? (pageN - 1) * limitN : 0,
+        take: limitN > 1 ? limitN : count_pd,
         include: {
             favprd: true,
         },
         where: {
             AND: [{
-                product: {
-                    contains: req.query.product
+                name: {
+                    contains: product
                 },
-                price: req.query.price,
+                price: {
+                    lte: max_price,
+                    gte: min_price
+                },
+                totalRating: {
+                    lte: rating,
+                    gt: isNaN(rating - 1) ? undefined : rating - 1
+                },
                 favprd: favFilter
             }]
         },
         include: {
             favprd: false,
         },
-        orderBy: { stock: sorting }
+        orderBy: { updatedAt: "asc" }
+    })
+    // filter includes array : complexity best case O(n), worst case O(n*(type+tag))
+    filter_pd = filter_pd.filter(product =>
+        type == undefined ? true : product.type.include(type.split(",")) &&
+            tag == undefined ? true : product.tag.include(type.split(","))
+    )
+    // array converter
+    filter_pd = filter_pd.map(product => {
+        return productConverter(product)
     })
     return res.json(filter_pd)
 })
@@ -88,6 +134,7 @@ router.get('/:id', JwtAuth, async (req, res, next) => {
     // })
     // filter_pd = filter_pd.sort( (a,b) => b[req.query.sort] - a[req.query.sort] )
     try {
+        // return product by id
         return res.json(await verifyId(req.params.id))
     } catch (err) {
         next(err)
@@ -95,7 +142,7 @@ router.get('/:id', JwtAuth, async (req, res, next) => {
 })
 
 router.post('/', JwtAuth, async (req, res, next) => {
-    let { product, price, stock } = req.body
+    let { name, description, itemOwner, type, tag, size, style, price } = req.body
     // let numberids = []
     // product_db.sort((a, b) => a.id - b.id).forEach(item => {
     //     numberids.push(item.id)
@@ -107,15 +154,33 @@ router.post('/', JwtAuth, async (req, res, next) => {
     //         current++
     //     }
     // })
+
+    // {
+    //     "name": "small zee cactus",
+    //     "description": "this is cactus create by zee",
+    //     "itemOwner": "piraphat123@gmail.com",
+    //     "type": "cactus",
+    //     "tag": ["cactus is amazing","flower cactus","cactus","","cactus","Cactus"],
+    //     "size": ["XS","S"],
+    //     "style": "light green cactus",
+    //     "price": 32,
+    // }
+    
+    // created product from request body and validation
     try {
-        let input = await prisma.products.create({
+        let input = await prisma.items.create({
             data: {
-                product: validateStr("product", product, 100),
-                price: validateDouble("price", price, true),
-                stock: validateInt("stock", stock, true)
+                name: validateStr("item name", name, 100),
+                description: validateStr("item description", description, 500, true),
+                itemOwner: validateEmail("item owner", itemOwner, 100),
+                type: validateStr("item type", type, 20),
+                tag: validateStrArray("item tag", tag, 10, 20),
+                size: validateStrArray("item size", size, 5, 4),
+                style: validateStr("item type", type, 50),
+                price: validateDouble("item price", price, true)
             }
         })
-        return res.status(201).json(input)
+        return res.status(201).json(productConverter(input))
     } catch (err) {
         next(err)
     }
@@ -190,26 +255,39 @@ router.put('/isFav/:id', JwtAuth, async (req, res, next) => {
 router.patch('/:id', JwtAuth, async (req, res, next) => {
     let mapData = {}
 
+    // body params mapping
     for (let i in req.body) {
         if (req.body[i] != undefined) {
-            mapData[i] = typeof req.body[i] == "string" ? validateStr(i, req.body[i], 100) :
-                typeof req.body[i] == "number" ? validateInt(i, req.body[i]) : validateBoolean(i, req.body[i])
+            // map object from body when update in prisma model
+            mapData[i] =
+                i == "name" ? validateStr("item name", req.body[i], 100) :
+                    i == "description" ? validateStr("item description", req.body[i], 500, true) :
+                        i == "itemOwner" ? validateEmail("item owner", req.body[i], 100) :
+                            i == "type" ? validateStr("item type", req.body[i], 20) :
+                                i == "tag" ? validateStrArray("item tag", req.body[i], 10, 20) :
+                                    i == "size" ? validateStrArray("item size", req.body[i], 5, 4) :
+                                        i == "style" ? validateStr("item type", req.body[i], 50) :
+                                            i == "price" ? validateDouble("item price", req.body[i], true) :
+                                                i == "isOutOfStock" ? validateBoolean("item is out of stock", req.body[i]) : undefined // unused body request
         }
     }
 
+    // update product
     try {
-        let input = await prisma.products.update({
+        let input = await prisma.items.update({
             where: {
-                productId: Number(req.params.id)
+                itemId: Number(req.params.id)
             },
             data: mapData
         })
-        return res.json(input)
+        // return update product converter
+        return res.json(productConverter(input))
     } catch (err) {
+        // if product is not found
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2025') {
-                err.message = "product id " + req.params.id + " does not exist"
+                err.message = "item id " + req.params.id + " does not exist"
             }
         }
         next(err)
@@ -218,17 +296,19 @@ router.patch('/:id', JwtAuth, async (req, res, next) => {
 
 router.delete('/:id', JwtAuth, async (req, res, next) => {
     try {
-        let input = await prisma.products.delete({
+        // find id to delete product
+        let input = await prisma.items.delete({
             where: {
-                productId: validateInt("productId", Number(req.params.id))
+                itemId: validateInt("itemId", Number(req.params.id))
             }
         })
-        return res.json("product id" + req.params.id + " has deleted")
+        return res.json("item id" + req.params.id + " has deleted")
     } catch (err) {
+        // if product is not found
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2025') {
-                err.message = "product id " + req.params.id + " does not exist"
+                err.message = "item id " + req.params.id + " does not exist"
             }
         }
         next(err)
@@ -236,37 +316,54 @@ router.delete('/:id', JwtAuth, async (req, res, next) => {
 })
 
 const verifyId = async (id) => {
-    let filter_pd = await prisma.products.findFirst({
+    // find product by id
+    let filter_pd = await prisma.items.findFirst({
         where: {
-            productId: validateInt("productId", id)
+            itemId: Number(id)
         }
     })
-    if (filter_pd == null) notFoundError("product id " + id + " does not exist")
-    return filter_pd
+
+    // check that product is found
+    if (filter_pd == null) notFoundError("item id " + id + " does not exist")
+
+    // return converter of product
+    return productConverter(filter_pd)
 }
 
 const verifyUserEmail = async (userEmail) => {
-    let filter_pd = await prisma.users.findFirst({
+    // find user by account email
+    let filter_pd = await prisma.accounts.findFirst({
         select: userView,
         where: {
             email: userEmail
         }
     })
-    if (filter_pd == null) notFoundError("product id " + id + " does not exist")
+
+    if (filter_pd == null) notFoundError("item id " + id + " does not exist")
     return filter_pd
 }
 
-const findFavPdById = async (email,id) => {
+const findFavPdById = async (email, id) => {
     let fav_pd = await prisma.favprd.findFirst({
         where: {
             AND: [
-                {productId: validateInt("productId", id)},
-                {userEmail: email}
+                { itemId: Number(id) },
+                { userEmail: email }
             ]
         }
     })
     return fav_pd
 }
 
+const productConverter = (product) => {
+            // array converter
+        product.tag = product.tag.split(",")
+        product.size = product.size.split(",")
+        product.images = product.images.split(",")
+
+        product.createdAt = dateTimeZoneNow(product.createdAt);
+        product.updatedAt = dateTimeZoneNow(product.updatedAt);
+        return product
+}
 
 module.exports = router

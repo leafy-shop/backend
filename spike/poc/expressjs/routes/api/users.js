@@ -26,8 +26,8 @@ router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res) => {
     console.log(req.query.name)
     let page = Number(req.query.page)
     let limit = Number(req.query.limit)
-    let count_user = await prisma.users.count()
-    let filter_u = await prisma.users.findMany({
+    let count_user = await prisma.accounts.count()
+    let filter_u = await prisma.accounts.findMany({
         skip: page > 0 ? (page - 1) * limit : 0,
         take: limit > 1 ? limit : count_user,
         where: {
@@ -64,7 +64,7 @@ router.get('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
 router.post('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     let { name, email, role, password } = req.body
     try {
-        let input = await prisma.users.create({
+        let input = await prisma.accounts.create({
             data: {
                 name: validateStr("name", name, 100),
                 email: validateEmail("email", email, 100),
@@ -100,7 +100,7 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
             }
         }
 
-        let input = await prisma.users.update({
+        let input = await prisma.accounts.update({
             where: {
                 userId: validateInt("userId", Number(req.params.id))
             },
@@ -123,7 +123,7 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) =>
     try {
         await verifyId(req.params.id)
 
-        let input = await prisma.users.delete({
+        let input = await prisma.accounts.delete({
             where: {
                 userId: validateInt("userId", Number(req.params.id))
             }
@@ -135,7 +135,7 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) =>
 })
 
 const verifyId = async (id) => {
-    let filter_u = await prisma.users.findFirst({
+    let filter_u = await prisma.accounts.findFirst({
         where: {
             userId: validateInt("userId", Number(id))
         },

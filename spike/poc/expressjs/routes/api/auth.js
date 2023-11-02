@@ -21,7 +21,7 @@ router.post('/', async (req, res) => {
     const { email, password } = req.body;
 
     // เรียกข้อมูล user โดยใช้ email
-    let user = await prisma.users.findFirst({
+    let user = await prisma.accounts.findFirst({
         where: {
             email: email
         }
