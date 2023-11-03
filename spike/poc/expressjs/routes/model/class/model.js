@@ -22,7 +22,8 @@ const userView = {
 }
 
 const userViewFav = () => {
-    userView["favprd"] = {
+    let userViewPrd = new Object(userView)
+    userViewPrd["favprd"] = {
         select: {
             items: {
                 select: prodList

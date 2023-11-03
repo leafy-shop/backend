@@ -9,7 +9,7 @@ const { JwtAuth, verifyRole } = require('./../../middleware/jwtAuth')
 const { ROLE } = require('./../model/enum/role')
 const { userView } = require('./../model/class/model')
 const { PrismaClient, Prisma } = require('@prisma/client');
-const { dateTimeZoneNow } = require('../model/class/utils/datetimeUtils');
+const { timeConverter } = require('../model/class/utils/converterUtils');
 const prisma = new PrismaClient()
 
 // Exclude keys from user
@@ -49,7 +49,7 @@ router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res) => {
         select: userView,
         orderBy: { updatedAt: "desc" }
     })
-    return res.json(userConverter(filter_u))
+    return res.json(timeConverter(filter_u))
 })
 
 router.get('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
@@ -73,7 +73,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
             },
             select: userView
         })
-        return res.json(userConverter(input))
+        return res.json(timeConverter(input))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -113,7 +113,7 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
             data: mapData,
             select: userView
         })
-        return res.json(userConverter(input))
+        return res.json(timeConverter(input))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -127,7 +127,10 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
 
 router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     try {
-        await verifyId(req.params.id)
+        let user = await verifyId(req.params.id)
+        if(user.email === req.user.email) {
+            validatError("you cannot delete myself")
+        }
 
         let input = await prisma.accounts.delete({
             where: {
@@ -136,6 +139,12 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) =>
         })
         return res.json("user id " + req.params.id + " has been deleted")
     } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.code === 'P2003') {
+                err.message = "cannot delete user when they have own product or order"
+            }
+        }
         next(err)
     }
 })
@@ -148,13 +157,7 @@ const verifyId = async (id) => {
         select: userView
     })
     if (filter_u == null) notFoundError("user id " + id + " does not exist")
-    return userConverter(filter_u)
-}
-
-let userConverter = (user) => {
-    if (user.createdAt !== undefined) user.createdAt = dateTimeZoneNow(user.createdAt);
-    if (user.updatedAt !== undefined) user.updatedAt = dateTimeZoneNow(user.updatedAt);
-    return user
+    return timeConverter(filter_u)
 }
 
 module.exports = router

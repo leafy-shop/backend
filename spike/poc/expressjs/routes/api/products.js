@@ -10,6 +10,7 @@ const { JwtAuth } = require('./../../middleware/jwtAuth')
 const { PrismaClient, Prisma } = require('@prisma/client');
 const { modelMapper } = require('../model/class/utils/modelMapping');
 const { mode } = require('../../config/minio_config');
+const { productConverter, timeConverter } = require('../model/class/utils/converterUtils');
 const prisma = new PrismaClient()
 
 // product demo
@@ -247,13 +248,17 @@ router.post('/addtocart', JwtAuth, async (req, res, next) => {
 
 router.put('/isFav/:id', JwtAuth, async (req, res, next) => {
     try {
-        let id = Number(req.params.id)
+        let item = await verifyId(Number(req.params.id))
+        console.log(item)
+        let userMatching = await findFavPdById(req.user.email, 
+                // find product by id
+                item.itemId)
         // if user hasn't favorite in this product id then add favorite product item
-        if (await findFavPdById(req.user.email, id) == null) {
+        if (userMatching == null) {
             await prisma.favprd.create({
                 data: {
                     userEmail: req.user.email,
-                    itemId: id
+                    itemId: item.itemId
                 }
             })
         // if user has favorite in this product id then clear favorite product item
@@ -261,7 +266,7 @@ router.put('/isFav/:id', JwtAuth, async (req, res, next) => {
             await prisma.favprd.delete({
                 where: {
                     itemId_userEmail: {
-                        itemId: id,
+                        itemId: item.itemId,
                         userEmail: req.user.email
                     }
                 }
@@ -367,10 +372,15 @@ const verifyUserEmail = async (userEmail) => {
     })
 
     if (filter_pd == null) notFoundError("user email " + email + " does not exist")
+    filter_pd = timeConverter(filter_pd)
+    filter_pd.favprd = filter_pd.favprd.map(favprd => {
+        return productConverter(favprd.items)
+    })
     return filter_pd
 }
 
 const findFavPdById = async (email, id) => {
+    // find product that match to user email
     let fav_pd = await prisma.favprd.findFirst({
         where: {
             AND: [
@@ -380,22 +390,6 @@ const findFavPdById = async (email, id) => {
         }
     })
     return fav_pd
-}
-
-const productConverter = (product, model) => {
-    // filter product mapping with model
-    if (model !== undefined) {
-        product = modelMapper(product, model)
-    }
-
-    // array converter
-    if (product.tag !== undefined) product.tag = product.tag.split(",")
-    if (product.size !== undefined) product.size = product.size.split(",")
-    if (product.images !== undefined) product.images = product.images.split(",")
-
-    if (product.createdAt !== undefined) product.createdAt = dateTimeZoneNow(product.createdAt);
-    if (product.updatedAt !== undefined) product.updatedAt = dateTimeZoneNow(product.updatedAt);
-    return product
 }
 
 module.exports = router
