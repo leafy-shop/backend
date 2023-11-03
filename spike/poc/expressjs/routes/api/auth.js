@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const { getToken, getUser, refreshToken, isExpired } = require('./../model/class/jwtUtils')
+const { getToken, getUser, refreshToken, isExpired } = require('./../model/class/utils/jwtUtils')
 const {errorRes} = require('./../model/error/error')
 const argon2 = require('argon2')
 // const { v4: uuidv4 } = require('uuid')

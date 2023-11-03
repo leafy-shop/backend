@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const { errorRes } = require('./../routes/model/error/error')
-const {getUser} = require('../routes/model/class/jwtUtils')
+const {getUser} = require('../routes/model/class/utils/jwtUtils')
 
 const dotenv = require('dotenv');
 

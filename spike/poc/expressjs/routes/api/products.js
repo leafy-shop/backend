@@ -3,10 +3,13 @@ const router = express.Router();
 
 const { validateStr, validateInt, validateBoolean, validateDouble, validateEmail, validateStrArray } = require('../validation/body')
 const { notFoundError, validatError } = require('./../model/error/error')
-const { dateTimeZoneNow } = require('./../model/class/datetimeUtils')
+const { dateTimeZoneNow } = require('../model/class/utils/datetimeUtils')
+const { userViewFav, prodList } = require('./../model/class/model')
 const { JwtAuth } = require('./../../middleware/jwtAuth')
 
-const { PrismaClient, Prisma } = require('@prisma/client')
+const { PrismaClient, Prisma } = require('@prisma/client');
+const { modelMapper } = require('../model/class/utils/modelMapping');
+const { mode } = require('../../config/minio_config');
 const prisma = new PrismaClient()
 
 // product demo
@@ -39,22 +42,26 @@ const product_db = [
         "size": ["S", "M", "l", "XL"],
         "style": "golden",
         "price": 289
+    },
+    {
+        "name": "big zee cactus",
+        "description": "this is very BIG cactus create by zee",
+        "itemOwner": "piraphat123@gmail.com",
+        "type": "cactus",
+        "tag": ["cactus", "very cute", "very fat and high"],
+        "size": ["l", "xL"],
+        "style": "golden",
+        "price": 570
+    },
+    {
+        "name": "zee shovel",
+        "itemOwner": "piraphat123@gmail.com",
+        "type": "tool",
+        "tag": ["shovel", "tool"],
+        "style": "shapen shovel",
+        "price": 139
     }
 ]
-
-const userView = {
-    userId: true,
-    name: true,
-    email: true,
-    role: true,
-    FavPrd: {
-        select: {
-            product: true
-        }
-    },
-    createdAt: true,
-    updatedAt: true
-}
 
 router.get('/', JwtAuth, async (req, res, next) => {
     // let filter_pd = product_db.filter( p => {
@@ -83,56 +90,75 @@ router.get('/', JwtAuth, async (req, res, next) => {
     // page number and page size
     let pageN = Number(page)
     let limitN = Number(limit)
-    console.log(limit)
+    // console.log(limit)
 
     // filter single and between value from name, price, rating and isFavPrd query
     // and return page that sorted by updateAt item
-    let filter_pd = await prisma.items.findMany({
-        skip: pageN > 0 ? (pageN - 1) * limitN : 0,
-        take: limitN >= 1 ? limitN : count_pd,
-        include: {
-            favprd: true,
-        },
-        where: {
-            AND: [{
-                name: {
-                    contains: product
-                },
-                price: {
-                    lte: max_price,
-                    gte: min_price
-                },
-                totalRating: {
-                    lte: rating,
-                    gt: isNaN(rating - 1) ? undefined : rating - 1
-                },
-                favprd: favFilter
-            }]
-        },
-        include: {
-            favprd: false,
-        },
-        orderBy: { updatedAt: "desc" }
-    })
-    // filter includes array : complexity best case O(n), worst case O(n*(type+tag))
-    filter_pd = filter_pd.filter(product =>
-        type == undefined ? true : product.type.include(type.split(",")) &&
-            tag == undefined ? true : product.tag.include(type.split(","))
-    )
-    // array converter
-    filter_pd = filter_pd.map(product => {
-        return productConverter(product)
-    })
-    return res.json(filter_pd)
+    try {
+        let filter_pd = await prisma.items.findMany({
+            include: {
+                favprd: true
+            },
+            where: {
+                AND: [{
+                    name: {
+                        contains: product
+                    },
+                    price: {
+                        lte: max_price,
+                        gte: min_price
+                    },
+                    totalRating: {
+                        lte: rating,
+                        gt: isNaN(rating - 1) ? undefined : rating - 1
+                    },
+                    favprd: favFilter,
+                }]
+            },
+            include: {
+                favprd: false,
+            },
+            orderBy: { updatedAt: "desc" }
+        })
+
+        // filter includes array : complexity best case O(n), worst case O(n*(type+tag))
+        filter_pd = filter_pd.filter(product => 
+            type == undefined ? true : type.split(",").includes(product.type)
+            // console.log(type.split(","))
+            // console.log(product.type)
+            // console.log(type.split(",").includes(product.type))
+
+            // https://stackoverflow.com/questions/16312528/check-if-an-array-contains-any-element-of-another-array-in-javascript
+            && tag == undefined ? true : tag.split(",").some(r => product.tag.split(",").includes(r))
+            // console.log(tag.split(","))
+            // console.log(product.tag.split(","))
+            // console.log(tag.split(",").some(r => product.tag.split(",").includes(r)))
+        )
+
+        // return to page with page number and page size
+        let VarPage = pageN > 0 ? (pageN - 1) * limitN : 0
+        let VarLimit = limitN >= 1 ? limitN : count_pd
+        filter_pd = filter_pd.slice(VarPage,VarPage+VarLimit)
+
+        // array converter
+        filter_pd = filter_pd.map(product => {
+            return productConverter(product, prodList)
+        })
+        return res.json(filter_pd)
+    } catch (err) {
+        // if favorite product is not found in this user
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.code === 'P2022') {
+                err.message = "this user has not favorite product"
+                err.status = 404
+            }
+        }
+        next(err)
+    }
 })
 
 router.get('/:id', JwtAuth, async (req, res, next) => {
-    // let filter_pd = product_db.filter( p => {
-    //     console.log(p)
-    //     return (req.query.product == undefined ? true : p.product.includes(req.query.product)) &&
-    //     (req.query.price == undefined ? true : req.query.price == p.price)
-    // })
-    // filter_pd = filter_pd.sort( (a,b) => b[req.query.sort] - a[req.query.sort] )
     try {
         // return product by id
         return res.json(await verifyId(req.params.id))
@@ -165,7 +191,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
     //     "style": "light green cactus",
     //     "price": 32,
     // }
-    
+
     // created product from request body and validation
     try {
         let input = await prisma.items.create({
@@ -222,18 +248,20 @@ router.post('/addtocart', JwtAuth, async (req, res, next) => {
 router.put('/isFav/:id', JwtAuth, async (req, res, next) => {
     try {
         let id = Number(req.params.id)
+        // if user hasn't favorite in this product id then add favorite product item
         if (await findFavPdById(req.user.email, id) == null) {
-            let FavPrds = await prisma.favprd.create({
+            await prisma.favprd.create({
                 data: {
                     userEmail: req.user.email,
-                    productId: id
+                    itemId: id
                 }
             })
+        // if user has favorite in this product id then clear favorite product item
         } else {
-            let unFavPrds = await prisma.favprd.delete({
+            await prisma.favprd.delete({
                 where: {
-                    productId_userEmail: {
-                        productId: id,
+                    itemId_userEmail: {
+                        itemId: id,
                         userEmail: req.user.email
                     }
                 }
@@ -241,7 +269,6 @@ router.put('/isFav/:id', JwtAuth, async (req, res, next) => {
         }
         return res.json(await verifyUserEmail(req.user.email))
     } catch (err) {
-        console.log(err)
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2002') {
@@ -302,7 +329,7 @@ router.delete('/:id', JwtAuth, async (req, res, next) => {
                 itemId: validateInt("itemId", Number(req.params.id))
             }
         })
-        return res.json("item id" + req.params.id + " has deleted")
+        return res.json("item id " + req.params.id + " has been deleted")
     } catch (err) {
         // if product is not found
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -333,13 +360,13 @@ const verifyId = async (id) => {
 const verifyUserEmail = async (userEmail) => {
     // find user by account email
     let filter_pd = await prisma.accounts.findFirst({
-        select: userView,
+        select: userViewFav(),
         where: {
             email: userEmail
         }
     })
 
-    if (filter_pd == null) notFoundError("item id " + id + " does not exist")
+    if (filter_pd == null) notFoundError("user email " + email + " does not exist")
     return filter_pd
 }
 
@@ -355,15 +382,20 @@ const findFavPdById = async (email, id) => {
     return fav_pd
 }
 
-const productConverter = (product) => {
-            // array converter
-        product.tag = product.tag.split(",")
-        product.size = product.size.split(",")
-        product.images = product.images.split(",")
+const productConverter = (product, model) => {
+    // filter product mapping with model
+    if (model !== undefined) {
+        product = modelMapper(product, model)
+    }
 
-        product.createdAt = dateTimeZoneNow(product.createdAt);
-        product.updatedAt = dateTimeZoneNow(product.updatedAt);
-        return product
+    // array converter
+    if (product.tag !== undefined) product.tag = product.tag.split(",")
+    if (product.size !== undefined) product.size = product.size.split(",")
+    if (product.images !== undefined) product.images = product.images.split(",")
+
+    if (product.createdAt !== undefined) product.createdAt = dateTimeZoneNow(product.createdAt);
+    if (product.updatedAt !== undefined) product.updatedAt = dateTimeZoneNow(product.updatedAt);
+    return product
 }
 
 module.exports = router

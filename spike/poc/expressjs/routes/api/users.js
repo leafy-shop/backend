@@ -7,22 +7,23 @@ let { sendMail } = require('./../../config/email_config')
 
 const { JwtAuth, verifyRole } = require('./../../middleware/jwtAuth')
 const { ROLE } = require('./../model/enum/role')
-
-const { PrismaClient, Prisma } = require('@prisma/client')
+const { userView } = require('./../model/class/model')
+const { PrismaClient, Prisma } = require('@prisma/client');
+const { dateTimeZoneNow } = require('../model/class/utils/datetimeUtils');
 const prisma = new PrismaClient()
 
 // Exclude keys from user
-const user = {
-    userId: true,
-    name: true,
-    email: true,
-    role: true,
-    createdAt: true,
-    updatedAt: true
-}
+// const user = {
+//     userId: true,
+//     name: true,
+//     email: true,
+//     role: true,
+//     createdAt: true,
+//     updatedAt: true
+// }
 
 router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res) => {
-    let sorting = req.query.sort == 'desc' ? 'desc' : 'asc'
+    // let sorting = req.query.sort == 'desc' ? 'desc' : 'asc'
     console.log(req.query.name)
     let page = Number(req.query.page)
     let limit = Number(req.query.limit)
@@ -31,30 +32,29 @@ router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res) => {
         skip: page > 0 ? (page - 1) * limit : 0,
         take: limit > 1 ? limit : count_user,
         where: {
-            AND: [
-                {
-                    OR: [{
-                        name: {
-                            contains: req.query.name
-                        },
-                        email: {
-                            contains: req.query.email
-                        }
-                    }]
-                }, {
-                    role: req.query.role
+            AND: [{
+                name: {
+                    contains: req.query.name
                 }
-            ]
+            },
+            {
+                email: {
+                    contains: req.query.email
+                }
+            },
+            {
+                role: req.query.role
+            }]
         },
-        select: user,
-        orderBy: { updatedAt: sorting }
+        select: userView,
+        orderBy: { updatedAt: "desc" }
     })
-    return res.json(filter_u)
+    return res.json(userConverter(filter_u))
 })
 
 router.get('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     try {
-        sendMail("test massage","test",req.user.email)
+        // sendMail("test massage","test",req.user.email)
         return res.json(await verifyId(req.params.id))
     } catch (err) {
         next(err)
@@ -71,9 +71,9 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
                 role: validateRole("role", role, ROLE),
                 password: await validatePassword("password", password, 8, 20)
             },
-            select: user
+            select: userView
         })
-        return res.json(input)
+        return res.json(userConverter(input))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -91,12 +91,18 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
 
         let mapData = {}
 
+        // name: validateStr("name", name, 100),
+        // email: validateEmail("email", email, 100),
+        // role: validateRole("role", role, ROLE),
+        // password: await validatePassword("password", password, 8, 20)
         for (let i in req.body) {
             if (req.body[i] != undefined) {
-                mapData[i] = i == "name" ? validateStr(i, req.body[i], 100) :
-                    i == "email" ? validateEmail(i, req.body[i], 100) :
-                        i == "role" ? validateRole(i, req.body[i], ROLE) :
-                            await validatePassword(i, req.body[i], 8, 20)
+                mapData[i] =
+                i == "name" ? validateStr("user name", req.body[i], 100) :
+                    i == "email" ? validateEmail("user email", req.body[i], 100) :
+                        i == "role" ? validateRole("user role", req.body[i], ROLE) :
+                            i == "password" ? await validatePassword("user password", req.body[i], 8, 20) :
+                                i == "status" ? validateBoolean("user status", req.body[i]): undefined
             }
         }
 
@@ -105,9 +111,9 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
                 userId: validateInt("userId", Number(req.params.id))
             },
             data: mapData,
-            select: user
+            select: userView
         })
-        return res.json(input)
+        return res.json(userConverter(input))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -128,7 +134,7 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) =>
                 userId: validateInt("userId", Number(req.params.id))
             }
         })
-        return res.json("user id" + req.params.id + " has deleted")
+        return res.json("user id " + req.params.id + " has been deleted")
     } catch (err) {
         next(err)
     }
@@ -139,11 +145,16 @@ const verifyId = async (id) => {
         where: {
             userId: validateInt("userId", Number(id))
         },
-        select: user
+        select: userView
     })
     if (filter_u == null) notFoundError("user id " + id + " does not exist")
-    return filter_u
+    return userConverter(filter_u)
 }
 
+let userConverter = (user) => {
+    if (user.createdAt !== undefined) user.createdAt = dateTimeZoneNow(user.createdAt);
+    if (user.updatedAt !== undefined) user.updatedAt = dateTimeZoneNow(user.updatedAt);
+    return user
+}
 
 module.exports = router
