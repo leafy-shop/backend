@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const { validateStr, validateInt, validateBoolean, validateEmail, validatePassword, validateRole } = require('../validation/body')
-let { notFoundError, validatError } = require('./../model/error/error')
+let { notFoundError, validatError, forbiddenError } = require('./../model/error/error')
 let { sendMail } = require('./../../config/email_config')
 
 const { JwtAuth, verifyRole } = require('./../../middleware/jwtAuth')
@@ -24,7 +24,7 @@ const prisma = new PrismaClient()
 
 router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res) => {
     // let sorting = req.query.sort == 'desc' ? 'desc' : 'asc'
-    console.log(req.query.name)
+    // console.log(req.query.name)
     let page = Number(req.query.page)
     let limit = Number(req.query.limit)
     let count_user = await prisma.accounts.count()
@@ -52,10 +52,17 @@ router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res) => {
     return res.json(timeConverter(filter_u))
 })
 
-router.get('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
+router.get('/:id', JwtAuth, async (req, res, next) => {
     try {
         // sendMail("test massage","test",req.user.email)
-        return res.json(await verifyId(req.params.id))
+        let user = await verifyId(req.params.id)
+        // user role checking and profile
+        if (req.user.role !== ROLE.Admin) {
+            if(req.user.email !== user.email){
+                forbiddenError("you can view yourself only")
+            }
+        }
+        return res.json(user)
     } catch (err) {
         next(err)
     }
@@ -98,11 +105,11 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
         for (let i in req.body) {
             if (req.body[i] != undefined) {
                 mapData[i] =
-                i == "name" ? validateStr("user name", req.body[i], 100) :
-                    i == "email" ? validateEmail("user email", req.body[i], 100) :
-                        i == "role" ? validateRole("user role", req.body[i], ROLE) :
-                            i == "password" ? await validatePassword("user password", req.body[i], 8, 20) :
-                                i == "status" ? validateBoolean("user status", req.body[i]): undefined
+                    i == "name" ? validateStr("user name", req.body[i], 100) :
+                        // i == "email" ? validateEmail("user email", req.body[i], 100) : cannot edit email
+                            i == "role" ? validateRole("user role", req.body[i], ROLE) :
+                                i == "password" ? await validatePassword("user password", req.body[i], 8, 20) :
+                                    i == "status" ? validateBoolean("user status", req.body[i]) : undefined
             }
         }
 
@@ -128,8 +135,8 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
 router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     try {
         let user = await verifyId(req.params.id)
-        if(user.email === req.user.email) {
-            validatError("you cannot delete myself")
+        if (user.email === req.user.email) {
+            forbiddenError("you cannot delete myself")
         }
 
         let input = await prisma.accounts.delete({
@@ -137,7 +144,7 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) =>
                 userId: validateInt("userId", Number(req.params.id))
             }
         })
-        return res.json("user id " + req.params.id + " has been deleted")
+        return res.json({message:"user id " + req.params.id + " has been deleted"})
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -156,6 +163,7 @@ const verifyId = async (id) => {
         },
         select: userView
     })
+    // not found checking
     if (filter_u == null) notFoundError("user id " + id + " does not exist")
     return timeConverter(filter_u)
 }

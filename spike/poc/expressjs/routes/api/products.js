@@ -2,15 +2,16 @@ const express = require('express');
 const router = express.Router();
 
 const { validateStr, validateInt, validateBoolean, validateDouble, validateEmail, validateStrArray } = require('../validation/body')
-const { notFoundError, validatError } = require('./../model/error/error')
+const { notFoundError, validatError, forbiddenError } = require('./../model/error/error')
 const { dateTimeZoneNow } = require('../model/class/utils/datetimeUtils')
 const { userViewFav, prodList } = require('./../model/class/model')
-const { JwtAuth } = require('./../../middleware/jwtAuth')
+const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('./../../middleware/jwtAuth')
 
 const { PrismaClient, Prisma } = require('@prisma/client');
 const { modelMapper } = require('../model/class/utils/modelMapping');
 const { mode } = require('../../config/minio_config');
 const { productConverter, timeConverter } = require('../model/class/utils/converterUtils');
+const { ROLE } = require('../model/enum/role');
 const prisma = new PrismaClient()
 
 // product demo
@@ -64,7 +65,7 @@ const product_db = [
     }
 ]
 
-router.get('/', JwtAuth, async (req, res, next) => {
+router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     // let filter_pd = product_db.filter( p => {
     //     console.log(p)
     //     return (req.query.product == undefined ? true : p.product.includes(req.query.product)) &&
@@ -123,23 +124,26 @@ router.get('/', JwtAuth, async (req, res, next) => {
         })
 
         // filter includes array : complexity best case O(n), worst case O(n*(type+tag))
-        filter_pd = filter_pd.filter(product => 
+        filter_pd = filter_pd.filter(product =>
             type == undefined ? true : type.split(",").includes(product.type)
-            // console.log(type.split(","))
-            // console.log(product.type)
-            // console.log(type.split(",").includes(product.type))
+                // console.log(type.split(","))
+                // console.log(product.type)
+                // console.log(type.split(",").includes(product.type))
 
-            // https://stackoverflow.com/questions/16312528/check-if-an-array-contains-any-element-of-another-array-in-javascript
-            && tag == undefined ? true : tag.split(",").some(r => product.tag.split(",").includes(r))
+                // https://stackoverflow.com/questions/16312528/check-if-an-array-contains-any-element-of-another-array-in-javascript
+                && tag == undefined ? true : tag.split(",").some(r => product.tag.split(",").includes(r))
             // console.log(tag.split(","))
             // console.log(product.tag.split(","))
             // console.log(tag.split(",").some(r => product.tag.split(",").includes(r)))
         )
 
+        // check if user is supplier then see only owner product
+        if (req.user.role === ROLE.Supplier) filter_pd = filter_pd.filter(product => product.itemOwner == req.user.email)
+
         // return to page with page number and page size
         let VarPage = pageN > 0 ? (pageN - 1) * limitN : 0
         let VarLimit = limitN >= 1 ? limitN : count_pd
-        filter_pd = filter_pd.slice(VarPage,VarPage+VarLimit)
+        filter_pd = filter_pd.slice(VarPage, VarPage + VarLimit)
 
         // array converter
         filter_pd = filter_pd.map(product => {
@@ -159,16 +163,23 @@ router.get('/', JwtAuth, async (req, res, next) => {
     }
 })
 
-router.get('/:id', JwtAuth, async (req, res, next) => {
+router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
     try {
+        // find id of product
+        let item = await verifyId(req.params.id)
+
+        // check user is supplier
+        if (req.user.role === ROLE.Supplier && item.itemOwner !== req.user.email)
+        forbiddenError("This supplier can view owner's item only") 
+        
         // return product by id
-        return res.json(await verifyId(req.params.id))
+        return res.json(item)
     } catch (err) {
         next(err)
     }
 })
 
-router.post('/', JwtAuth, async (req, res, next) => {
+router.post('/', JwtAuth, verifyRole(ROLE.Supplier), async (req, res, next) => {
     let { name, description, itemOwner, type, tag, size, style, price } = req.body
     // let numberids = []
     // product_db.sort((a, b) => a.id - b.id).forEach(item => {
@@ -195,6 +206,10 @@ router.post('/', JwtAuth, async (req, res, next) => {
 
     // created product from request body and validation
     try {
+        // check if supplier role delete other email
+        if (req.user.role == ROLE.Supplier && itemOwner !== req.user.email)
+            forbiddenError("This supplier can create owner's item only")
+
         let input = await prisma.items.create({
             data: {
                 name: validateStr("item name", name, 100),
@@ -203,7 +218,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
                 type: validateStr("item type", type, 20),
                 tag: validateStrArray("item tag", tag, 10, 20),
                 size: validateStrArray("item size", size, 5, 4),
-                style: validateStr("item type", type, 50),
+                style: validateStr("item style", style, 50),
                 price: validateDouble("item price", price, true)
             }
         })
@@ -246,13 +261,12 @@ router.post('/addtocart', JwtAuth, async (req, res, next) => {
     }
 })
 
-router.put('/isFav/:id', JwtAuth, async (req, res, next) => {
+router.put('/isFav/:id', JwtAuth, verifyRole(ROLE.User), async (req, res, next) => {
     try {
         let item = await verifyId(Number(req.params.id))
-        console.log(item)
-        let userMatching = await findFavPdById(req.user.email, 
-                // find product by id
-                item.itemId)
+        let userMatching = await findFavPdById(req.user.email,
+            // find product by id
+            item.itemId)
         // if user hasn't favorite in this product id then add favorite product item
         if (userMatching == null) {
             await prisma.favprd.create({
@@ -261,7 +275,7 @@ router.put('/isFav/:id', JwtAuth, async (req, res, next) => {
                     itemId: item.itemId
                 }
             })
-        // if user has favorite in this product id then clear favorite product item
+            // if user has favorite in this product id then clear favorite product item
         } else {
             await prisma.favprd.delete({
                 where: {
@@ -284,7 +298,7 @@ router.put('/isFav/:id', JwtAuth, async (req, res, next) => {
     }
 })
 
-router.patch('/:id', JwtAuth, async (req, res, next) => {
+router.patch('/:id', JwtAuth, verifyRole(ROLE.Supplier), async (req, res, next) => {
     let mapData = {}
 
     // body params mapping
@@ -294,7 +308,7 @@ router.patch('/:id', JwtAuth, async (req, res, next) => {
             mapData[i] =
                 i == "name" ? validateStr("item name", req.body[i], 100) :
                     i == "description" ? validateStr("item description", req.body[i], 500, true) :
-                        i == "itemOwner" ? validateEmail("item owner", req.body[i], 100) :
+                        // i == "itemOwner" ? validateEmail("item owner", req.body[i], 100) :
                             i == "type" ? validateStr("item type", req.body[i], 20) :
                                 i == "tag" ? validateStrArray("item tag", req.body[i], 10, 20) :
                                     i == "size" ? validateStrArray("item size", req.body[i], 5, 4) :
@@ -306,6 +320,13 @@ router.patch('/:id', JwtAuth, async (req, res, next) => {
 
     // update product
     try {
+        // find item id
+        let item = await verifyId(req.params.id)
+
+        // check if supplier role update other email
+        if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.email)
+            forbiddenError("This supplier can update owner's item only")
+
         let input = await prisma.items.update({
             where: {
                 itemId: Number(req.params.id)
@@ -326,15 +347,22 @@ router.patch('/:id', JwtAuth, async (req, res, next) => {
     }
 })
 
-router.delete('/:id', JwtAuth, async (req, res, next) => {
+router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     try {
+        // find item id
+        let item = await verifyId(req.params.id)
+
+        // check if supplier role delete other email
+        if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.email)
+            forbiddenError("This supplier can delete owner's item only")
+
         // find id to delete product
         let input = await prisma.items.delete({
             where: {
                 itemId: validateInt("itemId", Number(req.params.id))
             }
         })
-        return res.json("item id " + req.params.id + " has been deleted")
+        return res.json({message: "item id " + req.params.id + " has been deleted"})
     } catch (err) {
         // if product is not found
         if (err instanceof Prisma.PrismaClientKnownRequestError) {

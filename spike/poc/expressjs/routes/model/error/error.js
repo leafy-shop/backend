@@ -20,6 +20,13 @@ let forbiddenError = (msg) => {
     throw error
 }
 
+let unAuthorizedError = (msg) => {
+    let error = new Error(msg)
+    error.name = `Unauthorized Error`
+    error.status = 401
+    throw error
+}
+
 let errorRes = (msg, endpoint) => {
     return {
         error: msg,
@@ -32,3 +39,4 @@ module.exports.errorRes = errorRes
 module.exports.validatError = validatError
 module.exports.notFoundError = notFoundError
 module.exports.forbiddenError = forbiddenError
+module.exports.unAuthorizedError = unAuthorizedError

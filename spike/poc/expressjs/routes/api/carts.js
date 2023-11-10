@@ -59,7 +59,7 @@ router.put('/:id/increment', JwtAuth, async (req, res, next) => {
             data: { qty: { increment: qty } },
             include: { product: true }
         })
-        return res.json({msg: `cart of ${increment.userEmail}, name: ${increment.product.product} has increment quantity`})
+        return res.json({message: `cart of ${increment.userEmail}, name: ${increment.product.product} has increment quantity`})
     } catch (err) {
         next(err)
     }
@@ -78,7 +78,7 @@ router.put('/:id/decrement', JwtAuth, async (req, res, next) => {
             data: { qty: { decrement: qty } },
             include: { product: true }
         })
-        return res.json({msg: `cart of ${increment.userEmail}, name: ${increment.product.product} has decrement quantity`})
+        return res.json({message: `cart of ${increment.userEmail}, name: ${increment.product.product} has decrement quantity`})
     } catch (err) {
         next(err)
     }
@@ -92,7 +92,7 @@ router.delete('/:id', async (req, res, next) => {
         let increment = await prisma.carts.delete({
             where: { cartId: validateInt("cartId",Number(req.params.id)) }
         })
-        return res.json({msg: `cart id ${req.params.id} has been canceled`})
+        return res.json({message: `cart id ${req.params.id} has been canceled`})
     } catch (err) {
         next(err)
     }

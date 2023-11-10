@@ -32,6 +32,11 @@ router.post('/', async (req, res) => {
         return res.status(404).json(errorRes(`user email ${email} does not exist`, req.originalUrl))
     }
 
+    // ตรวจสอบสถานะของ user
+    else if (!user.status) {
+        return res.status(403).json(errorRes("this user is inactive!", req.originalUrl))
+    }
+
     const hashingConfig = { // based on OWASP cheat sheet recommendations (as of March, 2022)
         parallelism: 1,
         memoryCost: 64000, // 64 mb
@@ -43,18 +48,15 @@ router.post('/', async (req, res) => {
         return res.status(401).json(errorRes("user email or password is invalid please login again", req.originalUrl))
     }
 
-    // // ตรวจสอบสถานะของ user
-    // else if (user.user_status !== 'active') {
-    //     return res.status(403).json(errorRes("this user is inactive!", req.originalUrl))
-    // }
-
     // ลบ password ของ user ก่อน response กลับไป
     delete user.password;
 
+    // get user info
     console.log(user)
 
     // สร้าง access token ภายใต้ method ที่กำหนด
     const token = getToken({
+        "id": user.userId,
         "name": user.name,
         "email": user.email,
         "role": user.role,
@@ -62,13 +64,11 @@ router.post('/', async (req, res) => {
 
     // และ refresh token แต่เวลาต่างกัน
     const refreshtoken = getToken({
+        "id": user.userId,
         "name": user.name,
         "email": user.email,
         "role": user.role,
     }, "24h");
-
-    // console.log(token)
-    console.log(getUser(token).user_role)
 
     // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
     const cookieConfig = {
@@ -79,11 +79,9 @@ router.post('/', async (req, res) => {
     }
     res.cookie("token", token, cookieConfig);
     res.cookie("refreshToken", refreshtoken, cookieConfig);
-    // res.cookie("user_email", getUser(token).user_email);
-    // res.cookie("user_role", getUser(token).user_role);
-    // res.cookie("user_first_name", getUser(token).user_first_name)
-    // res.cookie("user_last_name", getUser(token).user_last_name)
+
     res.status(200).json({
+        "id": getUser(token).id,
         "name": getUser(token).name,
         "email": getUser(token).email,
         "role": getUser(token).role,
@@ -101,6 +99,7 @@ router.post('/refresh', async (req, res) => {
         "email": req.body.email
     }
 
+    // if refresh token expired that removed cookie and response
     if (isExpired(jwtRefreshToken.substring(7))) {
         // clear session cookie
         const cookieConfig = {
@@ -113,6 +112,7 @@ router.post('/refresh', async (req, res) => {
         return res.status(401).json(errorRes("token is expired, need login again", req.originalUrl))
     }
 
+    // สร้าง refresh token ใหม่ทั้ง token และ refreshToken
     let token = refreshToken(jwttoken.substring(7), jwttoken.substring(7), userInfo, "30m")
     let refreshtoken = refreshToken(jwttoken.substring(7), jwtRefreshToken.substring(7), userInfo, "24h")
 
@@ -129,11 +129,7 @@ router.post('/refresh', async (req, res) => {
     }
     res.cookie("token", token, cookieConfig);
     res.cookie("refreshToken", refreshtoken, cookieConfig);
-    // res.cookie("user_emp_code", getUser(token).user_emp_code)
-    // res.cookie("user_email", getUser(token).user_email);
-    // res.cookie("user_role", getUser(token).user_role);
-    // res.cookie("user_first_name", getUser(token).user_first_name)
-    // res.cookie("user_last_name", getUser(token).user_last_name)
+
     res.status(200).json({
         "name": getUser(token).name,
         "email": getUser(token).email,
