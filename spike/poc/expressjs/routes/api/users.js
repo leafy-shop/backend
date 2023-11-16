@@ -217,7 +217,14 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) =>
         if (user.email === req.user.email) {
             forbiddenError("you cannot delete myself")
         }
-
+        
+        if(user.userinfo.length !== 0){
+            await prisma.userinfo.delete({
+                where: {
+                    accounts_userId: validateInt("userId", Number(req.params.id))
+                }
+            })
+        }
         await prisma.accounts.delete({
             where: {
                 userId: Number(req.params.id)
@@ -226,6 +233,7 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) =>
         return res.json({ message: "user id " + req.params.id + " has been deleted" })
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            console.log(err)
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2003') {
                 err.message = "cannot delete user when they have own product or order"
