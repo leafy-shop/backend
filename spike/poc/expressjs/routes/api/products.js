@@ -138,7 +138,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         )
 
         // check if user is supplier then see only owner product
-        if (req.user.role === ROLE.Supplier) filter_pd = filter_pd.filter(product => product.itemOwner == req.user.email)
+        if (req.user !== undefined && req.user.role === ROLE.Supplier) filter_pd = filter_pd.filter(product => product.itemOwner == req.user.email)
 
         // return to page with page number and page size
         let VarPage = pageN > 0 ? (pageN - 1) * limitN : 0
@@ -169,7 +169,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         let item = await verifyId(req.params.id)
 
         // check user is supplier
-        if (req.user.role === ROLE.Supplier && item.itemOwner !== req.user.email)
+        if (req.user !== undefined && req.user.role === ROLE.Supplier && item.itemOwner !== req.user.email)
         forbiddenError("This supplier can view owner's item only") 
         
         // return product by id
@@ -392,16 +392,21 @@ const verifyId = async (id) => {
 
 const verifyUserEmail = async (userEmail) => {
     // find user by account email
-    let filter_pd = await prisma.accounts.findFirst({
+    let filter_user = await prisma.accounts.findFirst({
         select: userViewFav(),
         where: {
             email: userEmail
         }
     })
 
-    if (filter_pd == null) notFoundError("user email " + email + " does not exist")
-    filter_pd = timeConverter(filter_pd)
-    filter_pd.favprd = filter_pd.favprd.map(favprd => {
+    // check user exist
+    if (filter_user == null) notFoundError("user email " + email + " does not exist")
+
+    // time format
+    filter_user = timeConverter(filter_user)
+
+    // fav product converter
+    filter_user.favprd = filter_user.favprd.map(favprd => {
         return productConverter(favprd.items)
     })
     return filter_pd

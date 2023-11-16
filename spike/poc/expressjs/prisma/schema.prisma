@@ -55,15 +55,26 @@ model items {
 }
 
 model accounts {
-  userId    Int      @id @default(autoincrement())
-  name      String   @db.VarChar(100)
-  email     String   @unique(map: "Users_email_key") @db.VarChar(100)
-  password  String   @db.VarChar(100)
-  role      String   @default("user") @db.VarChar(11)
-  status    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  userId    Int        @id @default(autoincrement())
+  name      String     @db.VarChar(100)
+  email     String     @unique(map: "Users_email_key") @db.VarChar(100)
+  password  String     @db.VarChar(100)
+  role      String     @default("user") @db.VarChar(11)
+  status    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   carts     carts[]
   favprd    favprd[]
   items     items[]
+  userinfo  userinfo[]
+}
+
+model userinfo {
+  accounts_userId Int      @id @default(autoincrement())
+  accounts        accounts @relation(fields: [accounts_userId], references: [userId], map: "Users_accounts_fkey")
+  firstname       String   @db.VarChar(50)
+  lastname        String   @db.VarChar(50)
+  dob             DateTime
+  phone           String   @db.Char(11)
+  address         String   @db.VarChar(500)
 }

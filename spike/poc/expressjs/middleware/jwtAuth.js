@@ -34,8 +34,9 @@ exports.UnstrictJwtAuth = (req, res, next) => {
   // เอา token จาก headers or cookies
   const jwtToken = "Bearer " + req.cookies.token;
   // const jwtRefreshToken = req.headers.refresh || "Bearer " + req.cookies.refreshToken ;
+  console.log(req.cookies.token)
   try {
-    if (jwtToken.length > 7) {
+    if (req.cookies.token !== undefined) {
       // ตรวจสอบ user ใน access token 
       let user = jwt.verify(jwtToken.substring(7), process.env.TOKEN_SECRET);
       console.log(user)

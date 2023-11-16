@@ -21,9 +21,15 @@ const userView = {
     updatedAt: true
 }
 
+const userDetailView = () => {
+    let userDetail = new Object(userView)
+    userDetail.userinfo = true
+    return userDetail
+}
+
 const userViewFav = () => {
     let userViewPrd = new Object(userView)
-    userViewPrd["favprd"] = {
+    userViewPrd.favprd = {
         select: {
             items: {
                 select: prodList
@@ -34,5 +40,6 @@ const userViewFav = () => {
 }
 
 module.exports.userView = userView
+module.exports.userDetailView = userDetailView
 module.exports.userViewFav = userViewFav
 module.exports.prodList = prodList

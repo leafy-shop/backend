@@ -2,7 +2,7 @@
 const { validatError } = require('./../model/error/error')
 const argon2 = require("argon2")
 
-let validateStr = (prop = '', value = '', length = 0, isEmpty = false) => {
+const validateStr = (prop = '', value = '', length = 0, isEmpty = false) => {
     console.log("validate string of " + prop)
     // validate is null or null value or negative value
     if (!isEmpty && (value == undefined || value.length == 0)) {
@@ -20,7 +20,7 @@ let validateStr = (prop = '', value = '', length = 0, isEmpty = false) => {
     return value.trim()
 }
 
-let validateInt = (prop = '', value = 0, isNan = false) => {
+const validateInt = (prop = '', value = 0, isNan = false) => {
     console.log("validate number of " + prop)
     // validate is null or null value or negative value
     if (!isNan && (isNaN(value) || value <= 0)) {
@@ -34,7 +34,7 @@ let validateInt = (prop = '', value = 0, isNan = false) => {
     return Math.trunc(value)
 }
 
-let validateDouble = (prop = '', value = 0, isNan = false) => {
+const validateDouble = (prop = '', value = 0, isNan = false) => {
     console.log("validate number of " + prop)
     // validate is null or null value or negative value
     if (!isNan && (isNaN(value) || value <= 0)) {
@@ -50,7 +50,7 @@ let validateDouble = (prop = '', value = 0, isNan = false) => {
     return value
 }
 
-let validateBoolean = (prop = '', value = false) => {
+const validateBoolean = (prop = '', value = false) => {
     console.log("validate boolean of " + prop)
     // validate boolean format
     if (![true, false].includes(value)) {
@@ -60,7 +60,7 @@ let validateBoolean = (prop = '', value = false) => {
     return value
 }
 
-let validateEmail = (prop = '', value = '', length = 0) => {
+const validateEmail = (prop = '', value = '', length = 0) => {
     console.log("validate email of " + prop)
     regex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
     // validate is null or null value
@@ -79,7 +79,7 @@ let validateEmail = (prop = '', value = '', length = 0) => {
     return value.trim()
 }
 
-let validatePassword = async (prop = '', value = '', atLeast = 0, atMost = 0) => {
+const validatePassword = async (prop = '', value = '', atLeast = 0, atMost = 0) => {
     console.log("validate password of " + prop)
     // validate is null or null value
     if (value == undefined || value.length == 0) {
@@ -104,7 +104,7 @@ let validatePassword = async (prop = '', value = '', atLeast = 0, atMost = 0) =>
     return await argon2.hash(value.trim(), { ...hashingConfig })
 }
 
-let validateRole = (prop = '', value = '', enumtype, isEmpty = false) => {
+const validateRole = (prop = '', value = '', enumtype, isEmpty = false) => {
     console.log("validate role of " + prop)
     // validate is null or null value
     if (!isEmpty && (value == undefined || value.length == 0)) {
@@ -124,7 +124,7 @@ let validateRole = (prop = '', value = '', enumtype, isEmpty = false) => {
     validatError(`${prop}:${value} is not in this types`)
 }
 
-let validateStrArray = (prop = '', values = [], ArrL, inArrL) => {
+const validateStrArray = (prop = '', values = [], ArrL, inArrL) => {
     console.log("validate array of " + prop)
     // check values is array or not
     if (!(values instanceof Array)) {
@@ -154,6 +154,33 @@ let validateStrArray = (prop = '', values = [], ArrL, inArrL) => {
     return values.join()
 }
 
+const validateDatetimeFuture = (prop='', value = new Date()) => {
+    console.log("validate date of " + prop)
+
+    // check time format
+    value = new Date(value)
+    if(value == "Invalid Date"){
+        validatError(`${prop}:${value} is not date format`)
+    }
+
+    // check future time
+    if(value.getDate() > new Date()){
+        validatError(`${prop}:${value} is more over than present`)
+    }
+
+    console.log(`validate ${prop} is passed`)
+    return value
+}
+
+const validatePhone = (prop='', value=undefined) => {
+    let re = /^\(?(\d{3})\)?[- ]?(\d{3})[- ]?(\d{4})|\(?(\d{3})\)?[- ]?(\d{3})[- ]?(\d{4})[- ]?\d{1}$/;
+    // validate is null or null value
+    if (value !== undefined && !value.match(re)) {
+        validatError(`${prop} is not phone format`)
+    }
+    return value.replace(/-/g, '');
+}
+
 module.exports.validateStr = validateStr
 module.exports.validateInt = validateInt
 module.exports.validateBoolean = validateBoolean
@@ -162,3 +189,5 @@ module.exports.validatePassword = validatePassword
 module.exports.validateRole = validateRole
 module.exports.validateDouble = validateDouble
 module.exports.validateStrArray = validateStrArray
+module.exports.validateDatetimeFuture = validateDatetimeFuture
+module.exports.validatePhone = validatePhone
