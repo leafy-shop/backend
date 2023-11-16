@@ -260,9 +260,16 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) =>
             forbiddenError("you cannot delete myself")
         }
 
+        if(user.userinfo.length !== 0){
+            await prisma.userinfo.delete({
+                where: {
+                    accounts_userId: validateInt("userId", Number(req.params.id))
+                }
+            })
+        }
         await prisma.accounts.delete({
             where: {
-                userId: validateInt("userId", Number(req.params.id))
+                userId: Number(req.params.id)
             }
         })
         return res.json({ message: "user id " + req.params.id + " has been deleted" })
