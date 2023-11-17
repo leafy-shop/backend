@@ -206,8 +206,8 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
             }
         }
 
-        console.log(mapUser)
-        console.log(mapUserInfo)
+        // console.log(mapUser)
+        // console.log(mapUserInfo)
 
         // update data in user account table
         let input = await prisma.accounts.update({
@@ -234,7 +234,7 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
             })
         } else {
             // else user info found when create user account that update user info
-            input.userinfo = await prisma.userinfo.update({
+            input.userinfo[0] = await prisma.userinfo.update({
                 where: {
                     accounts_userId: id
                 },
