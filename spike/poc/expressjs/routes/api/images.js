@@ -36,7 +36,7 @@ router.post("/:endpoint/:id", JwtAuth, upload.array("file", 10), async (req, res
 // delete multiple image
 router.delete("/:endpoint/:id", JwtAuth, async (req, res) => {
     const folder = `${mode == "development" ? "developments" : "productions"}/${req.params.endpoint}/${req.params.id}`;
-    const fileNames = req.body.files
+    const fileNames = req.body.files || []
     const numberFiles = []
 
     // // convert array of keys to objects of Key Reference by https://www.tabnine.com/code/javascript/functions/aws-sdk/S3/deleteObjects
@@ -73,7 +73,7 @@ router.delete("/:endpoint/:id", JwtAuth, async (req, res) => {
         if (fileDeleted != "") console.log(`delete files: ${fileDeleted}`)
     }
     if (numberFiles.length > 0) return res.json({ message: "All File Selected has been deleted" })
-    else return res.json({ message: "All File has already deleted" });
+    else return res.json({ message: "There Files have already deleted" });
 });
 
 // delete all image
@@ -82,12 +82,13 @@ router.delete("/:endpoint/:id/all", JwtAuth, async (req, res) => {
 
     const listObjectsParams = {
         Bucket: bucket,
-        Delimiter: '/',
-        Prefix: folder,
+        Prefix: folder
     };
 
     try {
+        console.log(listObjectsParams)
         const listedObjects = await s3.listObjectsV2(listObjectsParams).promise();
+        console.log(listedObjects)
 
         if (listedObjects.Contents.length === 0) {
             return res.status(404).json({ message: 'No files to delete'});
