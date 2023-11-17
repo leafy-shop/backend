@@ -168,10 +168,9 @@ const validateDatetimeFuture = (prop = '', value = undefined, isEmpty = false) =
         validatError(`this ${prop} data is not date format`)
     }
 
-    console.log(value.getDate() >= new Date())
     // check future time
-    if (value !== undefined && value.getDate() >= new Date()) {
-        validatError(`${prop}:${value} is more over than present`)
+    if (value !== undefined && value.getTime() >= (new Date()).getTime()) {
+        validatError(`${prop}:${value} is not over than present`)
     }
 
     console.log(`validate ${prop} is passed`)
