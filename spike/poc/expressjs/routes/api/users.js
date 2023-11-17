@@ -10,6 +10,8 @@ const { ROLE } = require('./../model/enum/role')
 const { userView, userDetailView } = require('./../model/class/model')
 const { PrismaClient, Prisma } = require('@prisma/client');
 const { timeConverter, userConverter } = require('../model/class/utils/converterUtils');
+const { firestore } = require('firebase-admin');
+const { deleteNullValue } = require('../model/class/utils/modelMapping');
 const prisma = new PrismaClient()
 
 // Exclude keys from user
@@ -29,46 +31,39 @@ const user_db = [
         "email": "sahatat44@gmail.com",
         "password": "abcd1234",
         "role": "admin",
-        "userinfo": {
-            "firstname": "sahathat",
-            "lastname": "yingsakulkiet",
-            "dob": "2000-01-01",
-            "phone": "090-000-0000",
-            "address": "Asia Bangkok"
-        }
+        "firstname": "sahathat",
+        "lastname": "yingsakulkiet",
+        "dob": "2000-01-01",
+        "phone": "090-000-0000",
+        "address": "Asia Bangkok"
     },
     {
         "name": "aaeed",
         "email": "piraphat123@gmail.com",
         "password": "abcd1234",
         "role": "user",
-        "userinfo": {}
     },
     {
         "name": "zee",
         "email": "piraphat1234@gmail.com",
         "password": "abcd1234",
         "role": "admin",
-        "userinfo": {
-            "firstname": "piraphat",
-            "lastname": "kakerd",
-            "dob": "2000-01-01",
-            "phone": "090-100-0000",
-            "address": "Asia Bangkok"
-        }
+        "firstname": "piraphat",
+        "lastname": "kakerd",
+        "dob": "2000-01-01",
+        "phone": "090-100-0000",
+        "address": "Asia Bangkok"
     },
     {
         "name": "fern",
         "email": "panalee.fern@mail.kmutt.ac.th",
         "password": "abcd1234",
         "role": "user",
-        "userinfo": {
-            "firstname": "panalee",
-            "lastname": "palasri",
-            "dob": "2000-01-01",
-            "phone": "090-200-0000",
-            "address": "Asia Bangkok"
-        }
+        "firstname": "panalee",
+        "lastname": "palasri",
+        "dob": "2000-01-01",
+        "phone": "090-200-0000",
+        "address": "Asia Bangkok"
     }
 ]
 
@@ -119,29 +114,23 @@ router.get('/:id', JwtAuth, async (req, res, next) => {
 })
 
 router.post('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
-    let { name, email, role, password, userinfo } = req.body
+    let { name, email, role, password, firstname, lastname, dob, phone, address } = req.body
+
     try {
         let input = await prisma.accounts.create({
             data: {
                 name: validateStr("account name", name, 100),
                 email: validateEmail("account email", email, 100),
                 role: validateRole("account role", role, ROLE),
-                password: await validatePassword("account password", password, 8, 20)
+                password: await validatePassword("account password", password, 8, 20),
+                firstname: validateStr("user information firstname", firstname, 50, true),
+                lastname: validateStr("user information lastname", lastname, 50, true),
+                dob: validateDatetimeFuture("user information date of birth", dob, true),
+                phone: validatePhone("user information phone", phone),
+                address: validateStr("user information address", address, 500, true)
             },
             select: userView
         })
-        if (userinfo !== undefined) {
-            await prisma.userinfo.create({
-                data: {
-                    accounts_userId: input.userId,
-                    firstname: validateStr("user information firstname", userinfo.firstname, 50),
-                    lastname: validateStr("user information lastname", userinfo.lastname, 50),
-                    dob: validateDatetimeFuture("user information date of birth", userinfo.dob),
-                    phone: validatePhone("user information phone", userinfo.phone),
-                    address: validateStr("user information address", userinfo.address, 500, true)
-                }
-            })
-        }
         return res.json(timeConverter(input))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -173,19 +162,6 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
         // email: validateEmail("email", email, 100),
         // role: validateRole("role", role, ROLE),
         // password: await validatePassword("password", password, 8, 20)
-        for (let i in req.body) {
-            if (req.body[i] != undefined) {
-                mapUser[i] =
-                    i == "name" ? validateStr("user name", req.body[i], 100) :
-                        // i == "email" ? validateEmail("user email", req.body[i], 100) : cannot edit email
-                        i == "role" ? validateRole("user role", req.body[i], ROLE) :
-                            i == "password" ? await validatePassword("user password", req.body[i], 8, 20) :
-                                i == "status" ? validateBoolean("user status", req.body[i]) : undefined
-            }
-        }
-
-        // user info
-        let mapUserInfo = {}
 
         // user info
         // firstname: validateStr("user information firstname", userinfo.firstname, 50),
@@ -193,19 +169,21 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
         // dob: validateDatetimeFuture("user information date of birth", userinfo.dob),
         // phone: validatePhone("user information phone", userinfo.phone),
         // address: validateStr("user information address", userinfo.address, 500, true)
-        if (req.body.userinfo !== undefined) {
-            for (let i in req.body.userinfo) {
-                if (req.body.userinfo[i] != undefined) {
-                    mapUserInfo[i] =
-                        i == "firstname" ? validateStr("user information firstname", req.body.userinfo[i], 50) :
-                            i == "lastname" ? validateStr("user information lastname", req.body.userinfo[i], 50) :
-                                i == "dob" ? validateDatetimeFuture("user information date of birth", req.body.userinfo[i]) :
-                                    i == "phone" ? validatePhone("user information phone", req.body.userinfo[i]) :
-                                        i = "address" ? validateStr("user information address", req.body.userinfo[i], 500, true) : undefined
-                }
+        for (let i in req.body) {
+            if (req.body[i] != undefined) {
+                mapUser[i] =
+                    i == "name" ? validateStr("user name", req.body[i], 100) :
+                        // i == "email" ? validateEmail("user email", req.body[i], 100) : cannot edit email
+                        i == "role" ? validateRole("user role", req.body[i], ROLE) :
+                            i == "password" ? await validatePassword("user password", req.body[i], 8, 20) :
+                                i == "status" ? validateBoolean("user status", req.body[i]) :
+                                    i == "firstname" ? validateStr("user information firstname", req.body[i], 50, true) :
+                                        i == "lastname" ? validateStr("user information lastname", req.body[i], 50, true) :
+                                            i == "dob" ? validateDatetimeFuture("user information date of birth", req.body[i], true) :
+                                                i == "phone" ? validatePhone("user information phone", req.body[i]) :
+                                                    i = "address" ? validateStr("user information address", req.body[i], 500, true) : undefined
             }
         }
-
         // console.log(mapUser)
         // console.log(mapUserInfo)
 
@@ -215,38 +193,18 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
                 userId: id
             },
             data: mapUser,
-            select: userView
+            select: userDetailView
         })
 
-        // find user info when create or not
-        let userInfo = await prisma.userinfo.findFirst({
-            where: {
-                accounts_userId: id
-            }
-        })
-
-        // update user info table
-        if (userInfo == null) {
-            // if user info cannot found when create user account that create user info
-            mapUserInfo.accounts_userId = id
-            input.userinfo = await prisma.userinfo.create({
-                data: mapUserInfo
-            })
-        } else {
-            // else user info found when create user account that update user info
-            input.userinfo[0] = await prisma.userinfo.update({
-                where: {
-                    accounts_userId: id
-                },
-                data: mapUserInfo
-            })
-        }
         return res.json(userConverter(input))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
-            if (err.code === 'P2002') {
-                err.message = "email is duplicated"
+            console.log(err.meta)
+            if (err.meta.target === 'Users_email_key') {
+                err.message = "user email is duplicated"
+            } else if (err.meta.target == 'phone_UNIQUE') {
+                err.message = "user phone is duplicated"
             }
         }
         next(err)
@@ -260,13 +218,6 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) =>
             forbiddenError("you cannot delete myself")
         }
 
-        if(user.userinfo.length !== 0){
-            await prisma.userinfo.delete({
-                where: {
-                    accounts_userId: validateInt("userId", Number(req.params.id))
-                }
-            })
-        }
         await prisma.accounts.delete({
             where: {
                 userId: Number(req.params.id)
@@ -292,10 +243,14 @@ const verifyId = async (id) => {
         where: {
             userId: validateInt("userId", Number(id))
         },
-        select: userDetailView()
+        select: userDetailView
     })
     // not found checking
     if (filter_u == null) notFoundError("user id " + id + " does not exist")
+
+    // delete null value object
+    filter_u = deleteNullValue(filter_u)
+
     return userConverter(filter_u)
 }
 

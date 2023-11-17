@@ -30,13 +30,11 @@ const userConverter = (user) => {
     //     user = modelMapper(user, model)
     // }
 
-    // console.log(user.userinfo)
-
     // date of birth converter
-    if (user.userinfo !== undefined && user.userinfo[0].dob !== undefined) user.userinfo[0].dob = dateTimeZoneNow(user.userinfo[0].dob)
+    if (user.dob !== undefined) user.dob = dateTimeZoneNow(user.dob)
 
     // phone format
-    if (user.userinfo !== undefined && user.userinfo[0].phone !== undefined) user.userinfo[0].phone = reformatPhoneNumber(user.userinfo[0].phone)
+    if (user.phone !== undefined) user.phone = reformatPhoneNumber(user.phone)
 
     // time converter
     user = timeConverter(user)

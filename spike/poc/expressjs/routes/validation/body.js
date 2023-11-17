@@ -130,7 +130,7 @@ const validateStrArray = (prop = '', values = [], ArrL, inArrL) => {
     if (!(values instanceof Array)) {
         validatError(`${prop}:${values} is not array`)
     }
-    if (values.length > ArrL){
+    if (values.length > ArrL) {
         validatError(`length of ${prop}:${values} is more than ${ArrL}`)
     }
 
@@ -138,10 +138,10 @@ const validateStrArray = (prop = '', values = [], ArrL, inArrL) => {
     values = values.filter(v => !(v == undefined || v == null || v.trim().length == 0))
 
     // validate string in array and return to lower case values
-    values = values.map((v,i) => validateStr(`${prop} - ${i+1}:${v}`,v,inArrL).toLowerCase())
+    values = values.map((v, i) => validateStr(`${prop} - ${i + 1}:${v}`, v, inArrL).toLowerCase())
 
     // remove duplicated values
-    values =  [...new Set(values)]
+    values = [...new Set(values)]
 
     // check if array is empty then refill then with empty string
     if (values.length == 0) {
@@ -154,17 +154,23 @@ const validateStrArray = (prop = '', values = [], ArrL, inArrL) => {
     return values.join()
 }
 
-const validateDatetimeFuture = (prop='', value = new Date()) => {
+const validateDatetimeFuture = (prop = '', value = undefined, isEmpty = false) => {
     console.log("validate date of " + prop)
 
     // check time format
-    value = new Date(value)
-    if(value == "Invalid Date"){
-        validatError(`${prop}:${value} is not date format`)
+    if (!isEmpty && (value == undefined || value.length == 0)) {
+        validatError(`${prop} is null`)
     }
 
+    // check value is undefined before add
+    value = value !== undefined ? new Date(value) : undefined
+    if (value == "Invalid Date") {
+        validatError(`this ${prop} data is not date format`)
+    }
+
+    console.log(value.getDate() >= new Date())
     // check future time
-    if(value.getDate() > new Date()){
+    if (value !== undefined && value.getDate() >= new Date()) {
         validatError(`${prop}:${value} is more over than present`)
     }
 
@@ -172,7 +178,7 @@ const validateDatetimeFuture = (prop='', value = new Date()) => {
     return value
 }
 
-const validatePhone = (prop='', value=undefined) => {
+const validatePhone = (prop = '', value = undefined) => {
     let re = /^\(?(\d{3})\)?[- ]?(\d{3})[- ]?(\d{4})|\(?(\d{3})\)?[- ]?(\d{3})[- ]?(\d{4})[- ]?\d{1}$/;
     // validate is null or null value
     if (value !== undefined && !value.match(re)) {

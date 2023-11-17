@@ -21,10 +21,19 @@ const userView = {
     updatedAt: true
 }
 
-const userDetailView = () => {
-    let userDetail = new Object(userView)
-    userDetail.userinfo = true
-    return userDetail
+const userDetailView = {
+    userId: true,
+    name: true,
+    email: true,
+    role: true,
+    status: true,
+    firstname: true,
+    lastname: true,
+    dob: true,
+    phone: true,
+    address: true,
+    createdAt: true,
+    updatedAt: true
 }
 
 const userViewFav = () => {
