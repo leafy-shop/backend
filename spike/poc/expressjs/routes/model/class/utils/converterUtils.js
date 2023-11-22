@@ -1,4 +1,5 @@
 const { dateTimeZoneNow } = require("./datetimeUtils");
+const { listFirstImage, findImagePath } = require("./imageList");
 const { modelMapper } = require("./modelMapping");
 
 let timeConverter = (value) => {
@@ -25,11 +26,6 @@ const productConverter = (product, model) => {
 }
 
 const userConverter = (user) => {
-    // filter user mapping with model
-    // if (user !== undefined) {
-    //     user = modelMapper(user, model)
-    // }
-
     // date of birth converter
     if (user.dob !== undefined) user.dob = dateTimeZoneNow(user.dob)
 
@@ -38,6 +34,9 @@ const userConverter = (user) => {
 
     // time converter
     user = timeConverter(user)
+
+    // find first image
+    user.images = listFirstImage(findImagePath("users",user.userId))
 
     return user
 }

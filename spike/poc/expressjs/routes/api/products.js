@@ -12,6 +12,7 @@ const { modelMapper } = require('../model/class/utils/modelMapping');
 const { mode } = require('../../config/minio_config');
 const { productConverter, timeConverter } = require('../model/class/utils/converterUtils');
 const { ROLE } = require('../model/enum/role');
+const { findImagePath, listAllImage, listFirstImage } = require('../model/class/utils/imageList');
 const prisma = new PrismaClient()
 
 // product demo
@@ -145,11 +146,14 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         let VarLimit = limitN >= 1 ? limitN : count_pd
         filter_pd = filter_pd.slice(VarPage, VarPage + VarLimit)
 
-        // array converter
-        filter_pd = filter_pd.map(product => {
-            return productConverter(product, prodList)
+        // array converter and image mapping
+        Promise.all(
+            filter_pd.map(product => getProductImage(res, productConverter(product, prodList)))
+        ).then(productList =>{
+            return res.json(productList)
+        }).catch(err => {
+            return res.status(500).json("cannot get files")
         })
-        return res.json(filter_pd)
     } catch (err) {
         // if favorite product is not found in this user
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -163,6 +167,11 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     }
 })
 
+const getProductImage = async (res, product) => {
+    product.image = await listFirstImage(res, findImagePath("products", product.itemId))
+    return product
+}
+
 router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
     try {
         // find id of product
@@ -170,8 +179,12 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
 
         // check user is supplier
         if (req.user !== undefined && req.user.role === ROLE.Supplier && item.itemOwner !== req.user.email)
-        forbiddenError("This supplier can view owner's item only") 
-        
+            forbiddenError("This supplier can view owner's item only")
+
+        // image for product
+        let path = findImagePath("products", item.itemId)
+        item.images = await listAllImage(res, path)
+
         // return product by id
         return res.json(item)
     } catch (err) {
@@ -179,7 +192,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
     }
 })
 
-router.post('/', JwtAuth, verifyRole(ROLE.Supplier), async (req, res, next) => {
+router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     let { name, description, itemOwner, type, tag, size, style, price } = req.body
     // let numberids = []
     // product_db.sort((a, b) => a.id - b.id).forEach(item => {
@@ -298,7 +311,7 @@ router.put('/isFav/:id', JwtAuth, verifyRole(ROLE.User), async (req, res, next) 
     }
 })
 
-router.patch('/:id', JwtAuth, verifyRole(ROLE.Supplier), async (req, res, next) => {
+router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     let mapData = {}
 
     // body params mapping
@@ -308,13 +321,13 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Supplier), async (req, res, next) 
             mapData[i] =
                 i == "name" ? validateStr("item name", req.body[i], 100) :
                     i == "description" ? validateStr("item description", req.body[i], 500, true) :
-                        // i == "itemOwner" ? validateEmail("item owner", req.body[i], 100) :
-                            i == "type" ? validateStr("item type", req.body[i], 20) :
-                                i == "tag" ? validateStrArray("item tag", req.body[i], 10, 20) :
-                                    i == "size" ? validateStrArray("item size", req.body[i], 5, 4) :
-                                        i == "style" ? validateStr("item type", req.body[i], 50) :
-                                            i == "price" ? validateDouble("item price", req.body[i], true) :
-                                                i == "isOutOfStock" ? validateBoolean("item is out of stock", req.body[i]) : undefined // unused body request
+                        // i == "itemOwner" ? validateEmail("item owner", req.body[i], 100) : cannot change item owner
+                        i == "type" ? validateStr("item type", req.body[i], 20) :
+                            i == "tag" ? validateStrArray("item tag", req.body[i], 10, 20) :
+                                i == "size" ? validateStrArray("item size", req.body[i], 5, 4) :
+                                    i == "style" ? validateStr("item type", req.body[i], 50) :
+                                        i == "price" ? validateDouble("item price", req.body[i], true) :
+                                            i == "isOutOfStock" ? validateBoolean("item is out of stock", req.body[i]) : undefined // unused body request
         }
     }
 
@@ -362,7 +375,7 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req
                 itemId: validateInt("itemId", Number(req.params.id))
             }
         })
-        return res.json({message: "item id " + req.params.id + " has been deleted"})
+        return res.json({ message: "item id " + req.params.id + " has been deleted" })
     } catch (err) {
         // if product is not found
         if (err instanceof Prisma.PrismaClientKnownRequestError) {

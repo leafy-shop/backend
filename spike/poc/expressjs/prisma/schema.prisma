@@ -45,7 +45,6 @@ model items {
   sold         Int      @default(0)
   isOutOfStock Boolean  @default(false)
   price        Decimal  @default(0.00) @db.Decimal(32, 2)
-  images       String   @default("") @db.VarChar(500)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   carts        carts[]

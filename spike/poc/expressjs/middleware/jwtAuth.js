@@ -1,11 +1,15 @@
 const jwt = require("jsonwebtoken");
-const { errorRes } = require('./../routes/model/error/error')
+const { errorRes, forbiddenError, validatError } = require('./../routes/model/error/error')
 const { getUser } = require('../routes/model/class/utils/jwtUtils')
 
 const dotenv = require('dotenv');
 
 // get config vars
 dotenv.config();
+
+const { PrismaClient } = require('@prisma/client');
+const { ROLE } = require("../routes/model/enum/role");
+const prisma = new PrismaClient()
 
 exports.JwtAuth = (req, res, next) => {
   // เอา token จาก headers or cookies
@@ -70,3 +74,40 @@ exports.verifyRole = (...roles) => {
   }
 }
 
+exports.FileAuthorization = async (req, res, next) => {
+  try {
+    console.log(req.user)
+    console.log(req.params)
+    // check endpoint upload is products
+    if (req.params.endpoint === "products") {
+      // validate supplier
+      if (req.user.role === ROLE.Supplier) {
+        // find item owner by id
+        let item = await prisma.items.findFirst({ where: {
+          itemId: Number(req.params.id)
+        } })
+        if (req.user.email !== item.itemOwner) {
+          validatError("you can't edit other item owner's images except yourself.")
+        }
+      }
+    // check endpoint upload is users
+    } else if (req.params.endpoint === "users") {
+      // validate other user except admin
+      if (req.user.role !== ROLE.Admin) {
+        // find user email by id
+        let user = await prisma.accounts.findFirst({ where: {
+          userId: Number(req.params.id)
+        } })
+        if (req.user.email !== user.email) {
+          validatError("you can't edit other user icons except yourself.")
+        }
+      }
+    } else {
+      forbiddenError("cannot use endpoint " + req.params.endpoint + " for doing file")
+    }
+    next()
+  } catch (err) {
+    next(err)
+  }
+ 
+}
