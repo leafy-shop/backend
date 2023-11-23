@@ -148,7 +148,9 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
 
         // array converter and image mapping
         Promise.all(
-            filter_pd.map(product => getProductImage(res, productConverter(product, prodList)))
+            // list product with image
+            // filter_pd.map(product => getProductImage(res, productConverter(product, prodList)))
+            filter_pd.map(product => productConverter(product, prodList))
         ).then(productList =>{
             return res.json(productList)
         }).catch(err => {
@@ -182,8 +184,8 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
             forbiddenError("This supplier can view owner's item only")
 
         // image for product
-        let path = findImagePath("products", item.itemId)
-        item.images = await listAllImage(res, path)
+        // let path = findImagePath("products", item.itemId)
+        // item.images = await listAllImage(res, path)
 
         // return product by id
         return res.json(item)
