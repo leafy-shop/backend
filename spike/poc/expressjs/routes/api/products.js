@@ -81,7 +81,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         type, tag } = req.query
 
     // count items
-    let count_pd = await prisma.items.count()
+    // let count_pd = await prisma.items.count()
     // console.log(count_pd)
 
     // console.log(!! req.query.isFav)
@@ -142,19 +142,20 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         if (req.user !== undefined && req.user.role === ROLE.Supplier) filter_pd = filter_pd.filter(product => product.itemOwner == req.user.email)
 
         // return to page with page number and page size
-        let VarPage = pageN > 0 ? (pageN - 1) * limitN : 0
-        let VarLimit = limitN >= 1 ? limitN : count_pd
-        filter_pd = filter_pd.slice(VarPage, VarPage + VarLimit)
+        let varPage = pageN > 0 ? (pageN - 1) * limitN : 0
+        let varLimit = (limitN <= 0 || isNaN(limitN)) ? 0 : limitN >= 12 ? 12 : limitN
+        page_pd = filter_pd.slice(varPage, varPage + varLimit)
 
         // array converter and image mapping
         Promise.all(
             // list product with image
-            // filter_pd.map(product => getProductImage(res, productConverter(product, prodList)))
-            filter_pd.map(product => productConverter(product, prodList))
+            page_pd.map(product => getProductImage(res, productConverter(product, prodList)))
+            // filter_pd.map(product => productConverter(product, prodList))
         ).then(productList =>{
-            return res.json(productList)
+            return res.json({"page": pageN,"pageSize": varLimit,
+            "AllPage": Math.ceil(filter_pd.length/varLimit),"products": productList})
         }).catch(err => {
-            return res.status(500).json("cannot get files")
+            next(err)
         })
     } catch (err) {
         // if favorite product is not found in this user
@@ -184,8 +185,8 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
             forbiddenError("This supplier can view owner's item only")
 
         // image for product
-        // let path = findImagePath("products", item.itemId)
-        // item.images = await listAllImage(res, path)
+        let path = findImagePath("products", item.itemId)
+        item.images = await listAllImage(res, path)
 
         // return product by id
         return res.json(item)

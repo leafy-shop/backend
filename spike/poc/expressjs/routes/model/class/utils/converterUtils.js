@@ -3,6 +3,7 @@ const { listFirstImage, findImagePath } = require("./imageList");
 const { modelMapper } = require("./modelMapping");
 
 let timeConverter = (value) => {
+    console.log(value)
     if (value.createdAt !== undefined) value.createdAt = dateTimeZoneNow(value.createdAt);
     if (value.updatedAt !== undefined) value.updatedAt = dateTimeZoneNow(value.updatedAt);
     return value
@@ -34,9 +35,6 @@ const userConverter = (user) => {
 
     // time converter
     user = timeConverter(user)
-
-    // find first image
-    user.images = listFirstImage(findImagePath("users",user.userId))
 
     return user
 }

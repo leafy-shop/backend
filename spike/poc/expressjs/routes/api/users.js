@@ -10,8 +10,9 @@ const { ROLE } = require('./../model/enum/role')
 const { userView, userDetailView } = require('./../model/class/model')
 const { PrismaClient, Prisma } = require('@prisma/client');
 const { timeConverter, userConverter } = require('../model/class/utils/converterUtils');
-const { firestore } = require('firebase-admin');
+// const { firestore } = require('firebase-admin');
 const { deleteNullValue } = require('../model/class/utils/modelMapping');
+const { listFirstImage, findImagePath } = require('../model/class/utils/imageList');
 const prisma = new PrismaClient()
 
 // Exclude keys from user
@@ -67,15 +68,15 @@ const user_db = [
     }
 ]
 
-router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res) => {
+router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     // let sorting = req.query.sort == 'desc' ? 'desc' : 'asc'
     // console.log(req.query.name)
     let page = Number(req.query.page)
     let limit = Number(req.query.limit)
-    let count_user = await prisma.accounts.count()
+    let varPage = page > 0 ? (page - 1) * limit : 0
+    let varLimit = (limit <= 0 || isNaN(limit)) ? 0 : limit >= 10 ? 10 : limit
+    // let count_user = await prisma.accounts.count()
     let filter_u = await prisma.accounts.findMany({
-        skip: page > 0 ? (page - 1) * limit : 0,
-        take: limit > 1 ? limit : count_user,
         where: {
             AND: [{
                 name: {
@@ -94,19 +95,51 @@ router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res) => {
         select: userView,
         orderBy: { updatedAt: "desc" }
     })
-    return res.json(timeConverter(filter_u))
+
+    // make to page
+    let page_u = filter_u.slice(varPage, varPage + varLimit)
+
+    // array converter and image mapping
+    Promise.all(
+        // list user with image
+        page_u.map(user => timeConverter(user))
+        // filter_pd.map(user => userConverter(user, userList))
+    ).then(userList => {
+        return res.json({
+            "page": page, "pageSize": varLimit,
+            "AllPage": Math.ceil(filter_u.length / varLimit), "users": userList
+        })
+    }).catch(err => {
+        next(err)
+    })
+
+    // return res.json({ "page": page, "pageSize": varLimit, "AllPage": Math.ceil(filter_u.length / varLimit), "users": page_u.map(user => timeConverter(user)) })
 })
+
+// const getUserIcon = async (res, user) => {
+//     user.image = await listFirstImage(res, findImagePath("users", user.itemId))
+//     return user
+// }
 
 router.get('/:id', JwtAuth, async (req, res, next) => {
     try {
         // sendMail("test massage","test",req.user.email)
         let user = await verifyId(req.params.id)
+
+        console.log(user)
+
         // user role checking and profile
         if (req.user.role !== ROLE.Admin) {
             if (req.user.email !== user.email) {
                 forbiddenError("you can view yourself only")
             }
         }
+
+        // image for product
+        let path = findImagePath("users", user.userId)
+        user.image = await listFirstImage(res, path)
+        
+
         return res.json(user)
     } catch (err) {
         next(err)
@@ -217,8 +250,8 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) =>
         if (user.email === req.user.email) {
             forbiddenError("you cannot delete myself")
         }
-        
-        if(user.userinfo.length !== 0){
+
+        if (user.userinfo.length !== 0) {
             await prisma.userinfo.delete({
                 where: {
                     accounts_userId: validateInt("userId", Number(req.params.id))
@@ -236,7 +269,7 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) =>
             console.log(err)
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2003') {
-                err.message = "cannot delete user when they have own product or order"
+                err.message = "cannot delete user when they have own user or order"
             }
         }
         next(err)
