@@ -11,9 +11,10 @@ const prodList = {
     updatedAt: true
 }
 
+
 const userView = {
     userId: true,
-    name: true,
+    // name: true,
     email: true,
     role: true,
     status: true,
@@ -23,15 +24,12 @@ const userView = {
 
 const userDetailView = {
     userId: true,
-    name: true,
+    firstname: true,
+    lastname: true,
     email: true,
     role: true,
     status: true,
-    firstname: true,
-    lastname: true,
-    dob: true,
     phone: true,
-    address: true,
     createdAt: true,
     updatedAt: true
 }

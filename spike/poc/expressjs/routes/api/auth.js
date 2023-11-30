@@ -18,18 +18,21 @@ dotenv.config();
 
 router.post('/', async (req, res) => {
     // เก็บ email และ password ของผู้ใช้
-    const { email, password } = req.body;
+    const { email_phone, password } = req.body;
 
     // เรียกข้อมูล user โดยใช้ email
     let user = await prisma.accounts.findFirst({
         where: {
-            email: email
+            OR: [
+                {email: email_phone},
+                {phone: email_phone}
+            ]
         }
     })
 
     // ถ้า email หาไม่เจอก็จะส่งกลับไปเพื่อใช้ในการทำ reset password
     if (user == null) {
-        return res.status(404).json(errorRes(`user email ${email} does not exist`, req.originalUrl))
+        return res.status(404).json(errorRes(`user email or phone ${email_phone} does not exist`, req.originalUrl))
     }
 
     // ตรวจสอบสถานะของ user
@@ -57,7 +60,7 @@ router.post('/', async (req, res) => {
     // สร้าง access token ภายใต้ method ที่กำหนด
     const token = getToken({
         "id": user.userId,
-        "name": user.name,
+        "firstname": user.firstname,
         "email": user.email,
         "role": user.role,
     }, "1h");
@@ -65,7 +68,7 @@ router.post('/', async (req, res) => {
     // และ refresh token แต่เวลาต่างกัน
     const refreshtoken = getToken({
         "id": user.userId,
-        "name": user.name,
+        "firstname": user.firstname,
         "email": user.email,
         "role": user.role,
     }, "24h");
@@ -82,7 +85,7 @@ router.post('/', async (req, res) => {
 
     res.status(200).json({
         "id": getUser(token).id,
-        "name": getUser(token).name,
+        "firstname": getUser(token).firstname,
         "email": getUser(token).email,
         "role": getUser(token).role,
         "token": token,
@@ -113,7 +116,7 @@ router.post('/refresh', async (req, res) => {
     }
 
     // สร้าง refresh token ใหม่ทั้ง token และ refreshToken
-    let token = refreshToken(jwttoken.substring(7), jwttoken.substring(7), userInfo, "30m")
+    let token = refreshToken(jwttoken.substring(7), jwttoken.substring(7), userInfo, "1h")
     let refreshtoken = refreshToken(jwttoken.substring(7), jwtRefreshToken.substring(7), userInfo, "24h")
 
     // ตรวจดูว่า token ถูกต้องไหมก่อนส่ง
@@ -131,11 +134,12 @@ router.post('/refresh', async (req, res) => {
     res.cookie("refreshToken", refreshtoken, cookieConfig);
 
     res.status(200).json({
-        "name": getUser(token).name,
+        "id": getUser(token).id,
+        "firstname": getUser(token).firstname,
         "email": getUser(token).email,
         "role": getUser(token).role,
-        "token": getUser(token).token,
-        "refreshToken": getUser(token).refreshToken
+        "token": token,
+        "refreshToken": refreshtoken
     })
 })
 
