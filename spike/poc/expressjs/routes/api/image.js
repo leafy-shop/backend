@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 path = require("path");
 const multer = require("multer");
-const sharp = require("sharp")
+// const sharp = require("sharp")
 require('dotenv').config().parsed
 const { JwtAuth, FileAuthorization } = require('./../../middleware/jwtAuth')
 const { findImagePath, validateDeleteAllImage } = require('./../model/class/utils/imageList')
