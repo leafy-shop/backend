@@ -426,24 +426,7 @@ router.post('/:prodId/preview', JwtAuth, async (req, res, next) => {
         })
 
         // get average value of rating in item id
-        avg_preview = await prisma.item_preview.aggregate({
-            _avg: {
-                rating: true
-            },
-            where: {
-                itemId: item.itemId
-            }
-        })
-
-        // update average rating in item id
-        await prisma.items.update({
-            data: {
-                totalRating: Math.round(avg_preview._avg.rating, 1)
-            },
-            where: {
-                itemId: item.itemId
-            }
-        })
+        await updateAverageRating(item.itemId)
 
         return res.json(preview)
     } catch (err) {
@@ -471,6 +454,10 @@ router.delete('/:prodId/preview/:commentId', JwtAuth, async (req, res, next) => 
                 userEmail: req.user.email
             }
         })
+
+        // get average value of rating in item id
+        await updateAverageRating(item.itemId)
+
         return res.json({ message: "item comment id " + commentId + " has been deleted" })
     } catch (err) {
         // if product is not found
@@ -656,6 +643,30 @@ const findFavPdById = async (email, id) => {
         }
     })
     return fav_pd
+}
+
+const updateAverageRating = async (itemId) => {
+    // get average value of rating in item id
+    avg_preview = await prisma.item_preview.aggregate({
+        _avg: {
+            rating: true
+        },
+        where: {
+            itemId: itemId
+        }
+    })
+
+    // update average rating in item id
+    await prisma.items.update({
+        data: {
+            totalRating: Math.round(avg_preview._avg.rating, 1)
+        },
+        where: {
+            itemId: itemId
+        }
+    })
+
+    return avg_preview
 }
 
 module.exports = router
