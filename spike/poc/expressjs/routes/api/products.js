@@ -400,12 +400,12 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req
 })
 
 // preview -- zone ---
-router.post('/:prodid/preview', JwtAuth, async (req, res, next) => {
+router.post('/:prodId/preview', JwtAuth, async (req, res, next) => {
     try {
         let { comment, rating, size, style } = req.body
 
         // find item id
-        let item = await verifyId(req.params.prodid)
+        let item = await verifyId(req.params.prodId)
 
         // generate id
         const id = crypto.randomBytes(16).toString("hex");
@@ -451,10 +451,12 @@ router.post('/:prodid/preview', JwtAuth, async (req, res, next) => {
     }
 })
 
-router.delete('/:prodid/preview/:commentid', JwtAuth, async (req, res, next) => {
+router.delete('/:prodId/preview/:commentId', JwtAuth, async (req, res, next) => {
     try {
+        let { prodId, commentId } = req.params
+
         // find item id
-        let item = await verifyId(req.params.prodid)
+        let item = await verifyId(prodId)
 
         item.item_preview.forEach(preview => {
             // check if supplier role delete other email that not same finding commend that throw to exception
@@ -465,40 +467,79 @@ router.delete('/:prodid/preview/:commentid', JwtAuth, async (req, res, next) => 
         // find id to delete product
         await prisma.item_preview.delete({
             where: {
-                itemPreviewId: req.params.commentid,
+                itemPreviewId: commentId,
                 userEmail: req.user.email
             }
         })
-        return res.json({ message: "item comment id " + req.params.id + " has been deleted" })
+        return res.json({ message: "item comment id " + commentId + " has been deleted" })
     } catch (err) {
         // if product is not found
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2025') {
-                err.message = "item comment id " + req.params.id + " does not exist"
+                err.message = "item comment id " + commentId + " does not exist"
             }
         }
         next(err)
     }
 })
 
-router.put('/:prodid/preview/:commentid/like', JwtAuth, async (req, res, next) => {
+router.put('/:prodId/preview/:commentId/like', JwtAuth, async (req, res, next) => {
     try {
-        // get average value of rating in item id
-        preview = await findPreviewById(req.params.prodid, req.params.commentid)
+        let { prodId, commentId } = req.params
 
-        // update average rating in item id
-        let comment = await prisma.item_preview.update({
-            data: {
-                like: {
-                    increment: 1
+        // get average value of rating in item id
+        let preview = await findPreviewById(req.user.email, commentId)
+
+        let comment
+        // check if preview is undefined
+        if (preview === null) {
+            // add like message on log
+            let input = await prisma.item_preview_like.create({
+                data: {
+                    itemPreviewId: commentId,
+                    userEmail: req.user.email
                 }
-            },
-            where: {
-                itemPreviewId: preview.itemPreviewId,
-                itemId: preview.itemId
-            }
-        })
+            })
+
+            // update like in item id
+            comment = await prisma.item_preview.update({
+                data: {
+                    like: {
+                        increment: 1
+                    }
+                },
+                where: {
+                    itemPreviewId: input.itemPreviewId,
+                    itemId: Number(prodId)
+                }
+            })
+        } else {
+            // revert like message on log
+            await prisma.item_preview_like.delete({
+                where: {
+                    itemPreviewId_userEmail: {
+                        itemPreviewId: commentId,
+                        userEmail: req.user.email
+                    }
+                }
+            })
+
+            // console.log(prodId.userEmail)
+
+            // update unlike in item id
+            comment = await prisma.item_preview.update({
+                data: {
+                    like: {
+                        decrement: 1
+                    }
+                },
+                where: {
+                    itemPreviewId: preview.itemPreviewId,
+                    itemId: Number(prodId)
+                }
+            })
+        }
 
         return res.json(comment)
     } catch (err) {
@@ -506,44 +547,44 @@ router.put('/:prodid/preview/:commentid/like', JwtAuth, async (req, res, next) =
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2025') {
-                err.message = "item comment id " + req.params.id + " does not exist"
+                err.message = "item comment id " + commendId + " does not exist"
             }
         }
         next(err)
     }
 })
 
-router.put('/:prodid/preview/:commentid/unlike', JwtAuth, async (req, res, next) => {
-    try {
-        // get average value of rating in item id
-        preview = await findPreviewById(req.params.prodid, req.params.commentid)
+// router.put('/:prodid/preview/:commentid/unlike', JwtAuth, async (req, res, next) => {
+//     try {
+//         // get average value of rating in item id
+//         preview = await findPreviewById(req.params.prodid, req.params.commentid)
 
-        if (preview.like > 0) {
-            // update average rating in item id
-            let comment = await prisma.item_preview.update({
-                data: {
-                    like: { decrement: 1 }
-                },
-                where: {
-                    itemPreviewId: preview.itemPreviewId,
-                    itemId: preview.itemId
-                }
-            })
-            return res.json(comment)
-        } else {
-            validatError("preview like must not negative number")
-        }
-    } catch (err) {
-        // if product is not found
-        if (err instanceof Prisma.PrismaClientKnownRequestError) {
-            // The .code property can be accessed in a type-safe manner
-            if (err.code === 'P2025') {
-                err.message = "item comment id " + req.params.id + " does not exist"
-            }
-        }
-        next(err)
-    }
-})
+//         if (preview.like > 0) {
+//             // update average rating in item id
+//             let comment = await prisma.item_preview.update({
+//                 data: {
+//                     like: { decrement: 1 }
+//                 },
+//                 where: {
+//                     itemPreviewId: preview.itemPreviewId,
+//                     itemId: preview.itemId
+//                 }
+//             })
+//             return res.json(comment)
+//         } else {
+//             validatError("preview like must not negative number")
+//         }
+//     } catch (err) {
+//         // if product is not found
+//         if (err instanceof Prisma.PrismaClientKnownRequestError) {
+//             // The .code property can be accessed in a type-safe manner
+//             if (err.code === 'P2025') {
+//                 err.message = "item comment id " + req.params.id + " does not exist"
+//             }
+//         }
+//         next(err)
+//     }
+// })
 
 // -- method zone --
 const verifyId = async (id) => {
@@ -586,19 +627,20 @@ const verifyUserEmail = async (userEmail) => {
     return filter_pd
 }
 
-const findPreviewById = async (prodId, commendId) => {
+const findPreviewById = async (email, commendId) => {
     // get average value of rating in item id
-    preview = await prisma.item_preview.findFirst({
+    preview = await prisma.item_preview_like.findFirst({
         where: {
             AND: [
                 { itemPreviewId: commendId },
-                { itemId: Number(prodId) }
+                { userEmail: email }
             ]
         }
     })
+    console.log(preview)
 
     // check that product is found
-    if (preview == null) notFoundError("item id " + id + " does not exist")
+    // if (preview == null) notFoundError("item preview like of id " + id + " does not exist")
 
     return preview
 }

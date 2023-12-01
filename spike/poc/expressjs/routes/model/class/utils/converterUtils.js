@@ -60,16 +60,17 @@ const paginationList = (list, pageN, limitN, maxLimit) => {
   // set corrected page
   let varPage = (pageN <= 1 || isNaN(pageN)) ? 1 : pageN
 
-  // set current page
-  let currentPage = (varPage - 1) * limitN
-
   // set page size
   let varLimit = (limitN <= 0 || isNaN(limitN) || limitN >= maxLimit) ? maxLimit : limitN
 
+  // set current page
+  let currentPage = (varPage - 1) * varLimit
+
   // create page template for return value
   let pageTemplate = {
-    "page": varPage , "pageSize": varLimit,
+    "page": varPage, "pageSize": varLimit,
     "AllPage": Math.ceil(list.length / varLimit),
+    "AllItems": list.length,
     data: list.slice(currentPage, currentPage + varLimit)
   }
   return pageTemplate

@@ -49,7 +49,7 @@ app.use('/api/images',require('./routes/api/images.js'))
 
 const errorHandler = (error, req, res, next) => {
     if (res.headersSent) {
-        return next(err)
+        return next(error)
       }
     // Error handling middleware functionality
     console.log("")
