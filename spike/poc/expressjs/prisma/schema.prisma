@@ -32,44 +32,69 @@ model favprd {
 }
 
 model items {
-  itemId       Int      @id @default(autoincrement())
-  name         String   @db.VarChar(100)
-  description  String   @db.VarChar(500)
+  itemId       Int            @id @default(autoincrement())
+  name         String         @db.VarChar(100)
+  description  String         @db.VarChar(500)
   itemOwner    String
-  items        accounts @relation(fields: [itemOwner], references: [email], map: "Items_itemOwner_fkey")
-  type         String   @db.VarChar(20)
-  tag          String   @db.VarChar(500)
-  size         String   @db.VarChar(500)
-  style        String   @db.VarChar(50)
-  totalRating  Decimal  @default(0.0) @db.Decimal(2, 1)
-  sold         Int      @default(0)
-  isOutOfStock Boolean  @default(false)
-  price        Decimal  @default(0.00) @db.Decimal(32, 2)
-  images       String   @default("") @db.VarChar(500)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  items        accounts       @relation(fields: [itemOwner], references: [email], map: "Items_itemOwner_fkey")
+  type         String         @db.VarChar(20)
+  tag          String         @db.VarChar(500)
+  size         String         @db.VarChar(500)
+  style        String         @db.VarChar(50)
+  totalRating  Decimal        @default(0.0) @db.Decimal(2, 1)
+  sold         Int            @default(0)
+  isOutOfStock Boolean        @default(false)
+  price        Decimal        @default(0.00) @db.Decimal(32, 2)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
   carts        carts[]
   favprd       favprd[]
+  item_preview item_preview[]
 
   @@index([itemId], map: "fk_items_users1_idx")
 }
 
+model item_preview {
+  itemPreviewId     String              @id @db.VarChar(32)
+  itemId            Int
+  userEmail         String              @db.VarChar(100)
+  items             items               @relation(fields: [itemId], references: [itemId], map: "ItemPreview_itemId_fkey")
+  accounts          accounts            @relation(fields: [userEmail], references: [email], map: "ItemPreview_userEmail_fkey")
+  comment           String              @db.VarChar(500)
+  rating            Int                 @default(0)
+  like              Int                 @default(0)
+  size              String              @db.Char(100)
+  style             String              @db.VarChar(50)
+  createdAt         DateTime            @default(now())
+  item_preview_like item_preview_like[]
+}
+
+model item_preview_like {
+  userEmail     String       @db.VarChar(100)
+  itemPreviewId String       @db.VarChar(32)
+  item_preview  item_preview @relation(fields: [itemPreviewId], references: [itemPreviewId], map: "UserPreviewLike_itemPreviewId_fkey")
+  accounts      accounts     @relation(fields: [userEmail], references: [email], map: "UserPreviewLike_userEmail_fkey")
+
+  @@id([itemPreviewId, userEmail])
+  @@index([itemPreviewId], map: "fk_UserPreviewLike_items_preview1_idx")
+  @@index([userEmail], map: "fk_UserPreviewLike_users1_idx")
+}
+
 model accounts {
   userId    Int      @id @default(autoincrement())
-  name      String   @db.VarChar(100)
+  firstname String?  @db.VarChar(50)
+  lastname  String?  @db.VarChar(50)
   email     String   @unique(map: "Users_email_key") @db.VarChar(100)
   password  String   @db.VarChar(100)
   role      String   @default("user") @db.VarChar(11)
   status    Boolean  @default(true)
-  firstname String?  @db.VarChar(50) 
-  lastname  String?  @db.VarChar(50)
-  dob       DateTime?
-  phone     String?   @db.Char(11)
-  address   String?   @db.VarChar(500)
+  phone     String?  @db.Char(11)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  carts  carts[]
-  favprd favprd[]
-  items  items[]
+  carts             carts[]
+  favprd            favprd[]
+  items             items[]
+  item_preview      item_preview[]
+  item_preview_like item_preview_like[]
 }

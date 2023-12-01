@@ -3,9 +3,11 @@ const router = express.Router();
 path = require("path");
 const multer = require("multer");
 require('dotenv').config().parsed
-const { JwtAuth } = require('./../../middleware/jwtAuth')
+const { JwtAuth, verifyRole, FileAuthorization } = require('./../../middleware/jwtAuth')
 
 const { bucket, s3, storage, mode } = require("../../config/minio_config");
+const { ROLE } = require("../model/enum/role");
+const { deleteAllImage, findImagePath } = require("../model/class/utils/imageList");
 
 const upload = multer({
     storage: storage,
@@ -14,6 +16,7 @@ const upload = multer({
     },
     limits: { files: 10 },
     fileFilter(req, file, cb) {
+        // filter file content type
         if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
             return cb(new Error("Please upload a image file type jpg, jpeg or png"));
         }
@@ -23,7 +26,7 @@ const upload = multer({
 
 // upload multiple image
 // condition (file size < 8 MB, file multipart, file upload per solution, file type image only, path storage property)
-router.post("/:endpoint/:id", JwtAuth, upload.array("file", 10), async (req, res) => {
+router.post("/:endpoint/:id", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), FileAuthorization, upload.array("file", 10), async (req, res) => {
     let locations = []
     req.files.forEach(file => {
         locations.push(file.location)
@@ -34,8 +37,8 @@ router.post("/:endpoint/:id", JwtAuth, upload.array("file", 10), async (req, res
 });
 
 // delete multiple image
-router.delete("/:endpoint/:id", JwtAuth, async (req, res) => {
-    const folder = `${mode == "development" ? "developments" : "productions"}/${req.params.endpoint}/${req.params.id}`;
+router.delete("/:endpoint/:id", JwtAuth, FileAuthorization, async (req, res) => {
+    const folder = findImagePath(req.params.endpoint, req.params.id);
     const fileNames = req.body.files || []
     const numberFiles = []
 
@@ -77,33 +80,11 @@ router.delete("/:endpoint/:id", JwtAuth, async (req, res) => {
 });
 
 // delete all image
-router.delete("/:endpoint/:id/all", JwtAuth, async (req, res) => {
-    const folder = `${mode == "development" ? "developments" : "productions"}/${req.params.endpoint}/${req.params.id}`;
+router.delete("/:endpoint/:id/all", JwtAuth, FileAuthorization, async (req, res) => {
+    const folder = findImagePath(req.params.endpoint, req.params.id);
 
-    const listObjectsParams = {
-        Bucket: bucket,
-        Prefix: folder
-    };
-
-    try {
-        console.log(listObjectsParams)
-        const listedObjects = await s3.listObjectsV2(listObjectsParams).promise();
-        console.log(listedObjects)
-
-        if (listedObjects.Contents.length === 0) {
-            return res.status(404).json({ message: 'No files to delete'});
-        }
-
-        const deleteParams = {
-            Bucket: bucket,
-            Delete: { Objects: listedObjects.Contents.map(obj => ({ Key: obj.Key })) },
-        };
-
-        await s3.deleteObjects(deleteParams).promise();
-        return res.json({ message: `Deleted ${listedObjects.Contents.length} files in path ${folder}`});
-    } catch (err) {
-        return res.status(500).json({ message: "Could not delete file" });
-    }
+    // delete all image
+    return await deleteAllImage(res, folder)
 });
 
 module.exports = router;

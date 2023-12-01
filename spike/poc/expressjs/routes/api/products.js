@@ -10,9 +10,11 @@ const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('./../../middleware/jwt
 const { PrismaClient, Prisma } = require('@prisma/client');
 const { modelMapper } = require('../model/class/utils/modelMapping');
 const { mode } = require('../../config/minio_config');
-const { productConverter, timeConverter } = require('../model/class/utils/converterUtils');
+const { productConverter, timeConverter, paginationList } = require('../model/class/utils/converterUtils');
 const { ROLE } = require('../model/enum/role');
+const { findImagePath, listAllImage, listFirstImage } = require('../model/class/utils/imageList');
 const prisma = new PrismaClient()
+const crypto = require("crypto");
 
 // product demo
 const product_db = [
@@ -80,7 +82,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         type, tag } = req.query
 
     // count items
-    let count_pd = await prisma.items.count()
+    // let count_pd = await prisma.items.count()
     // console.log(count_pd)
 
     // console.log(!! req.query.isFav)
@@ -115,6 +117,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                         gt: isNaN(rating - 1) ? undefined : rating - 1
                     },
                     favprd: favFilter,
+
                 }]
             },
             include: {
@@ -141,15 +144,19 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         if (req.user !== undefined && req.user.role === ROLE.Supplier) filter_pd = filter_pd.filter(product => product.itemOwner == req.user.email)
 
         // return to page with page number and page size
-        let VarPage = pageN > 0 ? (pageN - 1) * limitN : 0
-        let VarLimit = limitN >= 1 ? limitN : count_pd
-        filter_pd = filter_pd.slice(VarPage, VarPage + VarLimit)
+        page_pd = paginationList(filter_pd, pageN, limitN, 18)
 
-        // array converter
-        filter_pd = filter_pd.map(product => {
-            return productConverter(product, prodList)
+        // array converter and image mapping
+        Promise.all(
+            // list product with image
+            page_pd.productList.map(product => getProductImage(res, productConverter(product, prodList)))
+            // filter_pd.map(product => productConverter(product, prodList))
+        ).then(productList => {
+            page_pd.productList = productList
+            return res.send(page_pd)
+        }).catch(err => {
+            next(err)
         })
-        return res.json(filter_pd)
     } catch (err) {
         // if favorite product is not found in this user
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -163,6 +170,11 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     }
 })
 
+const getProductImage = async (res, product) => {
+    product.image = await listFirstImage(res, findImagePath("products", product.itemId))
+    return product
+}
+
 router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
     try {
         // find id of product
@@ -170,8 +182,17 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
 
         // check user is supplier
         if (req.user !== undefined && req.user.role === ROLE.Supplier && item.itemOwner !== req.user.email)
-        forbiddenError("This supplier can view owner's item only") 
-        
+            forbiddenError("This supplier can view owner's item only")
+
+        // image for product
+        let path = findImagePath("products", item.itemId)
+        item.images = await listAllImage(res, path)
+
+        // list product preview to page
+        page = Number(req.query.pv_page)
+        limit = Number(req.query.pv_limit)
+        item.item_preview = paginationList(item.item_preview, page, limit, 5)
+
         // return product by id
         return res.json(item)
     } catch (err) {
@@ -179,7 +200,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
     }
 })
 
-router.post('/', JwtAuth, verifyRole(ROLE.Supplier), async (req, res, next) => {
+router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     let { name, description, itemOwner, type, tag, size, style, price } = req.body
     // let numberids = []
     // product_db.sort((a, b) => a.id - b.id).forEach(item => {
@@ -298,7 +319,7 @@ router.put('/isFav/:id', JwtAuth, verifyRole(ROLE.User), async (req, res, next) 
     }
 })
 
-router.patch('/:id', JwtAuth, verifyRole(ROLE.Supplier), async (req, res, next) => {
+router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     let mapData = {}
 
     // body params mapping
@@ -308,13 +329,13 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Supplier), async (req, res, next) 
             mapData[i] =
                 i == "name" ? validateStr("item name", req.body[i], 100) :
                     i == "description" ? validateStr("item description", req.body[i], 500, true) :
-                        // i == "itemOwner" ? validateEmail("item owner", req.body[i], 100) :
-                            i == "type" ? validateStr("item type", req.body[i], 20) :
-                                i == "tag" ? validateStrArray("item tag", req.body[i], 10, 20) :
-                                    i == "size" ? validateStrArray("item size", req.body[i], 5, 4) :
-                                        i == "style" ? validateStr("item type", req.body[i], 50) :
-                                            i == "price" ? validateDouble("item price", req.body[i], true) :
-                                                i == "isOutOfStock" ? validateBoolean("item is out of stock", req.body[i]) : undefined // unused body request
+                        // i == "itemOwner" ? validateEmail("item owner", req.body[i], 100) : cannot change item owner
+                        i == "type" ? validateStr("item type", req.body[i], 20) :
+                            i == "tag" ? validateStrArray("item tag", req.body[i], 10, 20) :
+                                i == "size" ? validateStrArray("item size", req.body[i], 5, 4) :
+                                    i == "style" ? validateStr("item type", req.body[i], 50) :
+                                        i == "price" ? validateDouble("item price", req.body[i], true) :
+                                            i == "isOutOfStock" ? validateBoolean("item is out of stock", req.body[i]) : undefined // unused body request
         }
     }
 
@@ -357,12 +378,15 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req
             forbiddenError("This supplier can delete owner's item only")
 
         // find id to delete product
-        let input = await prisma.items.delete({
+        let input = await prisma.item_preview.delete({
             where: {
-                itemId: validateInt("itemId", Number(req.params.id))
+                AND: [
+                    { itemId: validateInt("itemId", Number(req.params.id)) },
+                    { userEmail: req.user.email }
+                ]
             }
         })
-        return res.json({message: "item id " + req.params.id + " has been deleted"})
+        return res.json({ message: "item id " + req.params.id + " has been deleted" })
     } catch (err) {
         // if product is not found
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -375,11 +399,202 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req
     }
 })
 
+// preview -- zone ---
+router.post('/:prodId/preview', JwtAuth, async (req, res, next) => {
+    try {
+        let { comment, rating, size, style } = req.body
+
+        // find item id
+        let item = await verifyId(req.params.prodId)
+
+        // generate id
+        const id = crypto.randomBytes(16).toString("hex");
+
+        console.log(id.length); // => f9b327e70bbcf42494ccb28b2d98e00e
+
+        // add this user for comment
+        let preview = await prisma.item_preview.create({
+            data: {
+                itemPreviewId: id,
+                itemId: item.itemId,
+                userEmail: req.user.email,
+                comment: validateStr("item comment", comment, 200),
+                rating: validateInt("item rating", rating, 500, 1, 5),
+                size: validateStr("item size", size, 4),
+                style: validateStr("item style", style, 50),
+            }
+        })
+
+        // get average value of rating in item id
+        avg_preview = await prisma.item_preview.aggregate({
+            _avg: {
+                rating: true
+            },
+            where: {
+                itemId: item.itemId
+            }
+        })
+
+        // update average rating in item id
+        await prisma.items.update({
+            data: {
+                totalRating: Math.round(avg_preview._avg.rating, 1)
+            },
+            where: {
+                itemId: item.itemId
+            }
+        })
+
+        return res.json(preview)
+    } catch (err) {
+        next(err)
+    }
+})
+
+router.delete('/:prodId/preview/:commentId', JwtAuth, async (req, res, next) => {
+    try {
+        let { prodId, commentId } = req.params
+
+        // find item id
+        let item = await verifyId(prodId)
+
+        item.item_preview.forEach(preview => {
+            // check if supplier role delete other email that not same finding commend that throw to exception
+            if ([ROLE.Supplier, ROLE.User].includes(req.user.role) && preview.userEmail !== req.user.email)
+                forbiddenError("user can delete your comment only")
+        })
+
+        // find id to delete product
+        await prisma.item_preview.delete({
+            where: {
+                itemPreviewId: commentId,
+                userEmail: req.user.email
+            }
+        })
+        return res.json({ message: "item comment id " + commentId + " has been deleted" })
+    } catch (err) {
+        // if product is not found
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.code === 'P2025') {
+                err.message = "item comment id " + commentId + " does not exist"
+            }
+        }
+        next(err)
+    }
+})
+
+router.put('/:prodId/preview/:commentId/like', JwtAuth, async (req, res, next) => {
+    try {
+        let { prodId, commentId } = req.params
+
+        // get average value of rating in item id
+        let preview = await findPreviewById(req.user.email, commentId)
+
+        let comment
+        // check if preview is undefined
+        if (preview === null) {
+            // add like message on log
+            let input = await prisma.item_preview_like.create({
+                data: {
+                    itemPreviewId: commentId,
+                    userEmail: req.user.email
+                }
+            })
+
+            // update like in item id
+            comment = await prisma.item_preview.update({
+                data: {
+                    like: {
+                        increment: 1
+                    }
+                },
+                where: {
+                    itemPreviewId: input.itemPreviewId,
+                    itemId: Number(prodId)
+                }
+            })
+        } else {
+            // revert like message on log
+            await prisma.item_preview_like.delete({
+                where: {
+                    itemPreviewId_userEmail: {
+                        itemPreviewId: commentId,
+                        userEmail: req.user.email
+                    }
+                }
+            })
+
+            // console.log(prodId.userEmail)
+
+            // update unlike in item id
+            comment = await prisma.item_preview.update({
+                data: {
+                    like: {
+                        decrement: 1
+                    }
+                },
+                where: {
+                    itemPreviewId: preview.itemPreviewId,
+                    itemId: Number(prodId)
+                }
+            })
+        }
+
+        return res.json(comment)
+    } catch (err) {
+        // if product is not found
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.code === 'P2025') {
+                err.message = "item comment id " + commendId + " does not exist"
+            }
+        }
+        next(err)
+    }
+})
+
+// router.put('/:prodid/preview/:commentid/unlike', JwtAuth, async (req, res, next) => {
+//     try {
+//         // get average value of rating in item id
+//         preview = await findPreviewById(req.params.prodid, req.params.commentid)
+
+//         if (preview.like > 0) {
+//             // update average rating in item id
+//             let comment = await prisma.item_preview.update({
+//                 data: {
+//                     like: { decrement: 1 }
+//                 },
+//                 where: {
+//                     itemPreviewId: preview.itemPreviewId,
+//                     itemId: preview.itemId
+//                 }
+//             })
+//             return res.json(comment)
+//         } else {
+//             validatError("preview like must not negative number")
+//         }
+//     } catch (err) {
+//         // if product is not found
+//         if (err instanceof Prisma.PrismaClientKnownRequestError) {
+//             // The .code property can be accessed in a type-safe manner
+//             if (err.code === 'P2025') {
+//                 err.message = "item comment id " + req.params.id + " does not exist"
+//             }
+//         }
+//         next(err)
+//     }
+// })
+
+// -- method zone --
 const verifyId = async (id) => {
     // find product by id
     let filter_pd = await prisma.items.findFirst({
         where: {
             itemId: Number(id)
+        },
+        include: {
+            item_preview: true
         }
     })
 
@@ -410,6 +625,24 @@ const verifyUserEmail = async (userEmail) => {
         return productConverter(favprd.items)
     })
     return filter_pd
+}
+
+const findPreviewById = async (email, commendId) => {
+    // get average value of rating in item id
+    preview = await prisma.item_preview_like.findFirst({
+        where: {
+            AND: [
+                { itemPreviewId: commendId },
+                { userEmail: email }
+            ]
+        }
+    })
+    console.log(preview)
+
+    // check that product is found
+    // if (preview == null) notFoundError("item preview like of id " + id + " does not exist")
+
+    return preview
 }
 
 const findFavPdById = async (email, id) => {
