@@ -69,9 +69,10 @@ const paginationList = (list, pageN, limitN, maxLimit) => {
   // create page template for return value
   let pageTemplate = {
     "page": varPage, "pageSize": varLimit,
-    "AllPage": Math.ceil(list.length / varLimit),
-    "AllItems": list.length,
-    data: list.slice(currentPage, currentPage + varLimit)
+    "allPage": Math.ceil(list.length / varLimit),
+    "allItems": list.length,
+    // data: list.slice(currentPage, currentPage + varLimit)
+    productList: list.slice(currentPage, currentPage + varLimit)
   }
   return pageTemplate
 }
