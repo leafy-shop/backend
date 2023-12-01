@@ -144,15 +144,15 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         if (req.user !== undefined && req.user.role === ROLE.Supplier) filter_pd = filter_pd.filter(product => product.itemOwner == req.user.email)
 
         // return to page with page number and page size
-        page_pd = paginationList(filter_pd, pageN, limitN, 12)
+        page_pd = paginationList(filter_pd, pageN, limitN, 18)
 
         // array converter and image mapping
         Promise.all(
             // list product with image
-            page_pd.data.map(product => getProductImage(res, productConverter(product, prodList)))
+            page_pd.productList.map(product => getProductImage(res, productConverter(product, prodList)))
             // filter_pd.map(product => productConverter(product, prodList))
         ).then(productList => {
-            page_pd.data = productList
+            page_pd.productList = productList
             return res.send(page_pd)
         }).catch(err => {
             next(err)
