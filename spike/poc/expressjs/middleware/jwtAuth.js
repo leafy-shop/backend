@@ -38,7 +38,7 @@ exports.UnstrictJwtAuth = (req, res, next) => {
   // เอา token จาก headers or cookies
   const jwtToken = "Bearer " + req.cookies.token;
   // const jwtRefreshToken = req.headers.refresh || "Bearer " + req.cookies.refreshToken ;
-  console.log(req.cookies.token)
+  // console.log(req.cookies.token)
   try {
     if (req.cookies.token !== undefined) {
       // ตรวจสอบ user ใน access token 
@@ -87,7 +87,7 @@ exports.FileAuthorization = async (req, res, next) => {
           itemId: Number(req.params.id)
         } })
         if (req.user.email !== item.itemOwner) {
-          validatError("you can't edit other item owner's images except yourself.")
+          validatError("you can't manage other item owner's images except yourself.")
         }
       }
     // check endpoint upload is users
@@ -99,7 +99,7 @@ exports.FileAuthorization = async (req, res, next) => {
           userId: Number(req.params.id)
         } })
         if (req.user.email !== user.email) {
-          validatError("you can't edit other user icons except yourself.")
+          validatError("you can't manage other user icons except yourself.")
         }
       }
     } else {

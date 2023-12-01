@@ -20,31 +20,44 @@ const validateStr = (prop = '', value = '', length = 0, isEmpty = false) => {
     return value.trim()
 }
 
-const validateInt = (prop = '', value = 0, isNan = false) => {
+const validateInt = (prop = '', value = 0, isNan = false, min = 0, max = Infinity) => {
     console.log("validate number of " + prop)
     // validate is null or null value or negative value
-    if (!isNan && (isNaN(value) || value <= 0)) {
+    if (!isNan && (isNaN(value) || value <= min)) {
         validatError(`${prop} is nan`)
     }
-    // validate number format
-    if (typeof value !== 'number') {
-        validatError(`${prop}:${value} is not number format`)
+
+    // validate integer format
+    if (value % 1 !== 0) {
+        validatError(`${prop}:${value} is not integer number format`)
+    }
+
+    // validate min and max number
+    if (value < min) {
+        validatError(`${prop}:${value} is less than ${min}`)
+    } else if (value > max) {
+        validatError(`${prop}:${value} is more than ${max}`)
     }
     console.log(`validate ${prop} is passed`)
     return Math.trunc(value)
 }
 
-const validateDouble = (prop = '', value = 0, isNan = false) => {
+const validateDouble = (prop = '', value = 0, isNan = false, min = 0, max = Infinity) => {
     console.log("validate number of " + prop)
     // validate is null or null value or negative value
-    if (!isNan && (isNaN(value) || value <= 0)) {
+    if (!isNan && (isNaN(value) || value <= min)) {
         validatError(`${prop} is nan`)
     }
-    // validate number format
+    // validate double format
     if (typeof value !== 'number') {
-        value = Number(value)
+        validatError(`${prop}:${value} is not float number format`)
+    }
 
-        validatError(`${prop}:${value} is not number format`)
+    // validate min and max number
+    if (value < min) {
+        validatError(`${prop}:${value} is less than ${min}`)
+    } else if (value > max) {
+        validatError(`${prop}:${value} is more than ${max}`)
     }
     console.log(`validate ${prop} is passed`)
     return value
@@ -183,7 +196,7 @@ const validatePhone = (prop = '', value = undefined) => {
     if (value !== undefined && !value.match(re)) {
         validatError(`${prop} is not phone format`)
     }
-    return value.replace(/-/g, '');
+    return value === undefined ? undefined : value.replace(/-/g, '');
 }
 
 module.exports.validateStr = validateStr
