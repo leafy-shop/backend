@@ -16,7 +16,7 @@ let listAllImage = async (res, folder) => {
         const listedObjects = await s3.listObjectsV2(listObjectsParams).promise();
         return listedObjects.Contents.map(obj => obj.Key.replace(/^.*[\\/]/, '')); // get only file name
     } catch (err) {
-        return res.status(500).json({ message: "Could not list image name" });
+        return undefined
     }
 }
 
@@ -26,7 +26,7 @@ let listFirstImage = async (res, folder) => {
         const listedObjects = await listAllImage(res, folder)
         return listedObjects[0] // get only first file name
     } catch (err) {
-        return res.status(500).json({ message: "Could not list image name" });
+        return undefined
     }
 }
 
