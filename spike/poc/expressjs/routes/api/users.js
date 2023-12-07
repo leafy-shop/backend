@@ -140,8 +140,10 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
     try {
         let input
         if (req.user.role === ROLE.Admin) {
+            // admin user
             input = await prisma.accounts.create({
                 data: {
+                    itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
                     firstname: validateStr("user information firstname", firstname, 50),
                     lastname: validateStr("user information lastname", lastname, 50),
                     email: validateEmail("account email", email, 100),
@@ -152,8 +154,10 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
                 select: userView
             })
         } else {
+            // sign up case
             input = await prisma.accounts.create({
                 data: {
+                    itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
                     firstname: validateStr("user information firstname", firstname, 50),
                     lastname: validateStr("user information lastname", lastname, 50),
                     email: validateEmail("account email", email, 100),
@@ -168,8 +172,10 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
-            console.log(err.meta)
-            if (err.meta.target === 'Users_email_key') {
+            // console.log(err.meta)
+            if (err.meta.target === 'PRIMARY') {
+                err.message = "this user is duplicated"
+            } else if (err.meta.target === 'Users_email_key') {
                 err.message = "user email is duplicated"
             } else if (err.meta.target == 'phone_UNIQUE') {
                 err.message = "user phone is duplicated"

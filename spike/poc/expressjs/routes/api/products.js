@@ -201,7 +201,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
 })
 
 router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
-    let { name, description, itemOwner, type, tag, size, style, price } = req.body
+    let { itemId, name, description, itemOwner, type, tag, size, style, price } = req.body
     // let numberids = []
     // product_db.sort((a, b) => a.id - b.id).forEach(item => {
     //     numberids.push(item.id)
@@ -231,20 +231,47 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
         if (req.user.role == ROLE.Supplier && itemOwner !== req.user.email)
             forbiddenError("This supplier can create owner's item only")
 
-        let input = await prisma.items.create({
-            data: {
-                name: validateStr("item name", name, 100),
-                description: validateStr("item description", description, 500, true),
-                itemOwner: validateEmail("item owner", itemOwner, 100),
-                type: validateStr("item type", type, 20),
-                tag: validateStrArray("item tag", tag, 10, 20),
-                size: validateStrArray("item size", size, 5, 4),
-                style: validateStr("item style", style, 50),
-                price: validateDouble("item price", price, true)
-            }
-        })
+        let input
+        if (req.user.role == ROLE.Admin) {
+            // create item with custom item owner
+            input = await prisma.items.create({
+                data: {
+                    itemId: isNaN(itemId)? undefined : validateInt("item id", itemId, true),
+                    name: validateStr("item name", name, 100),
+                    description: validateStr("item description", description, 500, true),
+                    itemOwner: validateEmail("item owner", itemOwner, 100),
+                    type: validateStr("item type", type, 20),
+                    tag: validateStrArray("item tag", tag, 10, 20),
+                    size: validateStrArray("item size", size, 5, 4),
+                    style: validateStr("item style", style, 50),
+                    price: validateDouble("item price", price, true)
+                }
+            })
+        } else {
+            // create item with email owner
+            input = await prisma.items.create({
+                data: {
+                    itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
+                    name: validateStr("item name", name, 100),
+                    description: validateStr("item description", description, 500, true),
+                    itemOwner: req.user.email,
+                    type: validateStr("item type", type, 20),
+                    tag: validateStrArray("item tag", tag, 10, 20),
+                    size: validateStrArray("item size", size, 5, 4),
+                    style: validateStr("item style", style, 50),
+                    price: validateDouble("item price", price, true)
+                }
+            })
+        }
+
         return res.status(201).json(productConverter(input))
     } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.meta.target === 'PRIMARY') {
+                err.message = "product of user is duplicated"
+            }
+        }
         next(err)
     }
 })
@@ -378,12 +405,9 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req
             forbiddenError("This supplier can delete owner's item only")
 
         // find id to delete product
-        let input = await prisma.item_preview.delete({
+        let input = await prisma.items.delete({
             where: {
-                AND: [
-                    { itemId: validateInt("itemId", Number(req.params.id)) },
-                    { userEmail: req.user.email }
-                ]
+                itemId: validateInt("itemId", Number(req.params.id)),
             }
         })
         return res.json({ message: "item id " + req.params.id + " has been deleted" })
