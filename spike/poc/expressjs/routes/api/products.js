@@ -172,7 +172,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
 })
 
 const getProductImage = async (res, product) => {
-    product.image = await listFirstImage(res, findImagePath("products", product.itemId))
+    product.image = await listFirstImage(findImagePath("products", product.itemId))
     return product
 }
 
@@ -187,7 +187,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
 
         // image for product
         let path = findImagePath("products", item.itemId)
-        item.images = await listAllImage(res, path)
+        item.images = await listAllImage(path)
 
         // list product preview to page
         page = Number(req.query.pv_page)
