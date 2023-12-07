@@ -135,7 +135,7 @@ router.get('/:id', JwtAuth, async (req, res, next) => {
 })
 
 router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
-    let { email, role, password, firstname, lastname, phone } = req.body
+    let { userId, email, role, password, firstname, lastname, phone } = req.body
 
     try {
         let input
@@ -143,7 +143,7 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
             // admin user
             input = await prisma.accounts.create({
                 data: {
-                    itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
+                    userId: isNaN(userId) ? undefined : validateInt("item id", userId, true),
                     firstname: validateStr("user information firstname", firstname, 50),
                     lastname: validateStr("user information lastname", lastname, 50),
                     email: validateEmail("account email", email, 100),
@@ -157,7 +157,7 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
             // sign up case
             input = await prisma.accounts.create({
                 data: {
-                    itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
+                    userId: isNaN(userId) ? undefined : validateInt("item id", userId, true),
                     firstname: validateStr("user information firstname", firstname, 50),
                     lastname: validateStr("user information lastname", lastname, 50),
                     email: validateEmail("account email", email, 100),
