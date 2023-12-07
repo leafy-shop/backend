@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "npx prisma db push --accept-data-loss && npx prisma generate && set \"NODE_ENV=production\" && node index",
+    "start": "npx prisma generate && set \"NODE_ENV=production\" && node index",
     "dev": "npx prisma generate && set \"NODE_ENV=development\" && nodemon index"
   },
   "keywords": [],
