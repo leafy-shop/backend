@@ -92,6 +92,7 @@ router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     // array converter and image mapping
     Promise.all(
         // list user with image
+        page_u.data.length === 0 ? [] :
         page_u.data.map(user => timeConverter(user))
         // filter_pd.map(user => userConverter(user, userList))
     ).then(userList => {
