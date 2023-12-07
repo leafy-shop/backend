@@ -168,7 +168,7 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
             })
         }
 
-        return res.json(timeConverter(input))
+        return res.status(201).json(timeConverter(input))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
