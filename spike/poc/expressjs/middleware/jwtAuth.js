@@ -80,14 +80,17 @@ exports.FileAuthorization = async (req, res, next) => {
     // console.log(req.params)
     // check endpoint upload is products
     if (req.params.endpoint === "products") {
-      // check product is not found
-      let item = await prisma.items.findFirst({
-        where: {
-          itemId: Number(req.params.id)
+      // incase non admin role
+      if (req.user.role !== ROLE.Admin) {
+        // check product is not found
+        let item = await prisma.items.findFirst({
+          where: {
+            itemId: Number(req.params.id)
+          }
+        })
+        if (item === null) {
+          notFoundError("item id " + req.params.id + " not found")
         }
-      })
-      if (item === null) {
-        notFoundError("item id " + req.params.id + " not found")
       }
       // validate supplier
       if (req.user.role === ROLE.Supplier) {
@@ -99,21 +102,21 @@ exports.FileAuthorization = async (req, res, next) => {
       }
       // check endpoint upload is users
     } else if (req.params.endpoint === "users") {
-      // find user email by id
-      let user = await prisma.accounts.findFirst({
-        where: {
-          userId: Number(req.params.id)
-        }
-      })
-      if (user === null) {
-        notFoundError("user id " + req.params.id + "not found")
-      }
-      // validate other user except admin
+      // incase non admin role
       if (req.user.role !== ROLE.Admin) {
+        // find user email by id
+        let user = await prisma.accounts.findFirst({
+          where: {
+            userId: Number(req.params.id)
+          }
+        })
+        if (user === null) {
+          notFoundError("user id " + req.params.id + " not found")
+        }
+        // validate other user except admin
         if (req.user.email !== user.email) {
           validatError("you can't manage other user icons except yourself.")
         }
-
       }
     } else {
       forbiddenError("cannot use endpoint " + req.params.endpoint + " for doing file")
@@ -122,5 +125,4 @@ exports.FileAuthorization = async (req, res, next) => {
   } catch (err) {
     next(err)
   }
-
 }
