@@ -80,14 +80,14 @@ exports.FileAuthorization = async (req, res, next) => {
     // console.log(req.params)
     // check endpoint upload is products
     if (req.params.endpoint === "products") {
+      // check product is not found
+      let item = await prisma.items.findFirst({
+        where: {
+          itemId: Number(req.params.id)
+        }
+      })
       // incase non admin role
       if (req.user.role !== ROLE.Admin) {
-        // check product is not found
-        let item = await prisma.items.findFirst({
-          where: {
-            itemId: Number(req.params.id)
-          }
-        })
         if (item === null) {
           notFoundError("item id " + req.params.id + " not found")
         }
@@ -95,7 +95,6 @@ exports.FileAuthorization = async (req, res, next) => {
       // validate supplier
       if (req.user.role === ROLE.Supplier) {
         // find item owner by id
-
         if (req.user.email !== item.itemOwner) {
           validatError("you can't manage other item owner's images except yourself.")
         }
