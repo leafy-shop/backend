@@ -229,8 +229,8 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
     // created product from request body and validation
     try {
         // check if supplier role delete other email
-        if (req.user.role == ROLE.Supplier && itemOwner !== req.user.email)
-            forbiddenError("This supplier can create owner's item only")
+        // if (req.user.role == ROLE.Supplier && itemOwner !== req.user.email)
+        //     forbiddenError("This supplier can create owner's item only")
 
         let input
         if (req.user.role == ROLE.Admin) {
