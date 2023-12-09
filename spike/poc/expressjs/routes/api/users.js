@@ -140,7 +140,8 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
 
     try {
         let input
-        if (req.user.role === ROLE.Admin) {
+        console.log(req.user !== undefined)
+        if (req.user !== undefined && req.user.role === ROLE.Admin) {
             // admin user
             input = await prisma.accounts.create({
                 data: {

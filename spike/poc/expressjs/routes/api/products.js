@@ -96,6 +96,13 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     let limitN = Number(limit)
     // console.log(limit)
 
+    // rating scale format for filter
+    let ratingScale = [[0.9, 1.8], [1.8, 2.6], [2.6, 3.4], [3.4, 4.2], [4.2, 5]]
+
+    // console.log(rating)
+    // console.log(isNaN(rating) ? undefined : ratingScale[rating - 1][0])
+    // console.log(isNaN(rating) ? undefined : ratingScale[rating - 1][1])
+
     // filter single and between value from name, price, rating and isFavPrd query
     // and return page that sorted by updateAt item
     try {
@@ -113,8 +120,8 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                         gte: min_price
                     },
                     totalRating: {
-                        lte: rating,
-                        gt: isNaN(rating - 1) ? undefined : rating - 1
+                        gt: isNaN(rating) ? undefined : ratingScale[rating-1][0],
+                        lte: isNaN(rating) ? undefined : ratingScale[rating-1][1]
                     },
                     favprd: favFilter,
 

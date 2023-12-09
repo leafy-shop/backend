@@ -62,11 +62,15 @@ exports.verifyRole = (...roles) => {
   return (req, res, next) => {
     // เรียก role จาก header หรือ cookie
     const jwtToken = "Bearer " + req.cookies.token;
-    const reqRole = getUser(jwtToken.substring(7)).role;
+    let reqRole = getUser(jwtToken.substring(7)).role;
 
-    // ถ้าไม่มี role จะไม่มีสิทธิ์สำหรับการเข้าระบบ
-    if (!reqRole) return res.status(403).json(errorRes("the role is null", req.originalUrl));
-    const result = [...roles].includes(reqRole);
+    // // ถ้าไม่มี role จะสามารถการเข้าระบบได้
+    let result
+    if (reqRole) {
+      result = [...roles].includes(reqRole);
+    } else {
+      result = true
+    };
 
     // ถ้า role ไม่ใช่ user, admin_it และ admin_pr จะไม่มีสิทธิ์สำหรับการเข้าระบบในส่วนนั้น
     if (!result) return res.status(403).json(errorRes("the role is not allowed to use", req.originalUrl));
