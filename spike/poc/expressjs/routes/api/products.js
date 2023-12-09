@@ -127,18 +127,23 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         })
 
         // filter includes array : complexity best case O(n), worst case O(n*(type+tag))
-        filter_pd = filter_pd.filter(product =>
-            type == undefined ? true : type.split(",").includes(product.type)
-                // console.log(type.split(","))
-                // console.log(product.type)
-                // console.log(type.split(",").includes(product.type))
+        filter_pd = filter_pd.filter(product => {
+            condition = (type === undefined ? true : type.split(",").includes(product.type)) &&
+                (tag === undefined ? true : tag.split(",").some(r => product.tag.split(",").includes(r)))
+            // console.log(type.split(","))
+            // console.log(product.type)
+            // console.log(type.split(",").includes(product.type))
 
-                // https://stackoverflow.com/questions/16312528/check-if-an-array-contains-any-element-of-another-array-in-javascript
-                && tag == undefined ? true : tag.split(",").some(r => product.tag.split(",").includes(r))
-            // console.log(tag.split(","))
-            // console.log(product.tag.split(","))
-            // console.log(tag.split(",").some(r => product.tag.split(",").includes(r)))
-        )
+            // https://stackoverflow.com/questions/16312528/check-if-an-array-contains-any-element-of-another-array-in-javascript
+            
+            // if (product.itemId=="30002") {
+            //     console.log(tag.split(","))
+            //     console.log(product.tag.split(","))
+            //     console.log(tag.split(",").some(r => product.tag.split(",").includes(r)))
+            //     console.log(condition)
+            // }
+            return condition
+        })
 
         // check if user is supplier then see only owner product
         if (req.user !== undefined && req.user.role === ROLE.Supplier) filter_pd = filter_pd.filter(product => product.itemOwner == req.user.email)
@@ -150,7 +155,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         Promise.all(
             // list product with image
             page_pd.data.length === 0 ? [] :
-            page_pd.data.map(product => getProductImage(res, productConverter(product, prodList)))
+                page_pd.data.map(product => getProductImage(res, productConverter(product, prodList)))
             // filter_pd.map(product => productConverter(product, prodList))
         ).then(productList => {
             page_pd.data = productList
@@ -237,7 +242,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
             // create item with custom item owner
             input = await prisma.items.create({
                 data: {
-                    itemId: isNaN(itemId)? undefined : validateInt("item id", itemId, true),
+                    itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
                     name: validateStr("item name", name, 100),
                     description: validateStr("item description", description, 500, true),
                     itemOwner: validateEmail("item owner", itemOwner, 100),
