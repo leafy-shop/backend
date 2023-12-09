@@ -432,7 +432,7 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req
 // preview -- zone ---
 router.post('/:prodId/preview', JwtAuth, async (req, res, next) => {
     try {
-        let { comment, rating, size, style } = req.body
+        let { itemPreviewId, comment, rating, size, style } = req.body
 
         // find item id
         let item = await verifyId(req.params.prodId)
@@ -445,7 +445,7 @@ router.post('/:prodId/preview', JwtAuth, async (req, res, next) => {
         // add this user for comment
         let preview = await prisma.item_preview.create({
             data: {
-                itemPreviewId: id,
+                itemPreviewId: itemPreviewId == undefined ? itemPreviewId : id,
                 itemId: item.itemId,
                 userEmail: req.user.email,
                 comment: validateStr("item comment", comment, 200),
@@ -477,6 +477,12 @@ router.post('/:prodId/preview', JwtAuth, async (req, res, next) => {
 
         return res.json(preview)
     } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.code === 'P2002') {
+                err.message = "item preview is duplicated"
+            }
+        }
         next(err)
     }
 })
