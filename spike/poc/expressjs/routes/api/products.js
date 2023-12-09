@@ -442,10 +442,12 @@ router.post('/:prodId/preview', JwtAuth, async (req, res, next) => {
 
         console.log(id.length); // => f9b327e70bbcf42494ccb28b2d98e00e
 
+        console.log(itemPreviewId)
+
         // add this user for comment
         let preview = await prisma.item_preview.create({
             data: {
-                itemPreviewId: itemPreviewId == undefined ? itemPreviewId : id,
+                itemPreviewId: itemPreviewId !== undefined ? itemPreviewId : id,
                 itemId: item.itemId,
                 userEmail: req.user.email,
                 comment: validateStr("item comment", comment, 200),
