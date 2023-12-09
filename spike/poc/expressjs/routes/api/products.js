@@ -135,7 +135,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
             // console.log(type.split(",").includes(product.type))
 
             // https://stackoverflow.com/questions/16312528/check-if-an-array-contains-any-element-of-another-array-in-javascript
-            
+
             // if (product.itemId=="30002") {
             //     console.log(tag.split(","))
             //     console.log(product.tag.split(","))
@@ -457,25 +457,8 @@ router.post('/:prodId/preview', JwtAuth, async (req, res, next) => {
             }
         })
 
-        // get average value of rating in item id
-        avg_preview = await prisma.item_preview.aggregate({
-            _avg: {
-                rating: true
-            },
-            where: {
-                itemId: item.itemId
-            }
-        })
-
-        // update average rating in item id
-        await prisma.items.update({
-            data: {
-                totalRating: Math.round(avg_preview._avg.rating, 1)
-            },
-            where: {
-                itemId: item.itemId
-            }
-        })
+        // change average of rating in this item
+        await changeTotalRating(item.itemId)
 
         return res.json(preview)
     } catch (err) {
@@ -509,6 +492,10 @@ router.delete('/:prodId/preview/:commentId', JwtAuth, async (req, res, next) => 
                 userEmail: req.user.email
             }
         })
+
+        // change average of rating in this item
+        await changeTotalRating(item.itemId)
+
         return res.json({ message: "item comment id " + commentId + " has been deleted" })
     } catch (err) {
         // if product is not found
@@ -667,6 +654,29 @@ const verifyUserEmail = async (userEmail) => {
         return productConverter(favprd.items)
     })
     return filter_user
+}
+
+const changeTotalRating = async (id) => {
+    // get average value of rating in item id
+    avg_preview = await prisma.item_preview.aggregate({
+        _avg: {
+            rating: true
+        },
+        where: {
+            itemId: id
+        }
+    })
+
+    // update average rating in item id
+    await prisma.items.update({
+        data: {
+            totalRating: avg_preview._avg.rating.toFixed(1)
+        },
+        where: {
+            itemId: id
+        }
+    })
+    return avg_preview
 }
 
 const findPreviewById = async (email, commendId) => {
