@@ -624,7 +624,11 @@ const verifyId = async (id) => {
             itemId: Number(id)
         },
         include: {
-            item_preview: true
+            item_preview: {
+                orderBy: {
+                    createdAt: "desc"
+                }
+            }
         }
     })
 
