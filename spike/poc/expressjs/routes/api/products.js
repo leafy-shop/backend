@@ -658,7 +658,7 @@ const verifyUserEmail = async (userEmail) => {
     filter_user.favprd = filter_user.favprd.map(favprd => {
         return productConverter(favprd.items)
     })
-    return filter_pd
+    return filter_user
 }
 
 const findPreviewById = async (email, commendId) => {
