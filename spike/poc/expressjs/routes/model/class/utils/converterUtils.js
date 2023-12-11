@@ -76,7 +76,7 @@ const paginationList = (list, pageN, limitN, maxLimit) => {
     "allPage": Math.ceil(list.length / varLimit),
     "allItems": list.length,
     // data: list.slice(currentPage, currentPage + varLimit)
-    "data": list.slice(currentPage, currentPage + varLimit)
+    "list": list.slice(currentPage, currentPage + varLimit)
   }
   return pageTemplate
 }
