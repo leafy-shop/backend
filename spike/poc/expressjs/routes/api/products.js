@@ -161,11 +161,11 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         // array converter and image mapping
         Promise.all(
             // list product with image
-            page_pd.data.length === 0 ? [] :
-                page_pd.data.map(product => getProductImage(res, productConverter(product, prodList)))
+            page_pd.list.length === 0 ? [] :
+                page_pd.list.map(product => getProductImage(res, productConverter(product, prodList)))
             // filter_pd.map(product => productConverter(product, prodList))
         ).then(productList => {
-            page_pd.data = productList
+            page_pd.list = productList
             return res.send(page_pd)
         }).catch(err => {
             next(err)
