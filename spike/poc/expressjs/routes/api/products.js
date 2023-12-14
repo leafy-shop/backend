@@ -89,7 +89,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     // console.log(Boolean(req.query.isFav))
 
     // favFilter mode by show some user who are favorite
-    let favFilter = req.user !== undefined || isFav === undefined || isFav.toLocaleLowerCase() !== 'true' ? {} : { some: { userEmail: req.user.email } }
+    let favFilter = (req.user === undefined || isFav === undefined || isFav.toLocaleLowerCase() !== 'true') ? {} : { some: { userEmail: req.user.email } }
 
     // page number and page size
     let pageN = Number(page)
