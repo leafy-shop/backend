@@ -89,12 +89,19 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     // console.log(Boolean(req.query.isFav))
 
     // favFilter mode by show some user who are favorite
-    let favFilter = isFav === undefined || isFav.toLocaleLowerCase() !== 'true' ? {} : { some: { userEmail: req.user.email } }
+    let favFilter = (req.user === undefined || isFav === undefined || isFav.toLocaleLowerCase() !== 'true') ? {} : { some: { userEmail: req.user.email } }
 
     // page number and page size
     let pageN = Number(page)
     let limitN = Number(limit)
     // console.log(limit)
+
+    // rating scale format for filter
+    let ratingScale = [[0.9, 1.8], [1.8, 2.6], [2.6, 3.4], [3.4, 4.2], [4.2, 5]]
+
+    // console.log(rating)
+    // console.log(isNaN(rating) ? undefined : ratingScale[rating - 1][0])
+    // console.log(isNaN(rating) ? undefined : ratingScale[rating - 1][1])
 
     // filter single and between value from name, price, rating and isFavPrd query
     // and return page that sorted by updateAt item
@@ -113,8 +120,8 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                         gte: min_price
                     },
                     totalRating: {
-                        lte: rating,
-                        gt: isNaN(rating - 1) ? undefined : rating - 1
+                        gt: isNaN(rating) ? undefined : ratingScale[rating-1][0],
+                        lte: isNaN(rating) ? undefined : ratingScale[rating-1][1]
                     },
                     favprd: favFilter,
 
@@ -127,18 +134,23 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         })
 
         // filter includes array : complexity best case O(n), worst case O(n*(type+tag))
-        filter_pd = filter_pd.filter(product =>
-            type == undefined ? true : type.split(",").includes(product.type)
-                // console.log(type.split(","))
-                // console.log(product.type)
-                // console.log(type.split(",").includes(product.type))
+        filter_pd = filter_pd.filter(product => {
+            condition = (type === undefined ? true : type.split(",").includes(product.type)) &&
+                (tag === undefined ? true : tag.split(",").some(r => product.tag.split(",").includes(r)))
+            // console.log(type.split(","))
+            // console.log(product.type)
+            // console.log(type.split(",").includes(product.type))
 
-                // https://stackoverflow.com/questions/16312528/check-if-an-array-contains-any-element-of-another-array-in-javascript
-                && tag == undefined ? true : tag.split(",").some(r => product.tag.split(",").includes(r))
-            // console.log(tag.split(","))
-            // console.log(product.tag.split(","))
-            // console.log(tag.split(",").some(r => product.tag.split(",").includes(r)))
-        )
+            // https://stackoverflow.com/questions/16312528/check-if-an-array-contains-any-element-of-another-array-in-javascript
+
+            // if (product.itemId=="30002") {
+            //     console.log(tag.split(","))
+            //     console.log(product.tag.split(","))
+            //     console.log(tag.split(",").some(r => product.tag.split(",").includes(r)))
+            //     console.log(condition)
+            // }
+            return condition
+        })
 
         // check if user is supplier then see only owner product
         if (req.user !== undefined && req.user.role === ROLE.Supplier) filter_pd = filter_pd.filter(product => product.itemOwner == req.user.email)
@@ -149,10 +161,11 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         // array converter and image mapping
         Promise.all(
             // list product with image
-            page_pd.productList.map(product => getProductImage(res, productConverter(product, prodList)))
+            page_pd.list.length === 0 ? [] :
+                page_pd.list.map(product => getProductImage(res, productConverter(product, prodList)))
             // filter_pd.map(product => productConverter(product, prodList))
         ).then(productList => {
-            page_pd.productList = productList
+            page_pd.list = productList
             return res.send(page_pd)
         }).catch(err => {
             next(err)
@@ -171,7 +184,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
 })
 
 const getProductImage = async (res, product) => {
-    product.image = await listFirstImage(res, findImagePath("products", product.itemId))
+    product.image = await listFirstImage(findImagePath("products", product.itemId))
     return product
 }
 
@@ -186,7 +199,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
 
         // image for product
         let path = findImagePath("products", item.itemId)
-        item.images = await listAllImage(res, path)
+        item.images = await listAllImage(path)
 
         // list product preview to page
         page = Number(req.query.pv_page)
@@ -201,7 +214,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
 })
 
 router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
-    let { name, description, itemOwner, type, tag, size, style, price } = req.body
+    let { itemId, name, description, itemOwner, type, tag, size, style, price } = req.body
     // let numberids = []
     // product_db.sort((a, b) => a.id - b.id).forEach(item => {
     //     numberids.push(item.id)
@@ -228,23 +241,50 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
     // created product from request body and validation
     try {
         // check if supplier role delete other email
-        if (req.user.role == ROLE.Supplier && itemOwner !== req.user.email)
-            forbiddenError("This supplier can create owner's item only")
+        // if (req.user.role == ROLE.Supplier && itemOwner !== req.user.email)
+        //     forbiddenError("This supplier can create owner's item only")
 
-        let input = await prisma.items.create({
-            data: {
-                name: validateStr("item name", name, 100),
-                description: validateStr("item description", description, 500, true),
-                itemOwner: validateEmail("item owner", itemOwner, 100),
-                type: validateStr("item type", type, 20),
-                tag: validateStrArray("item tag", tag, 10, 20),
-                size: validateStrArray("item size", size, 5, 4),
-                style: validateStr("item style", style, 50),
-                price: validateDouble("item price", price, true)
-            }
-        })
+        let input
+        if (req.user.role == ROLE.Admin) {
+            // create item with custom item owner
+            input = await prisma.items.create({
+                data: {
+                    itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
+                    name: validateStr("item name", name, 100),
+                    description: validateStr("item description", description, 500, true),
+                    itemOwner: validateEmail("item owner", itemOwner, 100),
+                    type: validateStr("item type", type, 20),
+                    tag: validateStrArray("item tag", tag, 10, 20),
+                    size: validateStrArray("item size", size, 5, 4),
+                    style: validateStr("item style", style, 50),
+                    price: validateDouble("item price", price, true)
+                }
+            })
+        } else {
+            // create item with email owner
+            input = await prisma.items.create({
+                data: {
+                    itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
+                    name: validateStr("item name", name, 100),
+                    description: validateStr("item description", description, 500, true),
+                    itemOwner: req.user.email,
+                    type: validateStr("item type", type, 20),
+                    tag: validateStrArray("item tag", tag, 10, 20),
+                    size: validateStrArray("item size", size, 5, 4),
+                    style: validateStr("item style", style, 50),
+                    price: validateDouble("item price", price, true)
+                }
+            })
+        }
+
         return res.status(201).json(productConverter(input))
     } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.meta.target === 'PRIMARY') {
+                err.message = "product of user is duplicated"
+            }
+        }
         next(err)
     }
 })
@@ -378,12 +418,9 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req
             forbiddenError("This supplier can delete owner's item only")
 
         // find id to delete product
-        let input = await prisma.item_preview.delete({
+        let input = await prisma.items.delete({
             where: {
-                AND: [
-                    { itemId: validateInt("itemId", Number(req.params.id)) },
-                    { userEmail: req.user.email }
-                ]
+                itemId: validateInt("itemId", Number(req.params.id)),
             }
         })
         return res.json({ message: "item id " + req.params.id + " has been deleted" })
@@ -402,7 +439,7 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req
 // preview -- zone ---
 router.post('/:prodId/preview', JwtAuth, async (req, res, next) => {
     try {
-        let { comment, rating, size, style } = req.body
+        let { itemPreviewId, comment, rating, size, style } = req.body
 
         // find item id
         let item = await verifyId(req.params.prodId)
@@ -412,10 +449,12 @@ router.post('/:prodId/preview', JwtAuth, async (req, res, next) => {
 
         console.log(id.length); // => f9b327e70bbcf42494ccb28b2d98e00e
 
+        console.log(itemPreviewId)
+
         // add this user for comment
         let preview = await prisma.item_preview.create({
             data: {
-                itemPreviewId: id,
+                itemPreviewId: itemPreviewId !== undefined ? itemPreviewId : id,
                 itemId: item.itemId,
                 userEmail: req.user.email,
                 comment: validateStr("item comment", comment, 200),
@@ -425,28 +464,17 @@ router.post('/:prodId/preview', JwtAuth, async (req, res, next) => {
             }
         })
 
-        // get average value of rating in item id
-        avg_preview = await prisma.item_preview.aggregate({
-            _avg: {
-                rating: true
-            },
-            where: {
-                itemId: item.itemId
-            }
-        })
+        // change average of rating in this item
+        await changeTotalRating(item.itemId)
 
-        // update average rating in item id
-        await prisma.items.update({
-            data: {
-                totalRating: Math.round(avg_preview._avg.rating, 1)
-            },
-            where: {
-                itemId: item.itemId
-            }
-        })
-
-        return res.json(preview)
+        return res.json(timeConverter(preview))
     } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.code === 'P2002') {
+                err.message = "item preview is duplicated"
+            }
+        }
         next(err)
     }
 })
@@ -471,6 +499,10 @@ router.delete('/:prodId/preview/:commentId', JwtAuth, async (req, res, next) => 
                 userEmail: req.user.email
             }
         })
+
+        // change average of rating in this item
+        await changeTotalRating(item.itemId)
+
         return res.json({ message: "item comment id " + commentId + " has been deleted" })
     } catch (err) {
         // if product is not found
@@ -541,7 +573,7 @@ router.put('/:prodId/preview/:commentId/like', JwtAuth, async (req, res, next) =
             })
         }
 
-        return res.json(comment)
+        return res.json(timeConverter(comment))
     } catch (err) {
         // if product is not found
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -594,7 +626,11 @@ const verifyId = async (id) => {
             itemId: Number(id)
         },
         include: {
-            item_preview: true
+            item_preview: {
+                orderBy: {
+                    createdAt: "desc"
+                }
+            }
         }
     })
 
@@ -624,7 +660,30 @@ const verifyUserEmail = async (userEmail) => {
     filter_user.favprd = filter_user.favprd.map(favprd => {
         return productConverter(favprd.items)
     })
-    return filter_pd
+    return filter_user
+}
+
+const changeTotalRating = async (id) => {
+    // get average value of rating in item id
+    avg_preview = await prisma.item_preview.aggregate({
+        _avg: {
+            rating: true
+        },
+        where: {
+            itemId: id
+        }
+    })
+
+    // update average rating in item id
+    await prisma.items.update({
+        data: {
+            totalRating: avg_preview._avg.rating.toFixed(1)
+        },
+        where: {
+            itemId: id
+        }
+    })
+    return avg_preview
 }
 
 const findPreviewById = async (email, commendId) => {
@@ -637,7 +696,7 @@ const findPreviewById = async (email, commendId) => {
             ]
         }
     })
-    console.log(preview)
+    // console.log(preview)
 
     // check that product is found
     // if (preview == null) notFoundError("item preview like of id " + id + " does not exist")

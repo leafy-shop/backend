@@ -15,6 +15,10 @@ const productConverter = (product, model) => {
     product = modelMapper(product, model)
   }
 
+  // floating string to float convertor
+  if (product.totalRating !== undefined) product.totalRating = parseFloat(product.totalRating)
+  if (product.price !== undefined) product.price = parseFloat(product.price)
+
   // array converter
   if (product.tag !== undefined) product.tag = product.tag.split(",")
   if (product.size !== undefined) product.size = product.size.split(",")
@@ -72,7 +76,7 @@ const paginationList = (list, pageN, limitN, maxLimit) => {
     "allPage": Math.ceil(list.length / varLimit),
     "allItems": list.length,
     // data: list.slice(currentPage, currentPage + varLimit)
-    productList: list.slice(currentPage, currentPage + varLimit)
+    "list": list.slice(currentPage, currentPage + varLimit)
   }
   return pageTemplate
 }

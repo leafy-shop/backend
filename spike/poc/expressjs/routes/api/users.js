@@ -92,10 +92,11 @@ router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     // array converter and image mapping
     Promise.all(
         // list user with image
-        page_u.data.map(user => timeConverter(user))
+        page_u.list.length === 0 ? [] :
+        page_u.list.map(user => timeConverter(user))
         // filter_pd.map(user => userConverter(user, userList))
     ).then(userList => {
-        page_u.data = userList
+        page_u.list = userList
         return res.json(page_u)
     }).catch(err => {
         next(err)
@@ -135,13 +136,16 @@ router.get('/:id', JwtAuth, async (req, res, next) => {
 })
 
 router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
-    let { email, role, password, firstname, lastname, phone } = req.body
+    let { userId, email, role, password, firstname, lastname, phone } = req.body
 
     try {
         let input
-        if (req.user.role === ROLE.Admin) {
+        console.log(req.user !== undefined)
+        if (req.user !== undefined && req.user.role === ROLE.Admin) {
+            // admin user
             input = await prisma.accounts.create({
                 data: {
+                    userId: isNaN(userId) ? undefined : validateInt("item id", userId, true),
                     firstname: validateStr("user information firstname", firstname, 50),
                     lastname: validateStr("user information lastname", lastname, 50),
                     email: validateEmail("account email", email, 100),
@@ -152,8 +156,10 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
                 select: userView
             })
         } else {
+            // sign up case
             input = await prisma.accounts.create({
                 data: {
+                    userId: isNaN(userId) ? undefined : validateInt("item id", userId, true),
                     firstname: validateStr("user information firstname", firstname, 50),
                     lastname: validateStr("user information lastname", lastname, 50),
                     email: validateEmail("account email", email, 100),
@@ -164,12 +170,14 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
             })
         }
 
-        return res.json(timeConverter(input))
+        return res.status(201).json(timeConverter(input))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
-            console.log(err.meta)
-            if (err.meta.target === 'Users_email_key') {
+            // console.log(err.meta)
+            if (err.meta.target === 'PRIMARY') {
+                err.message = "this user is duplicated"
+            } else if (err.meta.target === 'Users_email_key') {
                 err.message = "user email is duplicated"
             } else if (err.meta.target == 'phone_UNIQUE') {
                 err.message = "user phone is duplicated"
@@ -250,13 +258,6 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) =>
             forbiddenError("you cannot delete myself")
         }
 
-        if (user.userinfo.length !== 0) {
-            await prisma.userinfo.delete({
-                where: {
-                    accounts_userId: validateInt("userId", Number(req.params.id))
-                }
-            })
-        }
         await prisma.accounts.delete({
             where: {
                 userId: Number(req.params.id)

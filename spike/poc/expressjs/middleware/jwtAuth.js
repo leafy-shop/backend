@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const { errorRes, forbiddenError, validatError } = require('./../routes/model/error/error')
+const { errorRes, forbiddenError, validatError, notFoundError } = require('./../routes/model/error/error')
 const { getUser } = require('../routes/model/class/utils/jwtUtils')
 
 const dotenv = require('dotenv');
@@ -62,11 +62,15 @@ exports.verifyRole = (...roles) => {
   return (req, res, next) => {
     // เรียก role จาก header หรือ cookie
     const jwtToken = "Bearer " + req.cookies.token;
-    const reqRole = getUser(jwtToken.substring(7)).role;
+    let reqRole = getUser(jwtToken.substring(7)).role;
 
-    // ถ้าไม่มี role จะไม่มีสิทธิ์สำหรับการเข้าระบบ
-    if (!reqRole) return res.status(403).json(errorRes("the role is null", req.originalUrl));
-    const result = [...roles].includes(reqRole);
+    // // ถ้าไม่มี role จะสามารถการเข้าระบบได้
+    let result
+    if (reqRole) {
+      result = [...roles].includes(reqRole);
+    } else {
+      result = true
+    };
 
     // ถ้า role ไม่ใช่ user, admin_it และ admin_pr จะไม่มีสิทธิ์สำหรับการเข้าระบบในส่วนนั้น
     if (!result) return res.status(403).json(errorRes("the role is not allowed to use", req.originalUrl));
@@ -76,28 +80,43 @@ exports.verifyRole = (...roles) => {
 
 exports.FileAuthorization = async (req, res, next) => {
   try {
-    console.log(req.user)
-    console.log(req.params)
+    // console.log(req.user)
+    // console.log(req.params)
     // check endpoint upload is products
     if (req.params.endpoint === "products") {
+      // check product is not found
+      let item = await prisma.items.findFirst({
+        where: {
+          itemId: Number(req.params.id)
+        }
+      })
+      // incase non admin role
+      if (req.user.role !== ROLE.Admin) {
+        if (item === null) {
+          notFoundError("item id " + req.params.id + " not found")
+        }
+      }
       // validate supplier
       if (req.user.role === ROLE.Supplier) {
         // find item owner by id
-        let item = await prisma.items.findFirst({ where: {
-          itemId: Number(req.params.id)
-        } })
         if (req.user.email !== item.itemOwner) {
           validatError("you can't manage other item owner's images except yourself.")
         }
       }
-    // check endpoint upload is users
+      // check endpoint upload is users
     } else if (req.params.endpoint === "users") {
-      // validate other user except admin
+      // incase non admin role
       if (req.user.role !== ROLE.Admin) {
         // find user email by id
-        let user = await prisma.accounts.findFirst({ where: {
-          userId: Number(req.params.id)
-        } })
+        let user = await prisma.accounts.findFirst({
+          where: {
+            userId: Number(req.params.id)
+          }
+        })
+        if (user === null) {
+          notFoundError("user id " + req.params.id + " not found")
+        }
+        // validate other user except admin
         if (req.user.email !== user.email) {
           validatError("you can't manage other user icons except yourself.")
         }
@@ -109,5 +128,4 @@ exports.FileAuthorization = async (req, res, next) => {
   } catch (err) {
     next(err)
   }
- 
 }

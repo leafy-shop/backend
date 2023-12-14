@@ -89,7 +89,7 @@ const validateEmail = (prop = '', value = '', length = 0) => {
         validatError(`${prop}:${value} have length more than ${length} characters`)
     }
     console.log(`validate ${prop} is passed`)
-    return value.trim()
+    return value.trim().toLowerCase()
 }
 
 const validatePassword = async (prop = '', value = '', atLeast = 0, atMost = 0) => {
