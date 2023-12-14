@@ -11,7 +11,6 @@ const prodList = {
     updatedAt: true
 }
 
-
 const userView = {
     userId: true,
     // name: true,

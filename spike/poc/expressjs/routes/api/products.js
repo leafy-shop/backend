@@ -89,7 +89,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     // console.log(Boolean(req.query.isFav))
 
     // favFilter mode by show some user who are favorite
-    let favFilter = isFav === undefined || isFav.toLocaleLowerCase() !== 'true' ? {} : { some: { userEmail: req.user.email } }
+    let favFilter = req.user !== undefined || isFav === undefined || isFav.toLocaleLowerCase() !== 'true' ? {} : { some: { userEmail: req.user.email } }
 
     // page number and page size
     let pageN = Number(page)
@@ -467,7 +467,7 @@ router.post('/:prodId/preview', JwtAuth, async (req, res, next) => {
         // change average of rating in this item
         await changeTotalRating(item.itemId)
 
-        return res.json(preview)
+        return res.json(timeConverter(preview))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -573,7 +573,7 @@ router.put('/:prodId/preview/:commentId/like', JwtAuth, async (req, res, next) =
             })
         }
 
-        return res.json(comment)
+        return res.json(timeConverter(comment))
     } catch (err) {
         // if product is not found
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -696,7 +696,7 @@ const findPreviewById = async (email, commendId) => {
             ]
         }
     })
-    console.log(preview)
+    // console.log(preview)
 
     // check that product is found
     // if (preview == null) notFoundError("item preview like of id " + id + " does not exist")
