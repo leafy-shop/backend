@@ -201,10 +201,10 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         let path = findImagePath("products", item.itemId)
         item.images = await listAllImage(path)
 
-        // list product preview to page
+        // list product review to page
         page = Number(req.query.pv_page)
         limit = Number(req.query.pv_limit)
-        item.item_preview = paginationList(item.item_preview, page, limit, 5)
+        item.item_review = paginationList(item.item_review, page, limit, 5)
 
         // return product by id
         return res.json(item)
@@ -436,10 +436,10 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req
     }
 })
 
-// preview -- zone ---
-router.post('/:prodId/preview', JwtAuth, async (req, res, next) => {
+// review -- zone ---
+router.post('/:prodId/review', JwtAuth, async (req, res, next) => {
     try {
-        let { itemPreviewId, comment, rating, size, style } = req.body
+        let { itemReviewId, comment, rating, size, style } = req.body
 
         // find item id
         let item = await verifyId(req.params.prodId)
@@ -449,12 +449,12 @@ router.post('/:prodId/preview', JwtAuth, async (req, res, next) => {
 
         console.log(id.length); // => f9b327e70bbcf42494ccb28b2d98e00e
 
-        console.log(itemPreviewId)
+        console.log(itemReviewId)
 
         // add this user for comment
-        let preview = await prisma.item_preview.create({
+        let review = await prisma.item_review.create({
             data: {
-                itemPreviewId: itemPreviewId !== undefined ? itemPreviewId : id,
+                itemReviewId: itemReviewId !== undefined ? itemReviewId : id,
                 itemId: item.itemId,
                 userEmail: req.user.email,
                 comment: validateStr("item comment", comment, 200),
@@ -467,35 +467,38 @@ router.post('/:prodId/preview', JwtAuth, async (req, res, next) => {
         // change average of rating in this item
         await changeTotalRating(item.itemId)
 
-        return res.json(timeConverter(preview))
+        return res.json(timeConverter(review))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2002') {
-                err.message = "item preview is duplicated"
+                err.message = "item review is duplicated"
+            }
+            if (err.code === 'P2025') {
+                err.message = "item id " + req.params.prodId + " does not exist"
             }
         }
         next(err)
     }
 })
 
-router.delete('/:prodId/preview/:commentId', JwtAuth, async (req, res, next) => {
+router.delete('/:prodId/review/:commentId', JwtAuth, async (req, res, next) => {
     try {
         let { prodId, commentId } = req.params
 
         // find item id
         let item = await verifyId(prodId)
 
-        item.item_preview.forEach(preview => {
+        item.item_review.forEach(review => {
             // check if supplier role delete other email that not same finding commend that throw to exception
-            if ([ROLE.Supplier, ROLE.User].includes(req.user.role) && preview.userEmail !== req.user.email)
+            if ([ROLE.Supplier, ROLE.User].includes(req.user.role) && review.userEmail !== req.user.email)
                 forbiddenError("user can delete your comment only")
         })
 
         // find id to delete product
-        await prisma.item_preview.delete({
+        await prisma.item_review.delete({
             where: {
-                itemPreviewId: commentId,
+                itemReviewId: commentId,
                 userEmail: req.user.email
             }
         })
@@ -516,42 +519,42 @@ router.delete('/:prodId/preview/:commentId', JwtAuth, async (req, res, next) => 
     }
 })
 
-router.put('/:prodId/preview/:commentId/like', JwtAuth, async (req, res, next) => {
+router.put('/:prodId/review/:commentId/like', JwtAuth, async (req, res, next) => {
     try {
         let { prodId, commentId } = req.params
 
         // get average value of rating in item id
-        let preview = await findPreviewById(req.user.email, commentId)
+        let review = await findReviewById(req.user.email, commentId)
 
         let comment
-        // check if preview is undefined
-        if (preview === null) {
+        // check if review is undefined
+        if (review === null) {
             // add like message on log
-            let input = await prisma.item_preview_like.create({
+            let input = await prisma.item_review_like.create({
                 data: {
-                    itemPreviewId: commentId,
+                    itemReviewId: commentId,
                     userEmail: req.user.email
                 }
             })
 
             // update like in item id
-            comment = await prisma.item_preview.update({
+            comment = await prisma.item_review.update({
                 data: {
                     like: {
                         increment: 1
                     }
                 },
                 where: {
-                    itemPreviewId: input.itemPreviewId,
+                    itemReviewId: input.itemReviewId,
                     itemId: Number(prodId)
                 }
             })
         } else {
             // revert like message on log
-            await prisma.item_preview_like.delete({
+            await prisma.item_review_like.delete({
                 where: {
-                    itemPreviewId_userEmail: {
-                        itemPreviewId: commentId,
+                    itemReviewId_userEmail: {
+                        itemReviewId: commentId,
                         userEmail: req.user.email
                     }
                 }
@@ -560,14 +563,14 @@ router.put('/:prodId/preview/:commentId/like', JwtAuth, async (req, res, next) =
             // console.log(prodId.userEmail)
 
             // update unlike in item id
-            comment = await prisma.item_preview.update({
+            comment = await prisma.item_review.update({
                 data: {
                     like: {
                         decrement: 1
                     }
                 },
                 where: {
-                    itemPreviewId: preview.itemPreviewId,
+                    itemReviewId: review.itemReviewId,
                     itemId: Number(prodId)
                 }
             })
@@ -586,38 +589,6 @@ router.put('/:prodId/preview/:commentId/like', JwtAuth, async (req, res, next) =
     }
 })
 
-// router.put('/:prodid/preview/:commentid/unlike', JwtAuth, async (req, res, next) => {
-//     try {
-//         // get average value of rating in item id
-//         preview = await findPreviewById(req.params.prodid, req.params.commentid)
-
-//         if (preview.like > 0) {
-//             // update average rating in item id
-//             let comment = await prisma.item_preview.update({
-//                 data: {
-//                     like: { decrement: 1 }
-//                 },
-//                 where: {
-//                     itemPreviewId: preview.itemPreviewId,
-//                     itemId: preview.itemId
-//                 }
-//             })
-//             return res.json(comment)
-//         } else {
-//             validatError("preview like must not negative number")
-//         }
-//     } catch (err) {
-//         // if product is not found
-//         if (err instanceof Prisma.PrismaClientKnownRequestError) {
-//             // The .code property can be accessed in a type-safe manner
-//             if (err.code === 'P2025') {
-//                 err.message = "item comment id " + req.params.id + " does not exist"
-//             }
-//         }
-//         next(err)
-//     }
-// })
-
 // -- method zone --
 const verifyId = async (id) => {
     // find product by id
@@ -626,7 +597,7 @@ const verifyId = async (id) => {
             itemId: Number(id)
         },
         include: {
-            item_preview: {
+            item_review: {
                 orderBy: {
                     createdAt: "desc"
                 }
@@ -665,7 +636,7 @@ const verifyUserEmail = async (userEmail) => {
 
 const changeTotalRating = async (id) => {
     // get average value of rating in item id
-    avg_preview = await prisma.item_preview.aggregate({
+    avg_review = await prisma.item_review.aggregate({
         _avg: {
             rating: true
         },
@@ -677,31 +648,27 @@ const changeTotalRating = async (id) => {
     // update average rating in item id
     await prisma.items.update({
         data: {
-            totalRating: avg_preview._avg.rating.toFixed(1)
+            totalRating: avg_review._avg.rating.toFixed(1)
         },
         where: {
             itemId: id
         }
     })
-    return avg_preview
+    return avg_review
 }
 
-const findPreviewById = async (email, commendId) => {
+const findReviewById = async (email, commendId) => {
     // get average value of rating in item id
-    preview = await prisma.item_preview_like.findFirst({
+    review = await prisma.item_review_like.findFirst({
         where: {
             AND: [
-                { itemPreviewId: commendId },
+                { itemReviewId: commendId },
                 { userEmail: email }
             ]
         }
     })
-    // console.log(preview)
 
-    // check that product is found
-    // if (preview == null) notFoundError("item preview like of id " + id + " does not exist")
-
-    return preview
+    return review
 }
 
 const findFavPdById = async (email, id) => {

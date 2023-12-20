@@ -1,5 +1,7 @@
 const multerS3 = require("multer-s3")
 const AWS = require("aws-sdk")
+const { findImagePath } = require("../routes/model/class/utils/imageList")
+
 require('dotenv').config().parsed
 
 const bucket = process.env.S3_BUCKET
@@ -22,9 +24,12 @@ module.exports.storage = multerS3({
   bucket,
   contentType: multerS3.AUTO_CONTENT_TYPE,
   metadata: async (req, file, cb) => {
+    console.log(mode)
     cb(null, { fieldName: file.fieldname });
   },
   key: (req, file, cb) => {
-    cb(null, `${mode == "development" ? "developments" : "productions"}/${req.params.endpoint}/${req.params.id}/${file.originalname}`);
+    let path = findImagePath(req.params.endpoint, req.params.id, req.params.style)
+    console.log(path)
+    cb(null, `${path}/${file.originalname}`);
   }
 });

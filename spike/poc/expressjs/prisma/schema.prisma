@@ -39,45 +39,52 @@ model items {
   items        accounts       @relation(fields: [itemOwner], references: [email], map: "Items_itemOwner_fkey")
   type         String         @db.VarChar(20)
   tag          String         @db.VarChar(500)
-  size         String         @db.VarChar(500)
-  style        String         @db.VarChar(50)
   totalRating  Decimal        @default(0.0) @db.Decimal(2, 1)
   sold         Int            @default(0)
-  isOutOfStock Boolean        @default(false)
   price        Decimal        @default(0.00) @db.Decimal(32, 2)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   carts        carts[]
   favprd       favprd[]
-  item_preview item_preview[]
+  item_reviews item_reviews[]
 
   @@index([itemId], map: "fk_items_users1_idx")
 }
 
-model item_preview {
-  itemPreviewId     String              @id @db.VarChar(32)
+model item_details {
+  itemId       Int
+  style        String  @db.VarChar(50)
+  size         String  @db.VarChar(500)
+  isOutOfStock Boolean @default(false)
+
+  @@id([itemId, style])
+  @@index([itemId], map: "fk_ItemDetail_items_idx")
+}
+
+model item_reviews {
+  itemReviewId      String              @id @db.VarChar(32)
   itemId            Int
   userEmail         String              @db.VarChar(100)
-  items             items               @relation(fields: [itemId], references: [itemId], map: "ItemPreview_itemId_fkey")
-  accounts          accounts            @relation(fields: [userEmail], references: [email], map: "ItemPreview_userEmail_fkey")
+  items             items               @relation(fields: [itemId], references: [itemId], map: "ItemReview_itemId_fkey")
+  accounts          accounts            @relation(fields: [userEmail], references: [email], map: "Itemreview_userEmail_fkey")
   comment           String              @db.VarChar(500)
   rating            Int                 @default(0)
   like              Int                 @default(0)
   size              String              @db.Char(100)
   style             String              @db.VarChar(50)
   createdAt         DateTime            @default(now())
-  item_preview_like item_preview_like[]
+  item_review_likes item_review_likes[]
 }
 
-model item_preview_like {
-  userEmail     String       @db.VarChar(100)
-  itemPreviewId String       @db.VarChar(32)
-  item_preview  item_preview @relation(fields: [itemPreviewId], references: [itemPreviewId], map: "UserPreviewLike_itemPreviewId_fkey")
-  accounts      accounts     @relation(fields: [userEmail], references: [email], map: "UserPreviewLike_userEmail_fkey")
+model item_review_likes {
+  userEmail    String       @db.VarChar(100)
+  itemReviewId String       @db.VarChar(32)
+  item_reviews item_reviews @relation(fields: [itemReviewId], references: [itemReviewId], map: "UserreviewLike_itemreviewId_fkey")
+  accounts     accounts     @relation(fields: [userEmail], references: [email], map: "UserreviewLike_userEmail_fkey")
 
-  @@id([itemPreviewId, userEmail])
-  @@index([itemPreviewId], map: "fk_UserPreviewLike_items_preview1_idx")
-  @@index([userEmail], map: "fk_UserPreviewLike_users1_idx")
+  @@id([itemReviewId, userEmail])
+  @@index([itemReviewId], map: "fk_UserReviewLike_items_review1_idx")
+  @@index([userEmail], map: "fk_UserReviewLike_users1_idx")
 }
 
 model accounts {
@@ -95,6 +102,6 @@ model accounts {
   carts             carts[]
   favprd            favprd[]
   items             items[]
-  item_preview      item_preview[]
-  item_preview_like item_preview_like[]
+  item_reviews      item_reviews[]
+  item_review_likes item_review_likes[]
 }

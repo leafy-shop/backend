@@ -7,8 +7,9 @@ const dotenv = require('dotenv');
 // get config vars
 dotenv.config();
 
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient, Prisma } = require('@prisma/client');
 const { ROLE } = require("../routes/model/enum/role");
+const { PrismaClientKnownRequestError } = require("@prisma/client/runtime/library");
 const prisma = new PrismaClient()
 
 exports.JwtAuth = (req, res, next) => {
@@ -85,16 +86,15 @@ exports.FileAuthorization = async (req, res, next) => {
     // check endpoint upload is products
     if (req.params.endpoint === "products") {
       // check product is not found
+      console.log(req.params)
       let item = await prisma.items.findFirst({
         where: {
           itemId: Number(req.params.id)
         }
       })
-      // incase non admin role
-      if (req.user.role !== ROLE.Admin) {
-        if (item === null) {
-          notFoundError("item id " + req.params.id + " not found")
-        }
+      // for all role
+      if (item === null) {
+        notFoundError("item id " + req.params.id + " not found")
       }
       // validate supplier
       if (req.user.role === ROLE.Supplier) {
@@ -126,6 +126,9 @@ exports.FileAuthorization = async (req, res, next) => {
     }
     next()
   } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      console.log(err.code)
+    }
     next(err)
   }
 }

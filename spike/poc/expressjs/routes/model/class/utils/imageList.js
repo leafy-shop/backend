@@ -1,15 +1,24 @@
-const { bucket, s3, mode } = require("./../../../../config/minio_config");
+const storage = require("./../../../../config/minio_config");
 
-let findImagePath = (endpoint, id) => {
-    return `${mode == "development" ? "developments" : "productions"}/${endpoint}/${id}`;
+// require('dotenv').config().parsed
+
+let findImagePath = (endpoint, id, subpath = undefined) => {
+    let mode = storage.mode
+    let path = `${mode == "development" ? "developments" : "productions"}/${endpoint}/${id}`
+    path = subpath !== undefined ? `${path}/${subpath}` : path
+    return path;
 }
 
 let listAllImage = async (folder) => {
+    let s3 = storage.s3
+    let bucket = storage.bucket
     // create list path
     const listObjectsParams = {
         Bucket: bucket,
         Prefix: folder
     };
+    console.log(bucket)
+    console.log(listObjectsParams)
 
     try {
         // list all object when exist
@@ -31,15 +40,18 @@ let listFirstImage = async (folder) => {
 }
 
 let validateDeleteAllImage = async (cb, folder) => {
+    let s3 = storage.s3
+    let bucket = storage.bucket
     try {
         // list all object when exist
         const listedObjects = await listAllImage(folder)
+
         if (listedObjects.length != 0) {
 
             // create mapping all images object params
             const deleteParams = {
                 Bucket: bucket,
-                Delete: { Objects: listedObjects.map(obj => ({ Key: folder+obj })) },
+                Delete: { Objects: listedObjects.map(obj => ({ Key: folder + "/" + obj })) },
             };
 
             // delete all files when exist
@@ -52,6 +64,8 @@ let validateDeleteAllImage = async (cb, folder) => {
 }
 
 let deleteAllImage = async (res, folder) => {
+    let s3 = storage.s3
+    let bucket = storage.bucket
     try {
         // list all object when exist
         const listedObjects = await listAllImage(folder)
@@ -61,7 +75,7 @@ let deleteAllImage = async (res, folder) => {
             // create mapping all images object params
             const deleteParams = {
                 Bucket: bucket,
-                Delete: { Objects: listedObjects.map(obj => ({ Key: folder+"/"+obj })) },
+                Delete: { Objects: listedObjects.map(obj => ({ Key: folder + "/" + obj })) },
             };
 
             console.log(listedObjects)

@@ -3,7 +3,7 @@ const router = express.Router();
 path = require("path");
 const multer = require("multer");
 require('dotenv').config().parsed
-const { JwtAuth, verifyRole, FileAuthorization } = require('./../../middleware/jwtAuth')
+const { JwtAuth, verifyRole, FileAuthorization } = require('../../middleware/jwtAuth')
 
 const { bucket, s3, storage, mode } = require("../../config/minio_config");
 const { ROLE } = require("../model/enum/role");
@@ -20,13 +20,14 @@ const upload = multer({
         if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
             return cb(new Error("Please upload a image file type jpg, jpeg or png"));
         }
+        console.log(file)
         cb(undefined, true);
     }
 });
 
 // upload multiple image
 // condition (file size < 8 MB, file multipart, file upload per solution, file type image only, path storage property)
-router.post("/:endpoint/:id", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), FileAuthorization, upload.array("file", 10), async (req, res) => {
+router.post("/:endpoint/:id/:style", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), FileAuthorization, upload.array("file", 10), async (req, res) => {
     let locations = []
     req.files.forEach(file => {
         locations.push(file.location)
@@ -37,8 +38,8 @@ router.post("/:endpoint/:id", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), Fi
 });
 
 // delete multiple image
-router.delete("/:endpoint/:id", JwtAuth, FileAuthorization, async (req, res) => {
-    const folder = findImagePath(req.params.endpoint, req.params.id);
+router.delete("/:endpoint/:id/:style", JwtAuth, FileAuthorization, async (req, res) => {
+    const folder = findImagePath(req.params.endpoint, req.params.id, req.params.style);
     const fileNames = req.body.files || []
     const numberFiles = []
 
@@ -80,8 +81,8 @@ router.delete("/:endpoint/:id", JwtAuth, FileAuthorization, async (req, res) => 
 });
 
 // delete all image
-router.delete("/:endpoint/:id/all", JwtAuth, FileAuthorization, async (req, res) => {
-    const folder = findImagePath(req.params.endpoint, req.params.id);
+router.delete("/:endpoint/:id/:style/all", JwtAuth, FileAuthorization, async (req, res) => {
+    const folder = findImagePath(req.params.endpoint, req.params.id, req.params.style);
 
     // delete all image
     return await deleteAllImage(res, folder)
