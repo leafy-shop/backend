@@ -88,8 +88,6 @@ router.post('/', async (req, res) => {
         "firstname": getUser(token).firstname,
         "email": getUser(token).email,
         "role": getUser(token).role,
-        "token": token,
-        "refreshToken": refreshtoken
     })
 })
 
