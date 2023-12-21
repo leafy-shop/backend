@@ -3,8 +3,6 @@ const prodList = {
     name: true,
     itemOwner: true,
     type: true,
-    tag: true,
-    size: true,
     totalRating: true,
     sold: true,
     price: true,

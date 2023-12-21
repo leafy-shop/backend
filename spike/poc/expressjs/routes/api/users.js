@@ -289,9 +289,6 @@ const verifyId = async (id) => {
     // not found checking
     if (filter_u == null) notFoundError("user id " + id + " does not exist")
 
-    // delete null value object
-    filter_u = deleteNullValue(filter_u)
-
     return userConverter(filter_u)
 }
 

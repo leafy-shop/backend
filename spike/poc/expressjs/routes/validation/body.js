@@ -137,21 +137,22 @@ const validateRole = (prop = '', value = '', enumtype, isEmpty = false) => {
     validatError(`${prop}:${value} is not in this types`)
 }
 
-const validateStrArray = (prop = '', values = [], ArrL, inArrL) => {
+const validateStrArray = (prop = '', values = [], ArrL, inArrL, upper = false) => {
     console.log("validate array of " + prop)
     // check values is array or not
     if (!(values instanceof Array)) {
         validatError(`${prop}:${values} is not array`)
     }
     if (values.length > ArrL) {
-        validatError(`length of ${prop}:${values} is more than ${ArrL}`)
+        validatError(`length of ${prop}:${values} have array length more than ${ArrL}`)
     }
 
     // check values is array then value is null, undefined and empty string
     values = values.filter(v => !(v == undefined || v == null || v.trim().length == 0))
 
     // validate string in array and return to lower case values
-    values = values.map((v, i) => validateStr(`${prop} - ${i + 1}:${v}`, v, inArrL).toLowerCase())
+    values = upper ? values.map((v, i) => validateStr(`${prop} - ${i + 1}:${v}`, v, inArrL).toUpperCase()) :
+     values.map((v, i) => validateStr(`${prop} - ${i + 1}:${v}`, v, inArrL).toLowerCase())
 
     // remove duplicated values
     values = [...new Set(values)]

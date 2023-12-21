@@ -17,13 +17,17 @@ let listAllImage = async (folder) => {
         Bucket: bucket,
         Prefix: folder
     };
-    console.log(bucket)
-    console.log(listObjectsParams)
 
     try {
         // list all object when exist
         const listedObjects = await s3.listObjectsV2(listObjectsParams).promise();
-        return listedObjects.Contents.map(obj => obj.Key.replace(/^.*[\\/]/, '')); // get only file name
+        // console.log(listedObjects)
+        
+        // complexity O(n^3)
+        return listedObjects.Contents.map(obj => {
+            // obj.Key.replace(/^.*[\\/]/, '')
+            return obj.Key.split("/").splice(3).join("/")
+        }); // get only file name
     } catch (err) {
         return undefined
     }

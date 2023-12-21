@@ -53,7 +53,7 @@ router.delete("/:endpoint/:id/:filename", JwtAuth, FileAuthorization, async (req
   const folder = findImagePath(req.params.endpoint, req.params.id);
   const fileName = `${folder}/${req.params.filename}`;
   const params = { Bucket: bucket, Key: fileName };
-  console.log(params)
+  // console.log(params)
 
   let file
 

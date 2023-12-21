@@ -3,13 +3,13 @@ const router = express.Router();
 
 const { validateStr, validateInt, validateBoolean, validateDouble, validateEmail, validateStrArray } = require('../validation/body')
 const { notFoundError, validatError, forbiddenError } = require('./../model/error/error')
-const { dateTimeZoneNow } = require('../model/class/utils/datetimeUtils')
+// const { dateTimeZoneNow } = require('../model/class/utils/datetimeUtils')
 const { userViewFav, prodList } = require('./../model/class/model')
 const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('./../../middleware/jwtAuth')
 
 const { PrismaClient, Prisma } = require('@prisma/client');
-const { modelMapper } = require('../model/class/utils/modelMapping');
-const { mode } = require('../../config/minio_config');
+// const { deleteNullValue } = require('../model/class/utils/modelMapping');
+// const { mode } = require('../../config/minio_config');
 const { productConverter, timeConverter, paginationList } = require('../model/class/utils/converterUtils');
 const { ROLE } = require('../model/enum/role');
 const { findImagePath, listAllImage, listFirstImage } = require('../model/class/utils/imageList');
@@ -78,8 +78,9 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
 
     // query params
     let { page, limit,
-        isFav, product, min_price, max_price, rating,
-        type, tag } = req.query
+        isFav, product, min_price, max_price, rating, owner,
+        type, tag,
+        sort_name, sort } = req.query
 
     // count items
     // let count_pd = await prisma.items.count()
@@ -95,6 +96,14 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     let pageN = Number(page)
     let limitN = Number(limit)
     // console.log(limit)
+
+    // customize sorting model
+    let sortModel = {}
+    if (sort_name !== undefined && ["price", "sold", "updatedAt"].includes(sort_name)) {
+        sortModel[sort_name] = (sort === "desc") ? "desc" : "asc"
+    } else {
+        sortModel.updatedAt = "desc"
+    }
 
     // rating scale format for filter
     let ratingScale = [[0.9, 1.8], [1.8, 2.6], [2.6, 3.4], [3.4, 4.2], [4.2, 5]]
@@ -120,17 +129,19 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                         gte: min_price
                     },
                     totalRating: {
-                        gt: isNaN(rating) ? undefined : ratingScale[rating-1][0],
-                        lte: isNaN(rating) ? undefined : ratingScale[rating-1][1]
+                        gt: isNaN(rating) ? undefined : ratingScale[rating - 1][0],
+                        lte: isNaN(rating) ? undefined : ratingScale[rating - 1][1]
                     },
                     favprd: favFilter,
-
+                    itemOwner: {
+                        contains: owner
+                    }
                 }]
             },
             include: {
                 favprd: false,
             },
-            orderBy: { updatedAt: "desc" }
+            orderBy: sortModel
         })
 
         // filter includes array : complexity best case O(n), worst case O(n*(type+tag))
@@ -204,7 +215,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         // list product review to page
         page = Number(req.query.pv_page)
         limit = Number(req.query.pv_limit)
-        item.item_review = paginationList(item.item_review, page, limit, 5)
+        item.item_reviews = paginationList(item.item_reviews, page, limit, 5)
 
         // return product by id
         return res.json(item)
@@ -214,7 +225,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
 })
 
 router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
-    let { itemId, name, description, itemOwner, type, tag, size, style, price } = req.body
+    let { itemId, name, description, itemOwner, type, tag, size, styles, price } = req.body
     // let numberids = []
     // product_db.sort((a, b) => a.id - b.id).forEach(item => {
     //     numberids.push(item.id)
@@ -233,9 +244,16 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
     //     "itemOwner": "piraphat123@gmail.com",
     //     "type": "cactus",
     //     "tag": ["cactus is amazing","flower cactus","cactus","","cactus","Cactus"],
-    //     "size": ["XS","S"],
-    //     "style": "light green cactus",
-    //     "price": 32,
+    //     "styles": [
+    //         {
+    //             "style": "light green cactus",
+    //             "size": ["XS","S"]
+    //         },{
+    //             "style": "green cactus",
+    //             "size": ["S"]
+    //         }
+    //     ],
+    //     "price": 32
     // }
 
     // created product from request body and validation
@@ -244,40 +262,43 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
         // if (req.user.role == ROLE.Supplier && itemOwner !== req.user.email)
         //     forbiddenError("This supplier can create owner's item only")
 
-        let input
-        if (req.user.role == ROLE.Admin) {
-            // create item with custom item owner
-            input = await prisma.items.create({
-                data: {
-                    itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
-                    name: validateStr("item name", name, 100),
-                    description: validateStr("item description", description, 500, true),
-                    itemOwner: validateEmail("item owner", itemOwner, 100),
-                    type: validateStr("item type", type, 20),
-                    tag: validateStrArray("item tag", tag, 10, 20),
-                    size: validateStrArray("item size", size, 5, 4),
-                    style: validateStr("item style", style, 50),
-                    price: validateDouble("item price", price, true)
-                }
-            })
-        } else {
-            // create item with email owner
-            input = await prisma.items.create({
-                data: {
-                    itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
-                    name: validateStr("item name", name, 100),
-                    description: validateStr("item description", description, 500, true),
-                    itemOwner: req.user.email,
-                    type: validateStr("item type", type, 20),
-                    tag: validateStrArray("item tag", tag, 10, 20),
-                    size: validateStrArray("item size", size, 5, 4),
-                    style: validateStr("item style", style, 50),
-                    price: validateDouble("item price", price, true)
-                }
-            })
-        }
 
-        return res.status(201).json(productConverter(input))
+        let itemModel = {
+            itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
+            name: validateStr("item name", name, 100),
+            description: validateStr("item description", description, 500, true),
+            type: validateStr("item type", type, 20),
+            tag: validateStrArray("item tag", tag, 10, 20),
+            price: validateDouble("item price", price, true)
+        }
+        if (req.user.role == ROLE.Admin) {
+            itemModel.itemOwner = validateEmail("item owner", itemOwner, 100)
+
+        }
+        // create item with email owner
+        let input = await prisma.items.create({
+            data: itemModel
+        })
+
+        const item_detail = styles.map((sty) =>
+            prisma.item_details.create({
+                data: {
+                    itemId: input.itemId,
+                    style: validateStr("item style", sty.style, 50),
+                    size: validateStrArray("item size", sty.size, 5, 4, true)
+                }
+            })
+        )
+
+        Promise.all(item_detail)
+            .then(data => {
+                input.styles = data
+                return res.status(201).json(productConverter(input))
+            })
+            .catch(err => {
+                next(err)
+            })
+
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -289,40 +310,40 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
     }
 })
 
-router.post('/addtocart', JwtAuth, async (req, res, next) => {
-    let { productId, qty } = req.body
+// router.post('/addtocart', JwtAuth, async (req, res, next) => {
+//     let { productId, qty } = req.body
 
-    try {
-        let choosePd = await verifyId(productId)
+//     try {
+//         let choosePd = await verifyId(productId)
 
-        let cart = await prisma.carts.aggregate({
-            _sum: {
-                qty: true
-            },
-            where: {
-                AND: [
-                    { productId: choosePd.productId },
-                    { isPaid: false }
-                ]
-            }
-        })
+//         let cart = await prisma.carts.aggregate({
+//             _sum: {
+//                 qty: true
+//             },
+//             where: {
+//                 AND: [
+//                     { productId: choosePd.productId },
+//                     { isPaid: false }
+//                 ]
+//             }
+//         })
 
-        if (cart._sum.qty + validateInt("quantity", qty, true) > choosePd.stock) validatError(`product ${productId}:${choosePd.product} have quantity more than their stocks`)
+//         if (cart._sum.qty + validateInt("quantity", qty, true) > choosePd.stock) validatError(`product ${productId}:${choosePd.product} have quantity more than their stocks`)
 
-        let input = await prisma.carts.create({
-            data: {
-                userEmail: req.user.email,
-                productId: productId,
-                qty: qty
-            }
-        })
-        return res.status(201).json({ msg: `your product ${choosePd.productId} ${choosePd.product} - ${choosePd.price} baht that add in your cart` })
-    } catch (err) {
-        next(err)
-    }
-})
+//         let input = await prisma.carts.create({
+//             data: {
+//                 userEmail: req.user.email,
+//                 productId: productId,
+//                 qty: qty
+//             }
+//         })
+//         return res.status(201).json({ msg: `your product ${choosePd.productId} ${choosePd.product} - ${choosePd.price} baht that add in your cart` })
+//     } catch (err) {
+//         next(err)
+//     }
+// })
 
-router.put('/isFav/:id', JwtAuth, verifyRole(ROLE.User), async (req, res, next) => {
+router.put('/isFav/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.User), async (req, res, next) => {
     try {
         let item = await verifyId(Number(req.params.id))
         let userMatching = await findFavPdById(req.user.email,
@@ -371,11 +392,7 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req,
                     i == "description" ? validateStr("item description", req.body[i], 500, true) :
                         // i == "itemOwner" ? validateEmail("item owner", req.body[i], 100) : cannot change item owner
                         i == "type" ? validateStr("item type", req.body[i], 20) :
-                            i == "tag" ? validateStrArray("item tag", req.body[i], 10, 20) :
-                                i == "size" ? validateStrArray("item size", req.body[i], 5, 4) :
-                                    i == "style" ? validateStr("item type", req.body[i], 50) :
-                                        i == "price" ? validateDouble("item price", req.body[i], true) :
-                                            i == "isOutOfStock" ? validateBoolean("item is out of stock", req.body[i]) : undefined // unused body request
+                            i == "price" ? validateDouble("item price", req.body[i], true) : undefined // unused body request
         }
     }
 
@@ -402,6 +419,49 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req,
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2025') {
                 err.message = "item id " + req.params.id + " does not exist"
+            }
+        }
+        next(err)
+    }
+})
+
+router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
+    // update product
+    try {
+        // find item id
+        let item = await verifyDetailId(req.params.id, req.params.style)
+
+        // check if supplier role update other email
+        if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.email)
+            forbiddenError("This supplier can update owner's item only")
+
+        // check that product is found
+        if (item == null) notFoundError("item id " + id + " does not exist")
+
+        // switch out of stock or not
+        let outStock = { isOutOfStock: true }
+        if (item.styles[0].isOutOfStock) {
+            outStock.isOutOfStock = false
+        }
+
+        // update stock
+        let input = await prisma.item_details.update({
+            where: {
+                itemId_style: {
+                    itemId: Number(req.params.id),
+                    style: req.params.style
+                }
+            },
+            data: outStock
+        })
+        // return update product converter
+        return res.json(productConverter(input))
+    } catch (err) {
+        // if product is not found
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.code === 'P2025') {
+                err.message = "item id " + req.params.id + " in style " + " does not exist"
             }
         }
         next(err)
@@ -452,7 +512,7 @@ router.post('/:prodId/review', JwtAuth, async (req, res, next) => {
         console.log(itemReviewId)
 
         // add this user for comment
-        let review = await prisma.item_review.create({
+        let review = await prisma.item_reviews.create({
             data: {
                 itemReviewId: itemReviewId !== undefined ? itemReviewId : id,
                 itemId: item.itemId,
@@ -489,14 +549,14 @@ router.delete('/:prodId/review/:commentId', JwtAuth, async (req, res, next) => {
         // find item id
         let item = await verifyId(prodId)
 
-        item.item_review.forEach(review => {
+        item.item_reviews.forEach(review => {
             // check if supplier role delete other email that not same finding commend that throw to exception
             if ([ROLE.Supplier, ROLE.User].includes(req.user.role) && review.userEmail !== req.user.email)
                 forbiddenError("user can delete your comment only")
         })
 
         // find id to delete product
-        await prisma.item_review.delete({
+        await prisma.item_reviews.delete({
             where: {
                 itemReviewId: commentId,
                 userEmail: req.user.email
@@ -530,7 +590,7 @@ router.put('/:prodId/review/:commentId/like', JwtAuth, async (req, res, next) =>
         // check if review is undefined
         if (review === null) {
             // add like message on log
-            let input = await prisma.item_review_like.create({
+            let input = await prisma.item_review_likes.create({
                 data: {
                     itemReviewId: commentId,
                     userEmail: req.user.email
@@ -538,7 +598,7 @@ router.put('/:prodId/review/:commentId/like', JwtAuth, async (req, res, next) =>
             })
 
             // update like in item id
-            comment = await prisma.item_review.update({
+            comment = await prisma.item_reviews.update({
                 data: {
                     like: {
                         increment: 1
@@ -551,7 +611,7 @@ router.put('/:prodId/review/:commentId/like', JwtAuth, async (req, res, next) =>
             })
         } else {
             // revert like message on log
-            await prisma.item_review_like.delete({
+            await prisma.item_review_likes.delete({
                 where: {
                     itemReviewId_userEmail: {
                         itemReviewId: commentId,
@@ -563,7 +623,7 @@ router.put('/:prodId/review/:commentId/like', JwtAuth, async (req, res, next) =>
             // console.log(prodId.userEmail)
 
             // update unlike in item id
-            comment = await prisma.item_review.update({
+            comment = await prisma.item_reviews.update({
                 data: {
                     like: {
                         decrement: 1
@@ -592,12 +652,12 @@ router.put('/:prodId/review/:commentId/like', JwtAuth, async (req, res, next) =>
 // -- method zone --
 const verifyId = async (id) => {
     // find product by id
-    let filter_pd = await prisma.items.findFirst({
+    let item = await prisma.items.findFirst({
         where: {
             itemId: Number(id)
         },
         include: {
-            item_review: {
+            item_reviews: {
                 orderBy: {
                     createdAt: "desc"
                 }
@@ -605,11 +665,44 @@ const verifyId = async (id) => {
         }
     })
 
+    // find item_details and map to item
+    item.styles = await prisma.item_details.findMany({
+        where: {
+            itemId: item.itemId
+        }
+    })
+
     // check that product is found
-    if (filter_pd == null) notFoundError("item id " + id + " does not exist")
+    if (item == null) notFoundError("item id " + id + " does not exist")
 
     // return converter of product
-    return productConverter(filter_pd)
+    return productConverter(item)
+}
+
+// use model for add to cart and check stock
+const verifyDetailId = async (id, sty) => {
+    // find product by id
+    let item_detail = await prisma.item_details.findFirst({
+        where: {
+            AND: [
+                { itemId: Number(id) },
+                { style: sty }
+            ]
+        }
+    })
+
+    // check that product is found
+    if (item_detail == null) notFoundError("item id " + id + " in style " + sty + " does not exist")
+
+    // check that item owner
+    let item = await prisma.items.findFirst({
+        where: { itemId: item_detail.itemId }
+    })
+
+    item.styles = [item_detail]
+
+    // return converter of product
+    return productConverter(item)
 }
 
 const verifyUserEmail = async (userEmail) => {
@@ -636,7 +729,7 @@ const verifyUserEmail = async (userEmail) => {
 
 const changeTotalRating = async (id) => {
     // get average value of rating in item id
-    avg_review = await prisma.item_review.aggregate({
+    avg_review = await prisma.item_reviews.aggregate({
         _avg: {
             rating: true
         },
@@ -659,7 +752,7 @@ const changeTotalRating = async (id) => {
 
 const findReviewById = async (email, commendId) => {
     // get average value of rating in item id
-    review = await prisma.item_review_like.findFirst({
+    review = await prisma.item_review_likes.findFirst({
         where: {
             AND: [
                 { itemReviewId: commendId },

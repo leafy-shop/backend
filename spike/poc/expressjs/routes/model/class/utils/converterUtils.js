@@ -1,6 +1,6 @@
 const { dateTimeZoneNow } = require("./datetimeUtils");
-const { listFirstImage, findImagePath } = require("./imageList");
-const { modelMapper } = require("./modelMapping");
+// const { listFirstImage, findImagePath } = require("./imageList");
+const { modelMapper, deleteNullValue } = require("./modelMapping");
 
 let timeConverter = (value) => {
   // console.log(value)
@@ -21,15 +21,23 @@ const productConverter = (product, model) => {
 
   // array converter
   if (product.tag !== undefined) product.tag = product.tag.split(",")
-  if (product.size !== undefined) product.size = product.size.split(",")
+  
+  // images converter
   if (product.images !== undefined) product.images = product.images.split(",")
 
-  if (product.item_preview !== undefined) product.item_preview = product.item_preview.map(preview => timeConverter(preview))
+  if (product.item_review !== undefined) product.item_review = product.item_review.map(review => timeConverter(review))
+
+  // style converter
+  if (product.styles !== undefined) product.styles = product.styles.map(style => {
+    if (style.size !== undefined) style.size = style.size.split(",")
+    return style
+  })
 
   // time converter
   product = timeConverter(product)
 
-  return product
+  // delete null value
+  return deleteNullValue(product)
 }
 
 const userConverter = (user) => {
@@ -42,7 +50,8 @@ const userConverter = (user) => {
   // time converter
   user = timeConverter(user)
 
-  return user
+  // delete null value
+  return deleteNullValue(user)
 }
 
 const reformatPhoneNumber = (phoneNumber) => {
