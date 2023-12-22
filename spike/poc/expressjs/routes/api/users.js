@@ -347,14 +347,22 @@ const verifyId = async (id) => {
 }
 
 const verifySupplier = async (email) => {
-    
+
     let filter_u = await prisma.accounts.findFirst({
         where: {
-            AND: [{ email: validateEmail("user email", email, 100) }, { role: ROLE.Supplier }]
+            AND: [
+                { email: validateEmail("user email", email, 100) },
+                {
+                    OR: [
+                        { role: ROLE.Supplier },
+                        { role: ROLE.GD_DESIGNER }
+                    ]
+                }
+            ]
         },
         select: userDetailView
     })
-    
+
     // not found checking
     if (filter_u == null) notFoundError("user email " + email + " does not exist")
 
