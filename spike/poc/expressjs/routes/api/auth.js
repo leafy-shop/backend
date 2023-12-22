@@ -1,7 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const { getToken, getUser, refreshToken, isExpired } = require('./../model/class/utils/jwtUtils')
-const { errorRes, notFoundError, unAuthorizedError } = require('./../model/error/error')
+const { errorRes, notFoundError, unAuthorizedError, forbiddenError } = require('./../model/error/error')
 const argon2 = require('argon2')
 const crypto = require('crypto')
 // const { v4: uuidv4 } = require('uuid')
@@ -12,6 +12,9 @@ const dotenv = require('dotenv');
 const cookieParser = require('cookie-parser')
 
 const { PrismaClient } = require('@prisma/client')
+const { UnstrictJwtAuth } = require('../../middleware/jwtAuth')
+const { ROLE } = require('../model/enum/role')
+const { validatePassword } = require('../validation/body')
 const prisma = new PrismaClient()
 
 // get config vars
@@ -162,7 +165,7 @@ router.get("/signout", (req, res) => {
     return res.status(200).json({ message: "this user is sign out !!" })
 })
 
-router.put('/verify', async (req, res, next) => {
+router.get('/verify', async (req, res, next) => {
     // let { verify } = req.cookies
     let { email } = req.query
 
@@ -171,9 +174,6 @@ router.put('/verify', async (req, res, next) => {
         // if (verify.split(",")[-1] == token) {
         //     unAuthorizedError("verify token is invalid")
         // }
-
-        // store in http only cookie
-        let vf_su_arr
 
         // generate id
         const verifyToken = crypto.randomBytes(8).toString("hex");
@@ -185,15 +185,8 @@ router.put('/verify', async (req, res, next) => {
             // secure: true
         }
 
-        if (req.cookies.vf_su !== undefined) {
-            // find verifies sign up token before add new token and unused previous token
-            req.cookies.vf_su = req.cookies.vf_su.split(",")
-            vf_su_arr = req.cookies.vf_su
-            vf_su_arr.push(verifyToken)
-            res.cookie("vf_su", vf_su_arr.join(","), cookieConfig)
-        } else {
-            res.cookie("vf_su", verifyToken, cookieConfig)
-        }
+        // store in http only cookies
+        res.cookie("vf_em", verifyToken, cookieConfig)
 
         // เปลี่ยนให้ user สามารถ login ได้
         await prisma.accounts.update({
@@ -205,9 +198,46 @@ router.put('/verify', async (req, res, next) => {
             }
         })
 
-        console.log(vf_su_arr[vf_su_arr.length - 1])
+        return res.json({ token: verifyToken })
+    } catch (err) {
+        // The .code property can be accessed in a type-safe manner
+        if (err.code === 'P2025') {
+            err.message = "accounts email " + req.query.email + " does not exist"
+        }
+        next(err)
+    }
+})
 
-        return res.json({ token: vf_su_arr[vf_su_arr.length - 1] })
+router.put('/resetpwd', UnstrictJwtAuth, async (req, res, next) => {
+    let { authorization } = req.headers
+    let { email, password } = req.body
+    let { vf_em } = req.cookies
+
+    try {
+        // เรียกข้อมูลที่จะยืนยัน โดยใช้ token
+        if (vf_em !== undefined && vf_em == authorization.substring(7)) {
+            res.clearCookie("vf_em")
+        } else {
+            unAuthorizedError("verify token is invalid or expired, please resign token")
+        }
+
+        // user and supplier condition
+        if (req.user !== undefined && [ROLE.User, ROLE.Supplier].includes(req.user.role) && req.user.email !== email) {
+            forbiddenError("your cannot reset password of other user")
+        }
+
+        // เปลี่ยนให้ user สามารถ login ได้
+        await prisma.accounts.update({
+            where: {
+                email: email
+            },
+            data: {
+                password: await validatePassword("account password", password, 8, 20)
+            }
+        })
+        // console.log(vf_pwd_arr[vf_pwd_arr.length - 1])
+
+        return res.json({ message: "user email " + email + " already change password!!"})
     } catch (err) {
         // The .code property can be accessed in a type-safe manner
         if (err.code === 'P2025') {

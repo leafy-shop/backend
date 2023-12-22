@@ -105,6 +105,41 @@ router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     // return res.json({ "page": page, "pageSize": varLimit, "AllPage": Math.ceil(filter_u.length / varLimit), "users": page_u.map(user => timeConverter(user)) })
 })
 
+router.get('/garden_designer', async (req, res, next) => {
+    // let sorting = req.query.sort == 'desc' ? 'desc' : 'asc'
+    // console.log(req.query.name)
+    let page = Number(req.query.page)
+    let limit = Number(req.query.limit)
+    // let varPage = page > 0 ? (page - 1) * limit : 0
+    // let varLimit = (limit <= 0 || isNaN(limit)) ? 0 : limit >= 10 ? 10 : limit
+    // let count_user = await prisma.accounts.count()
+    let filter_u = await prisma.accounts.findMany({
+        where: {
+            role: ROLE.GD_DESIGNER
+        },
+        select: userView,
+        orderBy: { updatedAt: "desc" }
+    })
+
+    // make to page
+    let page_u = paginationList(filter_u, page, limit, 10)
+
+    // array converter and image mapping
+    Promise.all(
+        // list user with image
+        page_u.list.length === 0 ? [] :
+            page_u.list.map(user => timeConverter(user))
+        // filter_pd.map(user => userConverter(user, userList))
+    ).then(userList => {
+        page_u.list = userList
+        return res.json(page_u)
+    }).catch(err => {
+        next(err)
+    })
+
+    // return res.json({ "page": page, "pageSize": varLimit, "AllPage": Math.ceil(filter_u.length / varLimit), "users": page_u.map(user => timeConverter(user)) })
+})
+
 // const getUserIcon = async (res, user) => {
 //     user.image = await listFirstImage(res, findImagePath("users", user.itemId))
 //     return user
@@ -135,6 +170,23 @@ router.get('/:id', JwtAuth, async (req, res, next) => {
     }
 })
 
+router.get('/supplier/:email', async (req, res, next) => {
+    try {
+        // sendMail("test massage","test",req.user.email)
+        let user = await verifySupplier(req.params.email)
+
+        // console.log(user)
+
+        // image for product
+        let path = findImagePath("users", user.userId)
+        user.image = await listFirstImage(res, path)
+
+        return res.json(user)
+    } catch (err) {
+        next(err)
+    }
+})
+
 router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     let { userId, email, role, password, firstname, lastname, description, phone } = req.body
 
@@ -158,7 +210,7 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
         } else {
             // send email for verify account
             account.verifyAccount = false
-            
+
             // send to email
             await sendMail(signup_email(email, "signup"), "Add new account", email)
         }
@@ -290,6 +342,21 @@ const verifyId = async (id) => {
     })
     // not found checking
     if (filter_u == null) notFoundError("user id " + id + " does not exist")
+
+    return userConverter(filter_u)
+}
+
+const verifySupplier = async (email) => {
+    
+    let filter_u = await prisma.accounts.findFirst({
+        where: {
+            AND: [{ email: validateEmail("user email", email, 100) }, { role: ROLE.Supplier }]
+        },
+        select: userDetailView
+    })
+    
+    // not found checking
+    if (filter_u == null) notFoundError("user email " + email + " does not exist")
 
     return userConverter(filter_u)
 }

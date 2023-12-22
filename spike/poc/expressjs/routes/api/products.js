@@ -133,9 +133,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                         lte: isNaN(rating) ? undefined : ratingScale[rating - 1][1]
                     },
                     favprd: favFilter,
-                    itemOwner: {
-                        contains: owner
-                    }
+                    itemOwner: owner
                 }]
             },
             include: {
@@ -497,6 +495,37 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req
 })
 
 // review -- zone ---
+router.get('/all/reviews', async (req, res, next) => {
+
+    // query params
+    let { page, limit } = req.query
+
+    // page number and page size
+    let pageN = Number(page)
+    let limitN = Number(limit)
+
+    // filter single and between value from name, price, rating and isFavPrd query
+    // and return page that sorted by updateAt item
+    try {
+        let filter_pd = await prisma.item_reviews.findMany({
+            where: {
+                rating: {
+                    gte: 3,
+                    lte: 5
+                },
+            },
+            orderBy: { createdAt: "desc" }
+        })
+
+        // return to page with page number and page size
+        page_pd = paginationList(filter_pd, pageN, limitN, 10)
+        return res.send(page_pd)
+
+    } catch (err) {
+        next(err)
+    }
+})
+
 router.post('/:prodId/review', JwtAuth, async (req, res, next) => {
     try {
         let { itemReviewId, comment, rating, size, style } = req.body
@@ -551,7 +580,7 @@ router.delete('/:prodId/review/:commentId', JwtAuth, async (req, res, next) => {
 
         // find item id
         let item = await findReviewById(prodId, commentId)
-        
+
         // check if supplier role delete other email that not same finding commend that throw to exception
         if ([ROLE.Supplier, ROLE.User].includes(req.user.role) && review.userEmail !== req.user.email) forbiddenError("user can delete your comment only")
 
