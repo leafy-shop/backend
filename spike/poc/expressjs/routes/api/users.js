@@ -170,7 +170,7 @@ router.get('/:id', JwtAuth, async (req, res, next) => {
     }
 })
 
-router.get('/supplier/:email', async (req, res, next) => {
+router.get('/views/:email', async (req, res, next) => {
     try {
         // sendMail("test massage","test",req.user.email)
         let user = await verifySupplier(req.params.email)
