@@ -23,6 +23,7 @@ const userDetailView = {
     userId: true,
     firstname: true,
     lastname: true,
+    description: true,
     email: true,
     role: true,
     status: true,

@@ -1,121 +1,34 @@
 const nodemailer=require('nodemailer')
+const { unAuthorizedError } = require('../routes/model/error/error')
 require('dotenv').config().parsed
 
-// let report_html=(service='',subj='',tOfUse='',tOfMachine='',brand='',problem='',other='',msg='',status='')=>{
+let signup_email=(email="", pattern="")=>{
 //  if(service.length==0,subj.length==0||problem.length==0){
 //     throw 'cannot make template for e-mail !!'
 //  }
 //  console.log(status)
 
-//  let info_service=`
-//  <tr>
-//  <th style="width:50%;text-align: right;">
-//     Subject :
-//  </th>
-//  <td style="width:50%;text-align: left;">
-//     ${service.length==0?'-':service}
-//  </td>
-// </tr>
-//  `
-
-//  let info_subj=`
-//  <tr>
-//  <th style="width:50%;text-align: right;">
-//     Subject :
-//  </th>
-//  <td style="width:50%;text-align: left;">
-//     ${subj.length==0?'-':subj}
-//  </td>
-// </tr>
-//  `
-
-//  let info_machine=tOfMachine.length==0?'':`
-//  <tr>
-//    <th style="width:50%;text-align: right;">
-//       Type of machine :
-//    </th>
-//    <td style="width:50%;text-align: left;">
-//       ${tOfMachine}
-//    </td>
-// </tr>
-//  `
-
-//  let info_use=tOfUse.length==0?'':`
-//  <tr >
-//    <th style="width:50%;text-align: right;">
-//       Type of use :
-//    </th>
-//    <td style="width:50%;text-align: left;">
-//       ${tOfUse=='or'?'อุปกรณ์ขององค์กร':'อุปกรณ์ส่วนตัว'}
-//    </td>
-// </tr>
-//  `
-
-// let info_brand=brand.length==0?'':`
-// <div style="margin:10px 15px 0px 15px;">
-//    <h5 style="display: block;text-align: left;font-weight: bold;">
-//       Brand : ${brand}
-//    </h5>
-// </div>
-// `
-
-//  let info_problems=`
-//  <div style="margin:10px 15px 0px 15px;">
-//    <h5 style="display: block;text-align: left;font-weight: bold;">
-//       ปัญหาที่พบ : ${problem.length==0?'-':problem}
-//    </h5>
-// </div>
-//  `
-
-//  let info_other=`
-//  <div style="margin:10px 15px 0px 15px;">
-//    <h5 style="display: block;text-align: left;font-weight: bold;">
-//       ปัญหาอื่นๆ ที่พบเจอ : ${other.length==0?'-':other}
-//    </h5>
-// </div>
-//  `
- 
-//  let info_message=`
-//  <div style="margin:10px 15px 0px 15px;">
-//    <h5 style="display: block;text-align: left;font-weight: bold;">
-//       เพิ่มเติม : ${msg.length==0?'-':msg}
-//    </h5>
-// </div>
-//  `
-
-//  let info_status=`
-//  <div style="margin:10px 15px 0px 15px;">
-//    <h5 style="display: block;text-align: left;font-weight: bold;">
-//       สถานะของการรับแจ้ง : ${status.length==0?'-':status}
-//    </h5>
-// </div>
-//  `
-
-// return `
-// <div style='width:100%;height:fit-content;font-size:15px'>        
-//      <div style="=width:90%;margin:auto;">
-//      <h5 style='width:fit-content;margin:auto;margin-top:10px;margin-bottom:10px;font-size: 23px;font-weight: bold;'>คำร้องขอรับบริการของคุณ</h5>
-
-//         <hr style="width: 60%;margin:auto;border-top: 2px solid gray;">
-//         <table style="width:100%;margin:15px auto 15px auto;">`
-//             +info_service
-//             +info_subj
-//             +info_use
-//             +info_machine
-//          +`   
-//          </table>
-//         <hr style="width: 60%;margin:auto;border-top: 2px solid gray">
-//         <div style="width:80%;margin-top: 15px;margin:auto;text-align: left;">`
-//                +info_brand
-//                +info_problems
-//                +info_other
-//                +info_message
-//                +info_status
-//         +`</div>
-//      </div>
-//   </div> 
-// `
-// }
+return `
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+<div class="container-fluid text-center p-0 m-0 border-0">
+    <h1 class="p-5">Verify email ${
+        pattern=="signup"?"for sign up": 
+        pattern=="resetpwd"?"for reset password": ""
+    }</h1>
+    <hr>
+    <div class="pt-2 pb-5">
+        <p>In order we are getting verified account ${
+            pattern=="signup"?"for new account": 
+            pattern=="resetpwd"?"for reset account password": ""
+        }
+        with <b>${email}</b> before expired in 30 minutes by click the button below </p>
+    </div>
+    <div class="mx-auto">
+        <a href="${process.env.BACKEND_HOST}/api/authentication/verify?email=${email}" class="btn btn-success text-center">Verify my email</a>
+    </div>
+</div>
+`
+}
 
 const sendMail=async (html=undefined,sub=undefined,to=undefined)=>{
     // let status=undefined
@@ -171,7 +84,6 @@ const sendMail=async (html=undefined,sub=undefined,to=undefined)=>{
         from: '"Leafy" <no-reply@gmail.com>',
         to:to,
         subject:sub,
-        text:sub,
         html: html
     }
 
@@ -184,21 +96,22 @@ const sendMail=async (html=undefined,sub=undefined,to=undefined)=>{
         .then (info=>{
             console.log(`send mail to ${to}`)
             if(info==undefined||info==false){
-                console.log('cannot send mail !!')
+                unAuthorizedError("Email not found")
                //  return res.status(500).json(errorModel(error,req.originalUrl))
                 // return status=false   
             }else{
-                console.log(`mail sended to ${to}!! :`,info.messageId)
+                console.log(`mail sended to ${to}!! : ${info.messageId} sucessfully`)
+
                //  return res.status(201).json({msg:'email sended!!'})
                 // return status= true
             }    
-            // console.log(nodemailer.getTestMessageUrl(info))
+            console.log(nodemailer.getTestMessageUrl(info))
         })
     } catch (error) {
         console.log(error)
-        throw 'cannot send mail'
+        unAuthorizedError("cannot send email")
     }
 }
 
 module.exports.sendMail=sendMail
-// module.exports.report_html=report_html
+module.exports.signup_email=signup_email

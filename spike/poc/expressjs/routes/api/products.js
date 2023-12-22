@@ -213,8 +213,8 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         item.images = await listAllImage(path)
 
         // list product review to page
-        page = Number(req.query.pv_page)
-        limit = Number(req.query.pv_limit)
+        page = Number(req.query.rv_page)
+        limit = Number(req.query.rv_limit)
         item.item_reviews = paginationList(item.item_reviews, page, limit, 5)
 
         // return product by id
@@ -266,7 +266,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
         let itemModel = {
             itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
             name: validateStr("item name", name, 100),
-            description: validateStr("item description", description, 500, true),
+            description: validateStr("item description", description, 5000, true),
             type: validateStr("item type", type, 20),
             tag: validateStrArray("item tag", tag, 10, 20),
             price: validateDouble("item price", price, true)
@@ -389,7 +389,7 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req,
             // map object from body when update in prisma model
             mapData[i] =
                 i == "name" ? validateStr("item name", req.body[i], 100) :
-                    i == "description" ? validateStr("item description", req.body[i], 500, true) :
+                    i == "description" ? validateStr("item description", req.body[i], 5000, true) :
                         // i == "itemOwner" ? validateEmail("item owner", req.body[i], 100) : cannot change item owner
                         i == "type" ? validateStr("item type", req.body[i], 20) :
                             i == "price" ? validateDouble("item price", req.body[i], true) : undefined // unused body request
@@ -502,7 +502,10 @@ router.post('/:prodId/review', JwtAuth, async (req, res, next) => {
         let { itemReviewId, comment, rating, size, style } = req.body
 
         // find item id
-        let item = await verifyId(req.params.prodId)
+        let item = await verifyDetailId(req.params.prodId, style)
+
+        // check size
+        if (!item.styles[0].size.includes(size)) notFoundError(`item id ${item.itemId} size not found `)
 
         // generate id
         const id = crypto.randomBytes(16).toString("hex");
@@ -519,8 +522,8 @@ router.post('/:prodId/review', JwtAuth, async (req, res, next) => {
                 userEmail: req.user.email,
                 comment: validateStr("item comment", comment, 200),
                 rating: validateInt("item rating", rating, 500, 1, 5),
-                size: validateStr("item size", size, 4),
-                style: validateStr("item style", style, 50),
+                size: size,
+                style: style
             }
         })
 
@@ -547,32 +550,28 @@ router.delete('/:prodId/review/:commentId', JwtAuth, async (req, res, next) => {
         let { prodId, commentId } = req.params
 
         // find item id
-        let item = await verifyId(prodId)
-
-        item.item_reviews.forEach(review => {
-            // check if supplier role delete other email that not same finding commend that throw to exception
-            if ([ROLE.Supplier, ROLE.User].includes(req.user.role) && review.userEmail !== req.user.email)
-                forbiddenError("user can delete your comment only")
-        })
+        let item = await findReviewById(prodId, commentId)
+        
+        // check if supplier role delete other email that not same finding commend that throw to exception
+        if ([ROLE.Supplier, ROLE.User].includes(req.user.role) && review.userEmail !== req.user.email) forbiddenError("user can delete your comment only")
 
         // find id to delete product
         await prisma.item_reviews.delete({
             where: {
-                itemReviewId: commentId,
-                userEmail: req.user.email
+                itemReviewId: commentId
             }
         })
 
         // change average of rating in this item
         await changeTotalRating(item.itemId)
 
-        return res.json({ message: "item comment id " + commentId + " has been deleted" })
+        return res.json({ message: "item review id " + commentId + " has been deleted" })
     } catch (err) {
         // if product is not found
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2025') {
-                err.message = "item comment id " + commentId + " does not exist"
+                err.message = "item review id " + req.params.commentId + " does not exist"
             }
         }
         next(err)
@@ -584,11 +583,12 @@ router.put('/:prodId/review/:commentId/like', JwtAuth, async (req, res, next) =>
         let { prodId, commentId } = req.params
 
         // get average value of rating in item id
-        let review = await findReviewById(req.user.email, commentId)
+        let review = await findReviewById(prodId, commentId)
+        let like = await findReviewLike(req.user.email, commentId)
 
         let comment
         // check if review is undefined
-        if (review === null) {
+        if (like === null) {
             // add like message on log
             let input = await prisma.item_review_likes.create({
                 data: {
@@ -642,7 +642,7 @@ router.put('/:prodId/review/:commentId/like', JwtAuth, async (req, res, next) =>
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2025') {
-                err.message = "item comment id " + commendId + " does not exist"
+                err.message = "item review id " + req.params.commentId + " does not exist"
             }
         }
         next(err)
@@ -665,15 +665,15 @@ const verifyId = async (id) => {
         }
     })
 
+    // check that product is found
+    if (item == null) notFoundError("item id " + id + " does not exist")
+
     // find item_details and map to item
     item.styles = await prisma.item_details.findMany({
         where: {
             itemId: item.itemId
         }
     })
-
-    // check that product is found
-    if (item == null) notFoundError("item id " + id + " does not exist")
 
     // return converter of product
     return productConverter(item)
@@ -750,9 +750,26 @@ const changeTotalRating = async (id) => {
     return avg_review
 }
 
-const findReviewById = async (email, commendId) => {
-    // get average value of rating in item id
-    review = await prisma.item_review_likes.findFirst({
+const findReviewById = async (prodId, commendId) => {
+    // get review by itemReview, item id and user email
+    let review = await prisma.item_reviews.findFirst({
+        where: {
+            AND: [
+                { itemReviewId: commendId },
+                { itemId: Number(prodId) },
+            ]
+        }
+    })
+
+    // check that product is found
+    if (review == null) notFoundError("item review id " + commendId + " does not exist")
+
+    return review
+}
+
+const findReviewLike = async (email, commendId) => {
+    // get review by itemReview, item id and user email
+    let like = await prisma.item_review_likes.findFirst({
         where: {
             AND: [
                 { itemReviewId: commendId },
@@ -761,8 +778,9 @@ const findReviewById = async (email, commendId) => {
         }
     })
 
-    return review
+    return like
 }
+
 
 const findFavPdById = async (email, id) => {
     // find product that match to user email

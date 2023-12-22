@@ -1,8 +1,9 @@
 const express = require('express')
 const router = express.Router()
 const { getToken, getUser, refreshToken, isExpired } = require('./../model/class/utils/jwtUtils')
-const {errorRes} = require('./../model/error/error')
+const { errorRes, notFoundError, unAuthorizedError } = require('./../model/error/error')
 const argon2 = require('argon2')
+const crypto = require('crypto')
 // const { v4: uuidv4 } = require('uuid')
 
 // const bcrypt = require('bcrypt')
@@ -24,8 +25,8 @@ router.post('/', async (req, res) => {
     let user = await prisma.accounts.findFirst({
         where: {
             OR: [
-                {email: email_phone},
-                {phone: email_phone}
+                { email: email_phone },
+                { phone: email_phone }
             ]
         }
     })
@@ -40,14 +41,19 @@ router.post('/', async (req, res) => {
         return res.status(403).json(errorRes("this user is inactive!", req.originalUrl))
     }
 
+    // ตรวจสอบการยืนยันผ่าน email ของ user
+    else if (!user.verifyAccount) {
+        return res.status(401).json(errorRes("please activate email for avaliable!", req.originalUrl))
+    }
+
     const hashingConfig = { // based on OWASP cheat sheet recommendations (as of March, 2022)
         parallelism: 1,
         memoryCost: 64000, // 64 mb
         timeCost: 3 // number of itetations
     }
-    
+
     // ตรวจสอบ password ที่ได้จาก mysql2 ว่าเป็น hash match กับ password ที่กรอกมาหรือป่าว
-    if (!(await argon2.verify(user.password,password,hashingConfig))) {
+    if (!(await argon2.verify(user.password, password, hashingConfig))) {
         return res.status(401).json(errorRes("user email or password is invalid please login again", req.originalUrl))
     }
 
@@ -128,6 +134,7 @@ router.post('/refresh', async (req, res) => {
         sameSite: 'Strict'
         // secure: true
     }
+
     res.cookie("token", token, cookieConfig);
     res.cookie("refreshToken", refreshtoken, cookieConfig);
 
@@ -153,6 +160,61 @@ router.get("/signout", (req, res) => {
     res.clearCookie("token")
     res.clearCookie("refreshToken")
     return res.status(200).json({ message: "this user is sign out !!" })
+})
+
+router.put('/verify', async (req, res, next) => {
+    // let { verify } = req.cookies
+    let { email } = req.query
+
+    try {
+        // // เรียกข้อมูลที่จะยืนยัน โดยใช้ email
+        // if (verify.split(",")[-1] == token) {
+        //     unAuthorizedError("verify token is invalid")
+        // }
+
+        // store in http only cookie
+        let vf_su_arr
+
+        // generate id
+        const verifyToken = crypto.randomBytes(8).toString("hex");
+        // config cookies
+        const cookieConfig = {
+            maxAge: 30 * 60 * 1000, // 30 minutes
+            httpOnly: true,
+            sameSite: 'Strict'
+            // secure: true
+        }
+
+        if (req.cookies.vf_su !== undefined) {
+            // find verifies sign up token before add new token and unused previous token
+            req.cookies.vf_su = req.cookies.vf_su.split(",")
+            vf_su_arr = req.cookies.vf_su
+            vf_su_arr.push(verifyToken)
+            res.cookie("vf_su", vf_su_arr.join(","), cookieConfig)
+        } else {
+            res.cookie("vf_su", verifyToken, cookieConfig)
+        }
+
+        // เปลี่ยนให้ user สามารถ login ได้
+        await prisma.accounts.update({
+            where: {
+                email: email
+            },
+            data: {
+                verifyAccount: true
+            }
+        })
+
+        console.log(vf_su_arr[vf_su_arr.length - 1])
+
+        return res.json({ token: vf_su_arr[vf_su_arr.length - 1] })
+    } catch (err) {
+        // The .code property can be accessed in a type-safe manner
+        if (err.code === 'P2025') {
+            err.message = "accounts email " + req.query.email + " does not exist"
+        }
+        next(err)
+    }
 })
 
 module.exports = router

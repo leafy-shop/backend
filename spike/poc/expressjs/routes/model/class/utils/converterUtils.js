@@ -15,6 +15,9 @@ const productConverter = (product, model) => {
     product = modelMapper(product, model)
   }
 
+  // delete null value
+  product = deleteNullValue(product)
+
   // floating string to float convertor
   if (product.totalRating !== undefined) product.totalRating = parseFloat(product.totalRating)
   if (product.price !== undefined) product.price = parseFloat(product.price)
@@ -37,21 +40,23 @@ const productConverter = (product, model) => {
   product = timeConverter(product)
 
   // delete null value
-  return deleteNullValue(product)
+  return product
 }
 
 const userConverter = (user) => {
   // date of birth converter
   // if (user.dob !== undefined) user.dob = dateTimeZoneNow(user.dob)
 
+  // delete null value
+  user = deleteNullValue(user)
+
   // phone format
   if (user.phone !== undefined) user.phone = reformatPhoneNumber(user.phone)
 
   // time converter
   user = timeConverter(user)
-
-  // delete null value
-  return deleteNullValue(user)
+  
+  return user
 }
 
 const reformatPhoneNumber = (phoneNumber) => {
