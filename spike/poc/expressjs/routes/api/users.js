@@ -212,7 +212,7 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
             account.verifyAccount = false
 
             // send to email
-            await sendMail(signup_email(email, "signup"), "Add new account", email)
+            await sendMail(signup_email(email, "signup", res), "Add new account", email)
         }
 
         // create accounts

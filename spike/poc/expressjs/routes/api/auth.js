@@ -15,89 +15,113 @@ const { PrismaClient } = require('@prisma/client')
 const { UnstrictJwtAuth } = require('../../middleware/jwtAuth')
 const { ROLE } = require('../model/enum/role')
 const { validatePassword } = require('../validation/body')
+const { sendMail, signup_email } = require('../../config/email_config')
 const prisma = new PrismaClient()
 
 // get config vars
 dotenv.config();
 
-router.post('/', async (req, res) => {
-    // เก็บ email และ password ของผู้ใช้
-    const { email_phone, password } = req.body;
+router.post('/', async (req, res, next) => {
+    try {
+        // เก็บ email และ password ของผู้ใช้
+        const { email_phone, password } = req.body;
 
-    // เรียกข้อมูล user โดยใช้ email
-    let user = await prisma.accounts.findFirst({
-        where: {
-            OR: [
-                { email: email_phone },
-                { phone: email_phone }
-            ]
+        // เรียกข้อมูล user โดยใช้ email
+        let user = await prisma.accounts.findFirst({
+            where: {
+                OR: [
+                    { email: email_phone },
+                    { phone: email_phone }
+                ]
+            }
+        })
+
+        // ถ้า email หาไม่เจอก็จะส่งกลับไปเพื่อใช้ในการทำ reset password
+        if (user == null) {
+            return res.status(404).json(errorRes(`user email or phone does not exist`, req.originalUrl))
         }
-    })
 
-    // ถ้า email หาไม่เจอก็จะส่งกลับไปเพื่อใช้ในการทำ reset password
-    if (user == null) {
-        return res.status(404).json(errorRes(`user email or phone ${email_phone} does not exist`, req.originalUrl))
+        // ตรวจสอบสถานะของ user
+        else if (!user.status) {
+            return res.status(403).json(errorRes("this user is inactive!", req.originalUrl))
+        }
+
+        // ตรวจสอบการยืนยันผ่าน email ของ user
+        if (!user.verifyAccount) {
+            // ตรวจสอบว่าถ้า cookie ตรงกันกับ authorization header ที่กำหนดไว้จะทำการปลดล็อค account คนนั้นให้ใช้งานได้ตามปกติ
+            if (req.cookies !== undefined && req.headers.authorization !== undefined) {
+                if (req.cookies.vf_em == req.headers.authorization.substring(7)) {
+                    // เปลี่ยนให้ user สามารถ login ได้
+                    await prisma.accounts.update({
+                        where: {
+                            email: email
+                        },
+                        data: {
+                            verifyAccount: true
+                        }
+                    })
+                    return res.json({ "message": "verify user complete please login again" })
+                } else {
+                    unAuthorizedError("verify token is invalid!!")
+                }
+            }
+            // send to email
+            await sendMail(signup_email(user.email, "signup", res), "Add new account", user.email)
+            unAuthorizedError("please activate email for avaliable!")
+        }
+
+        const hashingConfig = { // based on OWASP cheat sheet recommendations (as of March, 2022)
+            parallelism: 1,
+            memoryCost: 64000, // 64 mb
+            timeCost: 3 // number of itetations
+        }
+
+        // ตรวจสอบ password ที่ได้จาก mysql2 ว่าเป็น hash match กับ password ที่กรอกมาหรือป่าว
+        if (!(await argon2.verify(user.password, password, hashingConfig))) {
+            return res.status(401).json(errorRes("user email or password is invalid please login again", req.originalUrl))
+        }
+
+        // ลบ password ของ user ก่อน response กลับไป
+        delete user.password;
+
+        // get user info
+        console.log(user)
+
+        // สร้าง access token ภายใต้ method ที่กำหนด
+        const token = getToken({
+            "id": user.userId,
+            "firstname": user.firstname,
+            "email": user.email,
+            "role": user.role,
+        }, "1h");
+
+        // และ refresh token แต่เวลาต่างกัน
+        const refreshtoken = getToken({
+            "id": user.userId,
+            "firstname": user.firstname,
+            "email": user.email,
+            "role": user.role,
+        }, "24h");
+
+        // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
+        const cookieConfig = {
+            maxAge: 24 * 60 * 60 * 1000,
+            httpOnly: true,
+            sameSite: 'Strict'
+            // secure: true
+        }
+        res.cookie("token", token, cookieConfig);
+        res.cookie("refreshToken", refreshtoken, cookieConfig);
+
+        res.status(200).json({
+            "id": getUser(token).id,
+            "firstname": getUser(token).firstname,
+            "email": getUser(token).email,
+            "role": getUser(token).role,
+        })
+    } catch (err) {
+        next(err)
     }
-
-    // ตรวจสอบสถานะของ user
-    else if (!user.status) {
-        return res.status(403).json(errorRes("this user is inactive!", req.originalUrl))
-    }
-
-    // ตรวจสอบการยืนยันผ่าน email ของ user
-    else if (!user.verifyAccount) {
-        return res.status(401).json(errorRes("please activate email for avaliable!", req.originalUrl))
-    }
-
-    const hashingConfig = { // based on OWASP cheat sheet recommendations (as of March, 2022)
-        parallelism: 1,
-        memoryCost: 64000, // 64 mb
-        timeCost: 3 // number of itetations
-    }
-
-    // ตรวจสอบ password ที่ได้จาก mysql2 ว่าเป็น hash match กับ password ที่กรอกมาหรือป่าว
-    if (!(await argon2.verify(user.password, password, hashingConfig))) {
-        return res.status(401).json(errorRes("user email or password is invalid please login again", req.originalUrl))
-    }
-
-    // ลบ password ของ user ก่อน response กลับไป
-    delete user.password;
-
-    // get user info
-    console.log(user)
-
-    // สร้าง access token ภายใต้ method ที่กำหนด
-    const token = getToken({
-        "id": user.userId,
-        "firstname": user.firstname,
-        "email": user.email,
-        "role": user.role,
-    }, "1h");
-
-    // และ refresh token แต่เวลาต่างกัน
-    const refreshtoken = getToken({
-        "id": user.userId,
-        "firstname": user.firstname,
-        "email": user.email,
-        "role": user.role,
-    }, "24h");
-
-    // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
-    const cookieConfig = {
-        maxAge: 24 * 60 * 60 * 1000,
-        httpOnly: true,
-        sameSite: 'Strict'
-        // secure: true
-    }
-    res.cookie("token", token, cookieConfig);
-    res.cookie("refreshToken", refreshtoken, cookieConfig);
-
-    res.status(200).json({
-        "id": getUser(token).id,
-        "firstname": getUser(token).firstname,
-        "email": getUser(token).email,
-        "role": getUser(token).role,
-    })
 })
 
 router.post('/refresh', async (req, res) => {
@@ -167,38 +191,47 @@ router.get("/signout", (req, res) => {
 
 router.get('/verify', async (req, res, next) => {
     // let { verify } = req.cookies
-    let { email } = req.query
+    let { path, email_phone, vf_token } = req.query
 
     try {
-        // // เรียกข้อมูลที่จะยืนยัน โดยใช้ email
-        // if (verify.split(",")[-1] == token) {
-        //     unAuthorizedError("verify token is invalid")
-        // }
+        // เรียกข้อมูล user โดยใช้ email
+        let user = await prisma.accounts.findFirst({
+            where: {
+                OR: [
+                    { email: email_phone },
+                    { phone: email_phone }
+                ]
+            }
+        })
 
-        // generate id
-        const verifyToken = crypto.randomBytes(8).toString("hex");
-        // config cookies
-        const cookieConfig = {
-            maxAge: 30 * 60 * 1000, // 30 minutes
-            httpOnly: true,
-            sameSite: 'Strict'
-            // secure: true
+        // ถ้า email หาไม่เจอก็จะส่งกลับไปเพื่อใช้ในการทำ reset password
+        if (user == null) {
+            return res.status(404).json(errorRes(`user email or phone does not exist`, req.originalUrl))
         }
 
-        // store in http only cookies
-        res.cookie("vf_em", verifyToken, cookieConfig)
+        // ตรวจสอบว่า path ไหนไปได้บ้าง
+        if (!["login", "resetpwd"].includes(path)) {
+            forbiddenError("url path is invalid or not found")
+        }
+
+        if (vf_token === undefined || vf_token !== req.cookies.vf_em) {
+            unAuthorizedError("verify token is invalid")
+        }
 
         // เปลี่ยนให้ user สามารถ login ได้
         await prisma.accounts.update({
             where: {
-                email: email
+                email: user.email
             },
             data: {
                 verifyAccount: true
             }
         })
 
-        return res.json({ token: verifyToken })
+        // กำจัด cookie ของ verify token
+        res.clearCookie("vf_token")
+
+        return res.redirect(301, `${process.env.CLIENT_HOST}/pl4/${path}`)
     } catch (err) {
         // The .code property can be accessed in a type-safe manner
         if (err.code === 'P2025') {
@@ -237,7 +270,7 @@ router.put('/resetpwd', UnstrictJwtAuth, async (req, res, next) => {
         })
         // console.log(vf_pwd_arr[vf_pwd_arr.length - 1])
 
-        return res.json({ message: "user email " + email + " already change password!!"})
+        return res.json({ message: "user email " + email + " already change password!!" })
     } catch (err) {
         // The .code property can be accessed in a type-safe manner
         if (err.code === 'P2025') {
