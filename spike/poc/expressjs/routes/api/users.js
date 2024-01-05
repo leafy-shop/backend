@@ -7,7 +7,7 @@ let { sendMail, signup_email } = require('./../../config/email_config')
 
 const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('./../../middleware/jwtAuth')
 const { ROLE } = require('./../model/enum/role')
-const { userView, userDetailView } = require('./../model/class/model')
+const { userView, userDetailView, gardenDesignerView } = require('./../model/class/model')
 const { PrismaClient, Prisma } = require('@prisma/client');
 const { timeConverter, userConverter, paginationList } = require('../model/class/utils/converterUtils');
 // const { firestore } = require('firebase-admin');
@@ -115,9 +115,12 @@ router.get('/garden_designer', async (req, res, next) => {
     // let count_user = await prisma.accounts.count()
     let filter_u = await prisma.accounts.findMany({
         where: {
-            role: ROLE.GD_DESIGNER
+            AND: [
+                { role: ROLE.GD_DESIGNER },
+                { status: true }
+            ]
         },
-        select: userView,
+        select: gardenDesignerView,
         orderBy: { updatedAt: "desc" }
     })
 
@@ -128,7 +131,7 @@ router.get('/garden_designer', async (req, res, next) => {
     Promise.all(
         // list user with image
         page_u.list.length === 0 ? [] :
-            page_u.list.map(user => timeConverter(user))
+            page_u.list.map(user => getUserIcon(timeConverter(user)))
         // filter_pd.map(user => userConverter(user, userList))
     ).then(userList => {
         page_u.list = userList
@@ -139,6 +142,12 @@ router.get('/garden_designer', async (req, res, next) => {
 
     // return res.json({ "page": page, "pageSize": varLimit, "AllPage": Math.ceil(filter_u.length / varLimit), "users": page_u.map(user => timeConverter(user)) })
 })
+
+const getUserIcon = async (user) => {
+    user.image = await listFirstImage(findImagePath("users", user.userId))
+    return user
+}
+
 
 // const getUserIcon = async (res, user) => {
 //     user.image = await listFirstImage(res, findImagePath("users", user.itemId))

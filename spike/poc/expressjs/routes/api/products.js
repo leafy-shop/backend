@@ -4,17 +4,18 @@ const router = express.Router();
 const { validateStr, validateInt, validateBoolean, validateDouble, validateEmail, validateStrArray } = require('../validation/body')
 const { notFoundError, validatError, forbiddenError } = require('./../model/error/error')
 // const { dateTimeZoneNow } = require('../model/class/utils/datetimeUtils')
-const { userViewFav, prodList } = require('./../model/class/model')
+const { userViewFav, prodList, reviewView } = require('./../model/class/model')
 const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('./../../middleware/jwtAuth')
 
 const { PrismaClient, Prisma } = require('@prisma/client');
 // const { deleteNullValue } = require('../model/class/utils/modelMapping');
 // const { mode } = require('../../config/minio_config');
-const { productConverter, timeConverter, paginationList } = require('../model/class/utils/converterUtils');
+const { productConverter, timeConverter, paginationList, capitalizeFirstLetter } = require('../model/class/utils/converterUtils');
 const { ROLE } = require('../model/enum/role');
 const { findImagePath, listAllImage, listFirstImage } = require('../model/class/utils/imageList');
 const prisma = new PrismaClient()
 const crypto = require("crypto");
+const { DateTime } = require("luxon")
 
 // product demo
 const product_db = [
@@ -171,7 +172,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         Promise.all(
             // list product with image
             page_pd.list.length === 0 ? [] :
-                page_pd.list.map(product => getProductImage(res, productConverter(product, prodList)))
+                page_pd.list.map(product => getProductImage(productConverter(product, prodList)))
             // filter_pd.map(product => productConverter(product, prodList))
         ).then(productList => {
             page_pd.list = productList
@@ -192,7 +193,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     }
 })
 
-const getProductImage = async (res, product) => {
+const getProductImage = async (product) => {
     product.image = await listFirstImage(findImagePath("products", product.itemId))
     return product
 }
@@ -507,19 +508,47 @@ router.get('/all/reviews', async (req, res, next) => {
     // filter single and between value from name, price, rating and isFavPrd query
     // and return page that sorted by updateAt item
     try {
-        let filter_pd = await prisma.item_reviews.findMany({
+        let filter_rv = await prisma.item_reviews.findMany({
             where: {
                 rating: {
                     gte: 3,
                     lte: 5
                 },
             },
+            select: reviewView,
             orderBy: { createdAt: "desc" }
         })
 
+        let avg_rating = await prisma.item_reviews.aggregate({
+            _avg: {
+                rating: true
+            },
+        })
+
         // return to page with page number and page size
-        page_pd = paginationList(filter_pd, pageN, limitN, 10)
-        return res.send(page_pd)
+        let page_rv = paginationList(filter_rv, pageN, limitN, 10)
+        // return average review
+        page_rv.avg_rating = avg_rating._avg.rating
+        // console.log(page_rv.list)
+        page_rv.list = page_rv.list.map(rv => {
+            rv.name = `${capitalizeFirstLetter(rv.accounts.firstname)} ${capitalizeFirstLetter(rv.accounts.lastname)}`
+            rv.accounts = undefined
+            return timeConverter(rv)
+        })
+
+        page_rv.list = page_rv.list.filter(rv => {
+            // Replace this with the IANA timezone you desire
+            const dateTime = DateTime.fromFormat(rv.createdAt, 'MM/dd/yyyy, HH:mm:ss', { zone: 'Asia/Bangkok' }).toISO();
+            day7left = DateTime.now().minus({ days: 7 });
+            console.log(day7left)
+            // Calculate the difference in days
+            rv.time = day7left.diff(DateTime.fromISO(dateTime), 'days').toObject().days;
+
+            rv.createdAt = undefined
+            return rv.time <= 7
+        })
+
+        return res.send(page_rv)
 
     } catch (err) {
         next(err)

@@ -42,6 +42,19 @@ router.get("/:endpoint/:id/:filename", async (req, res) => {
   });
 });
 
+// product case
+router.get("/:endpoint/:id/:style/:filename", async (req, res) => {
+  const folder = findImagePath(req.params.endpoint, req.params.id, req.params.style);
+  const fileName = `${folder}/${req.params.filename}`;
+  const params = { Bucket: bucket, Key: fileName };
+
+  let file = await s3.getObject(params, function (err, data) {
+    // not found case
+    if (err) return res.status(404).json({ message: "File not found" });
+    return res.status(200).type("image/png").send(data.Body);
+  });
+});
+
 // upload single image
 // condition (file size < 8 MB, file multipart, file upload per solution, file type image only, path storage property)
 router.post("/:endpoint/:id", JwtAuth, FileAuthorization, upload.single("file"), async (req, res) => {

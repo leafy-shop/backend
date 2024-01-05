@@ -124,55 +124,61 @@ router.post('/', async (req, res, next) => {
     }
 })
 
-router.post('/refresh', async (req, res) => {
-    // เรียก refresh token เพื่อใช้ในการ refresh ถ้าหากเป็น access token จะทำการลบข้อมูลของ user ทำให้ส่ง token ผิด
-    const jwtRefreshToken = "Bearer " + req.cookies.refreshToken;
-    const jwttoken = "Bearer " + req.cookies.token
-    let userInfo = {
-        "name": req.body.name,
-        "email": req.body.email
-    }
+router.post('/refresh', async (req, res, next) => {
+    try {
+        // เรียก refresh token เพื่อใช้ในการ refresh ถ้าหากเป็น access token จะทำการลบข้อมูลของ user ทำให้ส่ง token ผิด
+        const jwtRefreshToken = "Bearer " + req.cookies.refreshToken;
+        const jwttoken = "Bearer " + req.cookies.token
+        let userInfo = {
+            "email": req.body.email
+        }
 
-    // if refresh token expired that removed cookie and response
-    if (isExpired(jwtRefreshToken.substring(7))) {
-        // clear session cookie
+        // if refresh token expired that removed cookie and response
+        if (isExpired(jwtRefreshToken.substring(7))) {
+            // clear session cookie
+            const cookieConfig = {
+                httpOnly: true,
+                sameSite: 'Strict'
+                // secure: true
+            }
+            res.clearCookie("token", cookieConfig)
+            res.clearCookie("refreshToken", cookieConfig)
+            unAuthorizedError("token is expired, need login again")
+        }
+
+        // สร้าง refresh token ใหม่ทั้ง token และ refreshToken
+        let token = refreshToken(jwttoken.substring(7), jwttoken.substring(7), userInfo, "1h")
+        let refreshtoken = refreshToken(jwttoken.substring(7), jwtRefreshToken.substring(7), userInfo, "24h")
+
+        // เรียกข้อมูล user โดยใช้ email
+        let user = await prisma.accounts.findFirst({
+            where: { email: userInfo.email }
+        })
+
+        // ตรวจดูว่า token ถูกต้องไหมก่อนส่ง
+        if (user === undefined) {
+            unAuthorizedError("please input valid refresh token")
+        }
+        // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
         const cookieConfig = {
+            maxAge: 24 * 60 * 60 * 1000,
             httpOnly: true,
             sameSite: 'Strict'
             // secure: true
         }
-        res.clearCookie("token", cookieConfig)
-        res.clearCookie("refreshToken", cookieConfig)
-        return res.status(401).json(errorRes("token is expired, need login again", req.originalUrl))
+
+        res.cookie("token", token, cookieConfig);
+        res.cookie("refreshToken", refreshtoken, cookieConfig);
+
+        res.status(200).json({
+            "id": user.userId,
+            "firstname": user.firstname,
+            "email": user.email,
+            "role": user.role
+        })
+    } catch (err) {
+        next(err)
     }
-
-    // สร้าง refresh token ใหม่ทั้ง token และ refreshToken
-    let token = refreshToken(jwttoken.substring(7), jwttoken.substring(7), userInfo, "1h")
-    let refreshtoken = refreshToken(jwttoken.substring(7), jwtRefreshToken.substring(7), userInfo, "24h")
-
-    // ตรวจดูว่า token ถูกต้องไหมก่อนส่ง
-    if ([getUser(token).email, getUser(token).role].includes(undefined)) {
-        return res.status(401).json(errorRes("please input valid refresh token", req.originalUrl))
-    }
-    // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
-    const cookieConfig = {
-        maxAge: 24 * 60 * 60 * 1000,
-        httpOnly: true,
-        sameSite: 'Strict'
-        // secure: true
-    }
-
-    res.cookie("token", token, cookieConfig);
-    res.cookie("refreshToken", refreshtoken, cookieConfig);
-
-    res.status(200).json({
-        "id": getUser(token).id,
-        "firstname": getUser(token).firstname,
-        "email": getUser(token).email,
-        "role": getUser(token).role,
-        "token": token,
-        "refreshToken": refreshtoken
-    })
 })
 
 router.get("/signout", (req, res) => {

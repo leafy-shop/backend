@@ -19,6 +19,28 @@ const userView = {
     updatedAt: true
 }
 
+const gardenDesignerView = {
+    userId: true,
+    firstname: true,
+    lastname: true,
+    description: true,
+    createdAt: true,
+    updatedAt: true
+}
+
+const reviewView = {
+    itemReviewId: true,
+    accounts: {
+        select: {
+            firstname: true,
+            lastname: true
+        }
+    },
+    comment: true,
+    rating: true,
+    createdAt: true
+}
+
 const userDetailView = {
     userId: true,
     firstname: true,
@@ -46,5 +68,7 @@ const userViewFav = () => {
 
 module.exports.userView = userView
 module.exports.userDetailView = userDetailView
+module.exports.gardenDesignerView = gardenDesignerView
+module.exports.reviewView = reviewView
 module.exports.userViewFav = userViewFav
 module.exports.prodList = prodList
