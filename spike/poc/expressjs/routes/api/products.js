@@ -533,19 +533,11 @@ router.get('/all/reviews', async (req, res, next) => {
         page_rv.list = page_rv.list.map(rv => {
             rv.name = `${capitalizeFirstLetter(rv.accounts.firstname)} ${capitalizeFirstLetter(rv.accounts.lastname)}`
             rv.accounts = undefined
-            return timeConverter(rv)
-        })
-
-        page_rv.list = page_rv.list.filter(rv => {
             // Replace this with the IANA timezone you desire
-            const dateTime = DateTime.fromFormat(rv.createdAt, 'MM/dd/yyyy, HH:mm:ss', { zone: 'Asia/Bangkok' }).toISO();
-            day7left = DateTime.now().minus({ days: 7 });
-            console.log(day7left)
-            // Calculate the difference in days
+            const dateTime = DateTime.fromJSDate(rv.createdAt, 'MM/dd/yyyy, HH:mm:ss', { zone: 'Asia/Bangkok' }).toISO();
+            day7left = DateTime.now();
             rv.time = day7left.diff(DateTime.fromISO(dateTime), 'days').toObject().days;
-
-            rv.createdAt = undefined
-            return rv.time <= 7
+            return rv
         })
 
         return res.send(page_rv)
