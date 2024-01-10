@@ -146,7 +146,8 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         // filter includes array : complexity best case O(n), worst case O(n*(type+tag))
         filter_pd = filter_pd.filter(product => {
             condition = (type === undefined ? true : type.split(",").includes(product.type)) &&
-                (tag === undefined ? true : tag.split(",").some(r => product.tag.split(",").includes(r)))
+                (tag === undefined ? true : product.tag.split(",").includes(tag))
+                // (tag === undefined ? true : tag.split(",").some(r => product.tag.split(",").includes(r)))
             // console.log(type.split(","))
             // console.log(product.type)
             // console.log(type.split(",").includes(product.type))
