@@ -11,15 +11,15 @@ const getToken = (user,date) => {
 }
 
 // refresh token
-const refreshToken = (jwttoken, result, user, date) => {
-    try {
-        // ตรวจ refresh token จาก user เพื่อไปสร้าง access token และ refresh token ใหม่
-        let user = jwt.verify(jwttoken,process.env.TOKEN_SECRET)
-    } catch (err) {
-        result = jwt.sign(user, process.env.TOKEN_SECRET, { expiresIn: date });
-    }
-    return result
-}
+// const refreshToken = (result, user, date) => {
+//     try {
+//         // ตรวจ refresh token จาก user เพื่อไปสร้าง access token และ refresh token ใหม่
+//         let user = jwt.verify(jwttoken,process.env.TOKEN_SECRET)
+//     } catch (err) {
+//         result = jwt.sign(user, process.env.TOKEN_SECRET, { expiresIn: date });
+//     }
+//     return result
+// }
 
 // convert to user email
 const getUser = (jwttoken, secret) => {
@@ -47,6 +47,6 @@ const isExpired = (jwtrefreshtoken) => {
 }
 
 module.exports.getToken = getToken
-module.exports.refreshToken = refreshToken
+// module.exports.refreshToken = refreshToken
 module.exports.getUser=getUser
 module.exports.isExpired = isExpired

@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const { getToken, getUser, refreshToken, isExpired } = require('./../model/class/utils/jwtUtils')
+const { getToken, getUser, isExpired } = require('./../model/class/utils/jwtUtils')
 const { errorRes, notFoundError, unAuthorizedError, forbiddenError } = require('./../model/error/error')
 const argon2 = require('argon2')
 const crypto = require('crypto')
@@ -95,6 +95,14 @@ router.post('/', async (req, res, next) => {
             "role": user.role,
         }, "1h");
 
+        // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
+        const cookieConfigToken = {
+            maxAge: 60 * 60 * 1000,
+            httpOnly: true,
+            sameSite: 'Strict'
+            // secure: true
+        }
+
         // และ refresh token แต่เวลาต่างกัน
         const refreshtoken = getToken({
             "id": user.userId,
@@ -104,14 +112,14 @@ router.post('/', async (req, res, next) => {
         }, "24h");
 
         // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
-        const cookieConfig = {
+        const cookieConfigRefreshToken = {
             maxAge: 24 * 60 * 60 * 1000,
             httpOnly: true,
             sameSite: 'Strict'
             // secure: true
         }
-        res.cookie("token", token, cookieConfig);
-        res.cookie("refreshToken", refreshtoken, cookieConfig);
+        res.cookie("token", token, cookieConfigToken);
+        res.cookie("refreshToken", refreshtoken, cookieConfigRefreshToken);
 
         res.status(200).json({
             "id": getUser(token).id,
@@ -128,9 +136,9 @@ router.post('/refresh', async (req, res, next) => {
     try {
         // เรียก refresh token เพื่อใช้ในการ refresh ถ้าหากเป็น access token จะทำการลบข้อมูลของ user ทำให้ส่ง token ผิด
         const jwtRefreshToken = "Bearer " + req.cookies.refreshToken;
-        const jwttoken = "Bearer " + req.cookies.token
+        // const jwttoken = "Bearer " + req.cookies.token
         let userInfo = {
-            "email": req.body.email
+            "email": req.body.email,
         }
 
         // if refresh token expired that removed cookie and response
@@ -146,19 +154,27 @@ router.post('/refresh', async (req, res, next) => {
             unAuthorizedError("token is expired, need login again")
         }
 
-        // สร้าง refresh token ใหม่ทั้ง token และ refreshToken
-        let token = refreshToken(jwttoken.substring(7), jwttoken.substring(7), userInfo, "1h")
-        let refreshtoken = refreshToken(jwttoken.substring(7), jwtRefreshToken.substring(7), userInfo, "24h")
-
         // เรียกข้อมูล user โดยใช้ email
         let user = await prisma.accounts.findFirst({
             where: { email: userInfo.email }
         })
 
+        // สร้าง refresh token ใหม่ทั้ง token และ refreshToken
+        let userToken = {
+            "id": user.userId,
+            "firstname": user.firstname,
+            "email": user.email,
+            "role": user.role
+        }
+
+        let token = getToken(userToken, "1h")
+        let refreshtoken = getToken(userToken, "24h")
+
         // ตรวจดูว่า token ถูกต้องไหมก่อนส่ง
         if (user === undefined) {
             unAuthorizedError("please input valid refresh token")
         }
+
         // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
         const cookieConfig = {
             maxAge: 24 * 60 * 60 * 1000,
