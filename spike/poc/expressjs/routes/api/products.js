@@ -100,7 +100,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
 
     // customize sorting model
     let sortModel = {}
-    if (sort_name !== undefined && ["price", "sold", "updatedAt"].includes(sort_name)) {
+    if (sort_name !== undefined && ["price", "sold", "updatedAt","totalRating"].includes(sort_name)) {
         sortModel[sort_name] = (sort === "desc") ? "desc" : "asc"
     } else {
         sortModel.updatedAt = "desc"
