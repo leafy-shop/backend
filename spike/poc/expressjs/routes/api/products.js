@@ -12,7 +12,7 @@ const { PrismaClient, Prisma } = require('@prisma/client');
 // const { mode } = require('../../config/minio_config');
 const { productConverter, timeConverter, paginationList, capitalizeFirstLetter } = require('../model/class/utils/converterUtils');
 const { ROLE } = require('../model/enum/role');
-const { findImagePath, listAllImage, listFirstImage } = require('../model/class/utils/imageList');
+const { findImagePath, listFirstImage, getAllStyleImageItem } = require('../model/class/utils/imageList');
 const prisma = new PrismaClient()
 const crypto = require("crypto");
 const { DateTime } = require("luxon")
@@ -100,7 +100,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
 
     // customize sorting model
     let sortModel = {}
-    if (sort_name !== undefined && ["price", "sold", "updatedAt","totalRating"].includes(sort_name)) {
+    if (sort_name !== undefined && ["price", "sold", "updatedAt", "totalRating"].includes(sort_name)) {
         sortModel[sort_name] = (sort === "desc") ? "desc" : "asc"
     } else {
         sortModel.updatedAt = "desc"
@@ -147,7 +147,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         filter_pd = filter_pd.filter(product => {
             condition = (type === undefined ? true : type.split(",").includes(product.type)) &&
                 (tag === undefined ? true : product.tag.split(",").includes(tag))
-                // (tag === undefined ? true : tag.split(",").some(r => product.tag.split(",").includes(r)))
+            // (tag === undefined ? true : tag.split(",").some(r => product.tag.split(",").includes(r)))
             // console.log(type.split(","))
             // console.log(product.type)
             // console.log(type.split(",").includes(product.type))
@@ -194,11 +194,6 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     }
 })
 
-const getProductImage = async (product) => {
-    product.image = await listFirstImage(findImagePath("products", product.itemId))
-    return product
-}
-
 router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
     try {
         // find id of product
@@ -210,15 +205,29 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
 
         // image for product
         let path = findImagePath("products", item.itemId)
-        item.images = await listAllImage(path)
+        item.image = await listFirstImage(path)
+
 
         // list product review to page
         page = Number(req.query.rv_page)
         limit = Number(req.query.rv_limit)
         item.item_reviews = paginationList(item.item_reviews, page, limit, 5)
 
-        // return product by id
-        return res.json(item)
+        // // return product by id
+        // return res.json(item)
+
+        // array converter and image mapping
+        Promise.all(
+            // list product style with image
+            item.styles.map(product => getProductStyleImage(productConverter(product)))
+            // filter_pd.map(product => productConverter(product, prodList))
+        ).then(styles => {
+            item.styles = styles
+            // return converter of product
+            return res.json(item)
+        }).catch(err => {
+            next(err)
+        })
     } catch (err) {
         next(err)
     }
@@ -701,6 +710,16 @@ router.put('/:prodId/review/:commentId/like', JwtAuth, async (req, res, next) =>
 })
 
 // -- method zone --
+const getProductImage = async (product) => {
+    product.image = await listFirstImage(findImagePath("products", product.itemId))
+    return product
+}
+
+const getProductStyleImage = async (style) => {
+    style.images = await getAllStyleImageItem(findImagePath("products", style.itemId + '/' + style.style))
+    return style
+}
+
 const verifyId = async (id) => {
     // find product by id
     let item = await prisma.items.findFirst({
@@ -726,7 +745,13 @@ const verifyId = async (id) => {
         }
     })
 
-    // return converter of product
+    // item.styles = await item.styles.map(async style => {
+    //     style.image = await getAllStyleImageItem(findImagePath('products', style.itemId + "/" + style.style))
+    //     console.log(style)
+    //     return style
+    // })
+
+    // console.log(item.styles)
     return productConverter(item)
 }
 
@@ -751,6 +776,7 @@ const verifyDetailId = async (id, sty) => {
     })
 
     item.styles = [item_detail]
+
 
     // return converter of product
     return productConverter(item)

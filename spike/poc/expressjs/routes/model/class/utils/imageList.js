@@ -9,7 +9,7 @@ let findImagePath = (endpoint, id, subpath = undefined) => {
     return path;
 }
 
-let listAllImage = async (folder) => {
+let listAllImage = async (folder, subpath) => {
     let s3 = storage.s3
     let bucket = storage.bucket
     // create list path
@@ -24,10 +24,11 @@ let listAllImage = async (folder) => {
         // console.log(listedObjects)
         
         // complexity O(n^3)
-        return listedObjects.Contents.map(obj => {
+        return listedObjects.Contents.filter(obj => {
+            // console.log(obj.Key.split("/"))
             // obj.Key.replace(/^.*[\\/]/, '')
-            return obj.Key.split("/").splice(3).join("/")
-        }); // get only file name
+            return obj.Key.split("/").splice(subpath).length === 1
+        }).map(obj => obj.Key.replace(/^.*[\\/]/, '')); // get only file name
     } catch (err) {
         return undefined
     }
@@ -36,8 +37,19 @@ let listAllImage = async (folder) => {
 let listFirstImage = async (folder) => {
     try {
         // list all object when exist
-        const listedObjects = await listAllImage(folder)
-        return listedObjects[0] // get only first file name
+        const listedObjects = await listAllImage(folder);
+        return listedObjects[0]
+    } catch (err) {
+        return undefined
+    }
+}
+
+let getAllStyleImageItem = async (folder) => {
+    try {
+        // list all style object when
+        const listedObjects = await listAllImage(folder, 4);
+        console.log(listedObjects)
+        return listedObjects
     } catch (err) {
         return undefined
     }
@@ -48,7 +60,7 @@ let validateDeleteAllImage = async (cb, folder) => {
     let bucket = storage.bucket
     try {
         // list all object when exist
-        const listedObjects = await listAllImage(folder)
+        const listedObjects = await listAllImage(folder,3)
 
         if (listedObjects.length != 0) {
 
@@ -95,5 +107,6 @@ let deleteAllImage = async (res, folder) => {
 module.exports.listAllImage = listAllImage;
 module.exports.findImagePath = findImagePath;
 module.exports.listFirstImage = listFirstImage;
+module.exports.getAllStyleImageItem = getAllStyleImageItem
 module.exports.deleteAllImage = deleteAllImage;
 module.exports.validateDeleteAllImage = validateDeleteAllImage;
