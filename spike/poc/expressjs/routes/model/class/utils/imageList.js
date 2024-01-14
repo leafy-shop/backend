@@ -9,7 +9,7 @@ let findImagePath = (endpoint, id, subpath = undefined) => {
     return path;
 }
 
-let listAllImage = async (folder, subpath) => {
+let listAllImage = async (folder, subpath = 3) => {
     let s3 = storage.s3
     let bucket = storage.bucket
     // create list path
@@ -25,7 +25,6 @@ let listAllImage = async (folder, subpath) => {
         
         // complexity O(n^3)
         return listedObjects.Contents.filter(obj => {
-            // console.log(obj.Key.split("/"))
             // obj.Key.replace(/^.*[\\/]/, '')
             return obj.Key.split("/").splice(subpath).length === 1
         }).map(obj => obj.Key.replace(/^.*[\\/]/, '')); // get only file name
@@ -36,6 +35,7 @@ let listAllImage = async (folder, subpath) => {
 
 let listFirstImage = async (folder) => {
     try {
+        // console.log("T")
         // list all object when exist
         const listedObjects = await listAllImage(folder);
         return listedObjects[0]
@@ -86,7 +86,7 @@ let deleteAllImage = async (res, folder) => {
         // list all object when exist
         const listedObjects = await listAllImage(folder)
         if (listedObjects.length != 0) {
-            console.log(folder)
+            // console.log(folder)
 
             // create mapping all images object params
             const deleteParams = {
