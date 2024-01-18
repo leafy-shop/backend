@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 
-const { validateStr, validateInt, validateBoolean, validateDouble, validateEmail, validateStrArray } = require('../validation/body')
-const { notFoundError, validatError, forbiddenError } = require('./../model/error/error')
+const { validateStr, validateInt, validateDouble, validateEmail, validateStrArray } = require('../validation/body')
+const { notFoundError, forbiddenError } = require('./../model/error/error')
 // const { dateTimeZoneNow } = require('../model/class/utils/datetimeUtils')
 const { userViewFav, prodList, reviewView } = require('./../model/class/model')
 const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('./../../middleware/jwtAuth')
@@ -10,63 +10,64 @@ const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('./../../middleware/jwt
 const { PrismaClient, Prisma } = require('@prisma/client');
 // const { deleteNullValue } = require('../model/class/utils/modelMapping');
 // const { mode } = require('../../config/minio_config');
-const { productConverter, timeConverter, paginationList, capitalizeFirstLetter } = require('../model/class/utils/converterUtils');
+const { productConverter, timeConverter, paginationList, generateId } = require('../model/class/utils/converterUtils');
 const { ROLE } = require('../model/enum/role');
 const { findImagePath, listFirstImage, getAllStyleImageItem } = require('../model/class/utils/imageList');
 const prisma = new PrismaClient()
-const crypto = require("crypto");
-const { DateTime } = require("luxon")
+// const crypto = require("crypto");
+// const { DateTime } = require("luxon");
+const { getDifferentTime } = require('../model/class/utils/datetimeUtils');
 
 // product demo
-const product_db = [
-    {
-        "name": "small zee cactus",
-        "description": "this is cactus create by zee",
-        "itemOwner": "piraphat123@gmail.com",
-        "type": "cactus",
-        "tag": ["cactus is amazing", "flower cactus", "cactus", "", "cactus", "Cactus"],
-        "size": ["XS", "S"],
-        "style": "light green cactus",
-        "price": 32,
-    },
-    {
-        "name": "lilac flower in beautiful jar",
-        "description": "this is lilac flower create by zee",
-        "itemOwner": "piraphat123@gmail.com",
-        "type": "flower",
-        "tag": ["lilac is relax", "levender flower", "", null, " "],
-        "size": ["S", "M", "l", "L"],
-        "style": "light purple flower",
-        "price": 149
-    },
-    {
-        "name": "golden rose",
-        "itemOwner": "piraphat123@gmail.com",
-        "type": "flower",
-        "tag": ["rose", "golden rose", "Rose", null, " "],
-        "size": ["S", "M", "l", "XL"],
-        "style": "golden",
-        "price": 289
-    },
-    {
-        "name": "big zee cactus",
-        "description": "this is very BIG cactus create by zee",
-        "itemOwner": "piraphat123@gmail.com",
-        "type": "cactus",
-        "tag": ["cactus", "very cute", "very fat and high"],
-        "size": ["l", "xL"],
-        "style": "golden",
-        "price": 570
-    },
-    {
-        "name": "zee shovel",
-        "itemOwner": "piraphat123@gmail.com",
-        "type": "tool",
-        "tag": ["shovel", "tool"],
-        "style": "shapen shovel",
-        "price": 139
-    }
-]
+// const product_db = [
+//     {
+//         "name": "small zee cactus",
+//         "description": "this is cactus create by zee",
+//         "itemOwner": "piraphat123@gmail.com",
+//         "type": "cactus",
+//         "tag": ["cactus is amazing", "flower cactus", "cactus", "", "cactus", "Cactus"],
+//         "size": ["XS", "S"],
+//         "style": "light green cactus",
+//         "price": 32,
+//     },
+//     {
+//         "name": "lilac flower in beautiful jar",
+//         "description": "this is lilac flower create by zee",
+//         "itemOwner": "piraphat123@gmail.com",
+//         "type": "flower",
+//         "tag": ["lilac is relax", "levender flower", "", null, " "],
+//         "size": ["S", "M", "l", "L"],
+//         "style": "light purple flower",
+//         "price": 149
+//     },
+//     {
+//         "name": "golden rose",
+//         "itemOwner": "piraphat123@gmail.com",
+//         "type": "flower",
+//         "tag": ["rose", "golden rose", "Rose", null, " "],
+//         "size": ["S", "M", "l", "XL"],
+//         "style": "golden",
+//         "price": 289
+//     },
+//     {
+//         "name": "big zee cactus",
+//         "description": "this is very BIG cactus create by zee",
+//         "itemOwner": "piraphat123@gmail.com",
+//         "type": "cactus",
+//         "tag": ["cactus", "very cute", "very fat and high"],
+//         "size": ["l", "xL"],
+//         "style": "golden",
+//         "price": 570
+//     },
+//     {
+//         "name": "zee shovel",
+//         "itemOwner": "piraphat123@gmail.com",
+//         "type": "tool",
+//         "tag": ["shovel", "tool"],
+//         "style": "shapen shovel",
+//         "price": 139
+//     }
+// ]
 
 router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     // let filter_pd = product_db.filter( p => {
@@ -541,12 +542,10 @@ router.get('/all/reviews', async (req, res, next) => {
         page_rv.avg_rating = avg_rating._avg.rating
         // console.log(page_rv.list)
         page_rv.list = page_rv.list.map(rv => {
-            rv.name = `${capitalizeFirstLetter(rv.accounts.firstname)} ${capitalizeFirstLetter(rv.accounts.lastname)}`
+            rv.name = rv.accounts.username
             rv.accounts = undefined
             // Replace this with the IANA timezone you desire
-            const dateTime = DateTime.fromJSDate(rv.createdAt, 'MM/dd/yyyy, HH:mm:ss', { zone: 'Asia/Bangkok' }).toISO();
-            day7left = DateTime.now();
-            rv.time = day7left.diff(DateTime.fromISO(dateTime), 'days').toObject().days;
+            rv.time = getDifferentTime(rv.createdAt)
             return rv
         })
 
@@ -559,16 +558,16 @@ router.get('/all/reviews', async (req, res, next) => {
 
 router.post('/:prodId/review', JwtAuth, async (req, res, next) => {
     try {
-        let { itemReviewId, comment, rating, size, style } = req.body
+        let { itemReviewId, comment, rating, style } = req.body
 
         // find item id
         let item = await verifyDetailId(req.params.prodId, style)
 
-        // check size
-        if (!item.styles[0].size.includes(size)) notFoundError(`item id ${item.itemId} size not found `)
+        // // check size
+        // if (!item.styles[0].size.includes(size)) notFoundError(`item id ${item.itemId} size not found `)
 
         // generate id
-        const id = crypto.randomBytes(16).toString("hex");
+        const id = generateId(16)
 
         console.log(id.length); // => f9b327e70bbcf42494ccb28b2d98e00e
 
@@ -582,7 +581,7 @@ router.post('/:prodId/review', JwtAuth, async (req, res, next) => {
                 userEmail: req.user.email,
                 comment: validateStr("item comment", comment, 200),
                 rating: validateInt("item rating", rating, 500, 1, 5),
-                size: size,
+                // size: size,
                 style: style
             }
         })

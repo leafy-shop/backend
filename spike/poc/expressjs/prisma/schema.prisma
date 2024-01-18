@@ -52,10 +52,9 @@ model items {
 }
 
 model item_details {
-  itemId       Int
-  style        String  @db.VarChar(50)
-  size         String  @db.VarChar(50)
-  isOutOfStock Boolean @default(false)
+  itemId Int
+  style  String @db.VarChar(50)
+  stock  Int
 
   @@id([itemId, style])
   @@index([itemId], map: "fk_ItemDetail_items_idx")
@@ -70,7 +69,6 @@ model item_reviews {
   comment           String              @db.VarChar(500)
   rating            Int                 @default(0)
   like              Int                 @default(0)
-  size              String              @db.Char(100)
   style             String              @db.VarChar(50)
   createdAt         DateTime            @default(now())
   item_review_likes item_review_likes[]
@@ -88,18 +86,19 @@ model item_review_likes {
 }
 
 model accounts {
-  userId      Int      @id @default(autoincrement())
-  firstname   String?  @db.VarChar(50)
-  lastname    String?  @db.VarChar(50)
-  description String?  @db.VarChar(500)
-  email       String   @unique(map: "Users_email_key") @db.VarChar(100)
-  password    String   @db.VarChar(100)
-  role        String   @default("user") @db.VarChar(11)
-  status      Boolean  @default(true)
-  verifyAccount Boolean @default(false)
-  phone       String?  @db.Char(11)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  userId        Int      @id @default(autoincrement())
+  username      String   @db.VarChar(50)
+  firstname     String?  @db.VarChar(50)
+  lastname      String?  @db.VarChar(50)
+  description   String?  @db.VarChar(500)
+  email         String   @unique(map: "Users_email_key") @db.VarChar(100)
+  password      String   @db.VarChar(100)
+  role          String   @default("user") @db.VarChar(11)
+  status        Boolean  @default(true)
+  verifyAccount Boolean  @default(false)
+  phone         String?  @db.Char(11)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   carts             carts[]
   favprd            favprd[]

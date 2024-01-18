@@ -11,7 +11,7 @@ const prodList = {
 
 const userView = {
     userId: true,
-    // name: true,
+    username: true,
     email: true,
     role: true,
     status: true,
@@ -21,8 +21,7 @@ const userView = {
 
 const gardenDesignerView = {
     userId: true,
-    firstname: true,
-    lastname: true,
+    username: true,
     description: true,
     createdAt: true,
     updatedAt: true
@@ -32,8 +31,7 @@ const reviewView = {
     itemReviewId: true,
     accounts: {
         select: {
-            firstname: true,
-            lastname: true
+            username: true
         }
     },
     comment: true,
@@ -43,6 +41,7 @@ const reviewView = {
 
 const userDetailView = {
     userId: true,
+    username: true,
     firstname: true,
     lastname: true,
     description: true,

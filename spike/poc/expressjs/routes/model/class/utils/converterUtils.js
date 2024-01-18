@@ -1,6 +1,7 @@
 const { dateTimeZoneNow } = require("./datetimeUtils");
 // const { listFirstImage, findImagePath } = require("./imageList");
 const { modelMapper, deleteNullValue } = require("./modelMapping");
+const crypto = require("crypto")
 
 let timeConverter = (value) => {
   // console.log(value)
@@ -100,8 +101,13 @@ const capitalizeFirstLetter = (string) => {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
+const generateId = (halfNumber) => {
+  return crypto.randomBytes(halfNumber).toString("hex");
+}
+
 module.exports.productConverter = productConverter
 module.exports.timeConverter = timeConverter
 module.exports.userConverter = userConverter
 module.exports.paginationList = paginationList
 module.exports.capitalizeFirstLetter = capitalizeFirstLetter
+module.exports.generateId = generateId
