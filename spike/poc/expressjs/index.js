@@ -36,15 +36,15 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: false}))
 
 // route ไปยังไฟล์ที่สามารถ req,res ได้
-app.use('/api/authentication',require('./routes/api/auth.js'))
-app.use('/api/products',require('./routes/api/products.js'))
-app.use('/api/users',require('./routes/api/users.js'))
-app.use('/api/carts',require('./routes/api/carts.js'))
+app.use('/api/authentication',require('./routes/api/authentication/auth.js'))
+app.use('/api/products',require('./routes/api/productProvider/products.js'))
+app.use('/api/users',require('./routes/api/accountProvider/users.js'))
+app.use('/api/carts',require('./routes/api/productProvider/carts.js'))
 // app.use('/api/problems',require('./routes/api/problem.js'))
-// app.use('/api/solutions',require('./routes/api/solution.js'))
-// app.use('/api/authentication',require('./routes/api/authen.js'))
-app.use('/api/image',require('./routes/api/image.js'))
-app.use('/api/images',require('./routes/api/productImages.js'))
+app.use('/api/image',require('./routes/api/imageProvider/image.js'))
+app.use('/api/images',require('./routes/api/imageProvider/productImages.js'))
+app.use('/api/addresses',require('./routes/api/accountProvider/addresses.js'))
+app.use('/api/payments',require('./routes/api/accountProvider/payments.js'))
 // app.use('/api/send-mail',require('./routes/api/mailer.js'))
 
 const errorHandler = (error, req, res, next) => {

@@ -1,18 +1,18 @@
 const express = require('express');
 const router = express.Router();
 
-const { validateStr, validateInt, validateBoolean, validateEmail, validatePassword, validateRole, validateDatetimeFuture, validatePhone } = require('../validation/body')
-let { notFoundError, validatError, forbiddenError } = require('./../model/error/error')
-let { sendMail, signup_email } = require('./../../config/email_config')
+const { validateStr, validateInt, validateBoolean, validateEmail, validatePassword, validateRole, validateDatetimeFuture, validatePhone } = require('../../validation/body')
+let { notFoundError, validatError, forbiddenError } = require('../../model/error/error')
+let { sendMail, signup_email } = require('../../../config/email_config')
 
-const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('./../../middleware/jwtAuth')
-const { ROLE } = require('./../model/enum/role')
-const { userView, userDetailView, gardenDesignerView } = require('./../model/class/model')
+const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('../../../middleware/jwtAuth')
+const { ROLE } = require('../../model/enum/role')
+const { userView, userDetailView, gardenDesignerView } = require('../../model/class/model')
 const { PrismaClient, Prisma } = require('@prisma/client');
-const { timeConverter, userConverter, paginationList } = require('../model/class/utils/converterUtils');
+const { timeConverter, userConverter, paginationList } = require('../../model/class/utils/converterUtils');
 // const { firestore } = require('firebase-admin');
 const crypto = require('crypto');
-const { listFirstImage, findImagePath } = require('../model/class/utils/imageList');
+const { listFirstImage, findImagePath } = require('../../model/class/utils/imageList');
 const prisma = new PrismaClient()
 
 // Exclude keys from user
@@ -69,7 +69,7 @@ router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     let filter_u = await prisma.accounts.findMany({
         where: {
             AND: [{
-                firstname: {
+                username: {
                     contains: req.query.name
                 }
             },
@@ -197,12 +197,13 @@ router.get('/views/:email', async (req, res, next) => {
 })
 
 router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
-    let { userId, email, role, password, firstname, lastname, description, phone } = req.body
+    let { userId, username, email, role, password, firstname, lastname, description, phone } = req.body
 
     try {
         // accounts data
         let account = {
             userId: isNaN(userId) ? undefined : validateInt("item id", userId, true),
+            username: validateStr("account username", username, 50),
             firstname: validateStr("account firstname", firstname, 50),
             lastname: validateStr("account lastname", lastname, 50),
             email: validateEmail("account email", email, 100),
@@ -212,17 +213,21 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
         // console.log(req.user !== undefined)
 
         // check role is admin when they is admin they can config role, description and activate account
-        if (req.user !== undefined && req.user.role === ROLE.Admin) {
-            account.role = validateRole("account role", role, ROLE)
-            account.description = validateStr("account description", description, 500)
-            account.verifyAccount = true
-        } else {
-            // send email for verify account
-            account.verifyAccount = false
+        // if (req.user !== undefined && req.user.role === ROLE.Admin) {
+        //     account.role = validateRole("account role", role, ROLE)
+        //     account.description = validateStr("account description", description, 500)
+        //     account.verifyAccount = true
+        // } else {
+        //     // send email for verify account
+        //     account.verifyAccount = false
 
-            // send to email
-            await sendMail(signup_email(email, "signup", res), "Add new account", email)
-        }
+        //     // send to email
+        //     await sendMail(signup_email(email, "signup", res), "Add new account", email)
+        // }
+
+        account.role = validateRole("account role", role, ROLE)
+        account.description = validateStr("account description", description, 500)
+        account.verifyAccount = true
 
         // create accounts
         let input = await prisma.accounts.create({
@@ -275,14 +280,15 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
         for (let i in req.body) {
             if (req.body[i] != undefined) {
                 mapUser[i] =
-                    i == "firstname" ? validateStr("account firstname", req.body[i], 50) :
-                        i == "lastname" ? validateStr("account lastname", req.body[i], 50) :
-                            i == "description" ? validateStr("account desciption", req.body[i], 500) :
-                                // i == "email" ? validateEmail("user email", req.body[i], 100) : cannot edit email
-                                i == "role" ? validateRole("account role", req.body[i], ROLE) :
-                                    i == "password" ? await validatePassword("account password", req.body[i], 8, 20) :
-                                        i == "status" ? validateBoolean("account status", req.body[i]) :
-                                            i == "phone" ? validatePhone("account information phone", req.body[i]) : undefined
+                    i == "username" ? validateStr("account username", req.body[i], 50) :
+                        i == "firstname" ? validateStr("account firstname", req.body[i], 50) :
+                            i == "lastname" ? validateStr("account lastname", req.body[i], 50) :
+                                i == "description" ? validateStr("account desciption", req.body[i], 500) :
+                                    // i == "email" ? validateEmail("user email", req.body[i], 100) : cannot edit email
+                                    i == "role" ? validateRole("account role", req.body[i], ROLE) :
+                                        i == "password" ? await validatePassword("account password", req.body[i], 8, 20) :
+                                            i == "status" ? validateBoolean("account status", req.body[i]) :
+                                                i == "phone" ? validatePhone("account information phone", req.body[i]) : undefined
             }
         }
         // console.log(mapUser)
@@ -332,7 +338,7 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) =>
             console.log(err)
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2003') {
-                err.message = "cannot delete user when they have own user or order"
+                err.message = "cannot delete user when they have own item or order"
             }
         }
         next(err)

@@ -3,11 +3,11 @@ const router = express.Router();
 path = require("path");
 const multer = require("multer");
 require('dotenv').config().parsed
-const { JwtAuth, FileAuthorization } = require('./../../middleware/jwtAuth')
-const { findImagePath, validateDeleteAllImage } = require('./../model/class/utils/imageList')
+const { JwtAuth, FileAuthorization } = require('../../../middleware/jwtAuth')
+const { findImagePath, validateDeleteAllImage } = require('../../model/class/utils/imageList')
 
 // reference: https://dev.to/franciscomendes10866/upload-files-to-minio-object-storage-s3-with-expressjs-3561
-const { bucket, s3, storage, mode } = require("../../config/minio_config")
+const { bucket, s3, storage, mode } = require("../../../config/minio_config")
 
 const upload = multer({
   storage: storage,

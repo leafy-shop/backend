@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 
-const { validateInt } = require('../validation/body')
-const { notFoundError, forbiddenError, validatError } = require('./../model/error/error')
-const { JwtAuth } = require('./../../middleware/jwtAuth')
+const { validateInt } = require('../../validation/body')
+const { notFoundError, forbiddenError, validatError } = require('../../model/error/error')
+const { JwtAuth } = require('../../../middleware/jwtAuth')
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient()

@@ -3,6 +3,7 @@ const { dateTimeZoneNow } = require("./datetimeUtils");
 const { modelMapper, deleteNullValue } = require("./modelMapping");
 const crypto = require("crypto")
 
+// inner object
 let timeConverter = (value) => {
   // console.log(value)
   if (value.createdAt !== undefined) value.createdAt = dateTimeZoneNow(value.createdAt);
@@ -10,6 +11,7 @@ let timeConverter = (value) => {
   return value
 }
 
+// inner object
 const productConverter = (product, model) => {
   // filter product mapping with model
   if (model !== undefined) {
@@ -44,6 +46,7 @@ const productConverter = (product, model) => {
   return product
 }
 
+// inner object
 const userConverter = (user) => {
   // date of birth converter
   // if (user.dob !== undefined) user.dob = dateTimeZoneNow(user.dob)
@@ -60,6 +63,7 @@ const userConverter = (user) => {
   return user
 }
 
+// phone string
 const reformatPhoneNumber = (phoneNumber) => {
   if (phoneNumber.length === 10) {
     // Format for 0900000000 to 090-000-0000
@@ -73,6 +77,7 @@ const reformatPhoneNumber = (phoneNumber) => {
   }
 }
 
+// list object
 const paginationList = (list, pageN, limitN, maxLimit) => {
   // return to page with page number and page size
 
@@ -96,11 +101,13 @@ const paginationList = (list, pageN, limitN, maxLimit) => {
   return pageTemplate
 }
 
+// text
 // reference: https://stackoverflow.com/questions/1026069/how-do-i-make-the-first-letter-of-a-string-uppercase-in-javascript?page=1&tab=scoredesc#tab-top
 const capitalizeFirstLetter = (string) => {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
+// text
 const generateId = (halfNumber) => {
   return crypto.randomBytes(halfNumber).toString("hex");
 }

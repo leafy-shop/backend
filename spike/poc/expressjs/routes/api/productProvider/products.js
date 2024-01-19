@@ -1,22 +1,23 @@
 const express = require('express');
 const router = express.Router();
 
-const { validateStr, validateInt, validateDouble, validateEmail, validateStrArray } = require('../validation/body')
-const { notFoundError, forbiddenError } = require('./../model/error/error')
+const { validateStr, validateInt, validateDouble, validateEmail, validateStrArray, validateRole } = require('../../validation/body')
+const { notFoundError, forbiddenError } = require('../../model/error/error')
 // const { dateTimeZoneNow } = require('../model/class/utils/datetimeUtils')
-const { userViewFav, prodList, reviewView } = require('./../model/class/model')
-const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('./../../middleware/jwtAuth')
+const { userViewFav, prodList, reviewView } = require('../../model/class/model')
+const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('../../../middleware/jwtAuth')
 
 const { PrismaClient, Prisma } = require('@prisma/client');
 // const { deleteNullValue } = require('../model/class/utils/modelMapping');
 // const { mode } = require('../../config/minio_config');
-const { productConverter, timeConverter, paginationList, generateId } = require('../model/class/utils/converterUtils');
-const { ROLE } = require('../model/enum/role');
-const { findImagePath, listFirstImage, getAllStyleImageItem } = require('../model/class/utils/imageList');
+const { productConverter, timeConverter, paginationList, generateId } = require('../../model/class/utils/converterUtils');
+const { ROLE } = require('../../model/enum/role');
+const { findImagePath, listFirstImage, getAllStyleImageItem } = require('../../model/class/utils/imageList');
 const prisma = new PrismaClient()
 // const crypto = require("crypto");
 // const { DateTime } = require("luxon");
-const { getDifferentTime } = require('../model/class/utils/datetimeUtils');
+const { getDifferentTime } = require('../../model/class/utils/datetimeUtils');
+const { ITEMTYPE } = require('../../model/enum/itemType');
 
 // product demo
 // const product_db = [
@@ -69,6 +70,7 @@ const { getDifferentTime } = require('../model/class/utils/datetimeUtils');
 //     }
 // ]
 
+// GET - all page products by filter and sort
 router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     // let filter_pd = product_db.filter( p => {
     //     console.log(p)
@@ -195,6 +197,8 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     }
 })
 
+
+// GET - products by id
 router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
     try {
         // find id of product
@@ -234,8 +238,9 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
     }
 })
 
+// POST - create product and product details
 router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
-    let { itemId, name, description, itemOwner, type, tag, size, styles, price } = req.body
+    let { itemId, name, description, itemOwner, type, tag, styles, price } = req.body
     // let numberids = []
     // product_db.sort((a, b) => a.id - b.id).forEach(item => {
     //     numberids.push(item.id)
@@ -277,7 +282,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
             itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
             name: validateStr("item name", name, 100),
             description: validateStr("item description", description, 5000, true),
-            type: validateStr("item type", type, 20),
+            type: validateRole("item type", type, ITEMTYPE),
             tag: validateStrArray("item tag", tag, 10, 20),
             price: validateDouble("item price", price, true)
         }
@@ -295,7 +300,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
                 data: {
                     itemId: input.itemId,
                     style: validateStr("item style", sty.style, 50),
-                    size: validateStrArray("item size", sty.size, 5, 4, true)
+                    size: validateStr("item size", sty.size, 4, true)
                 }
             })
         )
@@ -353,6 +358,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
 //     }
 // })
 
+// PUT - change favorite product by id
 router.put('/isFav/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.User), async (req, res, next) => {
     try {
         let item = await verifyId(Number(req.params.id))
@@ -390,6 +396,7 @@ router.put('/isFav/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.User), async (req,
     }
 })
 
+// PATCH - update product by id
 router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     let mapData = {}
 
@@ -401,7 +408,7 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req,
                 i == "name" ? validateStr("item name", req.body[i], 100) :
                     i == "description" ? validateStr("item description", req.body[i], 5000, true) :
                         // i == "itemOwner" ? validateEmail("item owner", req.body[i], 100) : cannot change item owner
-                        i == "type" ? validateStr("item type", req.body[i], 20) :
+                        // i == "type" ? validateStr("item type", req.body[i], 20) :
                             i == "price" ? validateDouble("item price", req.body[i], true) : undefined // unused body request
         }
     }
@@ -435,11 +442,17 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req,
     }
 })
 
+// PUT - update product detail by id and style
 router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     // update product
+
+    let {size, stock} = req.body
+
+    size = size ? size : 'No'
+
     try {
         // find item id
-        let item = await verifyDetailId(req.params.id, req.params.style)
+        let item = await verifyDetailId(req.params.id, req.params.style, size)
 
         // check if supplier role update other email
         if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.email)
@@ -449,17 +462,15 @@ router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async 
         if (item == null) notFoundError("item id " + id + " does not exist")
 
         // switch out of stock or not
-        let outStock = { isOutOfStock: true }
-        if (item.styles[0].isOutOfStock) {
-            outStock.isOutOfStock = false
-        }
+        let outStock = { stock: validateInt('validate item stock',stock, false, 0) }
 
         // update stock
         let input = await prisma.item_details.update({
             where: {
-                itemId_style: {
+                itemId_style_size: {
                     itemId: Number(req.params.id),
-                    style: req.params.style
+                    style: req.params.style,
+                    size: validateStr('validate size', size, 4)
                 }
             },
             data: outStock
@@ -478,6 +489,7 @@ router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async 
     }
 })
 
+// DELETE - delete product
 router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     try {
         // find item id
@@ -507,6 +519,8 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req
 })
 
 // review -- zone ---
+
+// GET - get all reviews
 router.get('/all/reviews', async (req, res, next) => {
 
     // query params
@@ -556,12 +570,13 @@ router.get('/all/reviews', async (req, res, next) => {
     }
 })
 
+// POST - add reviews into product id
 router.post('/:prodId/review', JwtAuth, async (req, res, next) => {
     try {
-        let { itemReviewId, comment, rating, style } = req.body
+        let { itemReviewId, comment, rating, style, size } = req.body
 
         // find item id
-        let item = await verifyDetailId(req.params.prodId, style)
+        let item = await verifyDetailId(req.params.prodId, style, size)
 
         // // check size
         // if (!item.styles[0].size.includes(size)) notFoundError(`item id ${item.itemId} size not found `)
@@ -569,9 +584,9 @@ router.post('/:prodId/review', JwtAuth, async (req, res, next) => {
         // generate id
         const id = generateId(16)
 
-        console.log(id.length); // => f9b327e70bbcf42494ccb28b2d98e00e
+        // console.log(id.length); // => f9b327e70bbcf42494ccb28b2d98e00e
 
-        console.log(itemReviewId)
+        // console.log(itemReviewId)
 
         // add this user for comment
         let review = await prisma.item_reviews.create({
@@ -581,7 +596,7 @@ router.post('/:prodId/review', JwtAuth, async (req, res, next) => {
                 userEmail: req.user.email,
                 comment: validateStr("item comment", comment, 200),
                 rating: validateInt("item rating", rating, 500, 1, 5),
-                // size: size,
+                size: size,
                 style: style
             }
         })
@@ -604,6 +619,8 @@ router.post('/:prodId/review', JwtAuth, async (req, res, next) => {
     }
 })
 
+
+// DELETE - delete review by review id and product id
 router.delete('/:prodId/review/:commentId', JwtAuth, async (req, res, next) => {
     try {
         let { prodId, commentId } = req.params
@@ -637,6 +654,7 @@ router.delete('/:prodId/review/:commentId', JwtAuth, async (req, res, next) => {
     }
 })
 
+// PUT - like review by review id and product id
 router.put('/:prodId/review/:commentId/like', JwtAuth, async (req, res, next) => {
     try {
         let { prodId, commentId } = req.params
@@ -755,19 +773,20 @@ const verifyId = async (id) => {
 }
 
 // use model for add to cart and check stock
-const verifyDetailId = async (id, sty) => {
+const verifyDetailId = async (id, sty, size) => {
     // find product by id
     let item_detail = await prisma.item_details.findFirst({
         where: {
             AND: [
                 { itemId: Number(id) },
-                { style: sty }
+                { style: sty },
+                { size: size }
             ]
         }
     })
 
     // check that product is found
-    if (item_detail == null) notFoundError("item id " + id + " in style " + sty + " does not exist")
+    if (item_detail == null) notFoundError("item id " + id + " in style " + sty + " have size " + size + " does not exist")
 
     // check that item owner
     let item = await prisma.items.findFirst({
@@ -775,7 +794,6 @@ const verifyDetailId = async (id, sty) => {
     })
 
     item.styles = [item_detail]
-
 
     // return converter of product
     return productConverter(item)

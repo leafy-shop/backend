@@ -55,13 +55,14 @@ model item_details {
   itemId Int
   style  String @db.VarChar(50)
   stock  Int
+  size   String @db.VarChar(4)
 
-  @@id([itemId, style])
-  @@index([itemId], map: "fk_ItemDetail_items_idx")
+  @@id([itemId, style, size])
+  @@index([itemId, style, size], map: "fk_ItemDetail_items_idx")
 }
 
 model item_reviews {
-  itemReviewId      String              @id @db.VarChar(32)
+  itemReviewId      String              @id @db.Char(32)
   itemId            Int
   userEmail         String              @db.VarChar(100)
   items             items               @relation(fields: [itemId], references: [itemId], map: "ItemReview_itemId_fkey")
@@ -70,13 +71,14 @@ model item_reviews {
   rating            Int                 @default(0)
   like              Int                 @default(0)
   style             String              @db.VarChar(50)
+  size              String              @db.VarChar(4)
   createdAt         DateTime            @default(now())
   item_review_likes item_review_likes[]
 }
 
 model item_review_likes {
   userEmail    String       @db.VarChar(100)
-  itemReviewId String       @db.VarChar(32)
+  itemReviewId String       @db.Char(32)
   item_reviews item_reviews @relation(fields: [itemReviewId], references: [itemReviewId], map: "UserreviewLike_itemreviewId_fkey")
   accounts     accounts     @relation(fields: [userEmail], references: [email], map: "UserreviewLike_userEmail_fkey")
 
@@ -105,4 +107,28 @@ model accounts {
   items             items[]
   item_reviews      item_reviews[]
   item_review_likes item_review_likes[]
+  addresses         addresses[]
+  payments          payments[]
+}
+
+model addresses {
+  addressId    String   @id @db.Char(32)
+  userEmail    String   @db.VarChar(100)
+  accounts     accounts @relation(fields: [userEmail], references: [email], map: "Addresses_userEmail_fkey")
+  addressname  String   @db.VarChar(100)
+  phone        String?   @db.Char(11)
+  address      String   @db.VarChar(50)
+  province     String   @db.VarChar(20)
+  distrinct    String   @db.VarChar(20)
+  subDistrinct String?   @db.VarChar(20)
+  postalCode   String   @db.Char(5)
+}
+
+model payments {
+  paymentId   String   @id @db.Char(32)
+  userEmail   String   @db.VarChar(100)
+  accounts    accounts @relation(fields: [userEmail], references: [email], map: "Payments_userEmail_fkey")
+  bankname    String   @db.VarChar(100)
+  bankCode    String   @db.VarChar(10)
+  bankAccount String   @db.VarChar(16)
 }

@@ -152,7 +152,7 @@ const validateStrArray = (prop = '', values = [], ArrL, inArrL, upper = false) =
 
     // validate string in array and return to lower case values
     values = upper ? values.map((v, i) => validateStr(`${prop} - ${i + 1}:${v}`, v, inArrL).toUpperCase()) :
-     values.map((v, i) => validateStr(`${prop} - ${i + 1}:${v}`, v, inArrL).toLowerCase())
+        values.map((v, i) => validateStr(`${prop} - ${i + 1}:${v}`, v, inArrL).toLowerCase())
 
     // remove duplicated values
     values = [...new Set(values)]
@@ -197,7 +197,47 @@ const validatePhone = (prop = '', value = undefined) => {
     if (value !== undefined && !value.match(re)) {
         validatError(`${prop} is not phone format`)
     }
+    console.log(`validate ${prop} is passed`)
     return value === undefined ? undefined : value.replace(/-/g, '');
+}
+
+const validateCode = (prop = '', value = '', length = 0, arrayCodeDigit = []) => {
+
+    // validate is null or null value or negative value
+    if (value == undefined || value.length == 0) {
+        validatError(`${prop} is null`)
+    }
+    // validate string format
+    if (typeof value !== 'string') {
+        validatError(`${prop}:${value} is not string format`)
+    }
+
+    value = value.trim()
+
+    // validate string length
+    if (value.length > length) {
+        validatError(`${prop}:${value} have length more than ${length} characters`)
+    }
+    // validate is number in string
+    if (arrayCodeDigit.length == 0) {
+        let re = new RegExp(`^\\d{${length}}$`);
+        if (!re.test(value)) {
+            validatError(`${prop}:${value} is not code from ${prop} format`)
+        }
+    } else {
+        // Loop through the array of custom numbers
+        for (number of arrayCodeDigit) {
+            // Create the regular expression dynamically
+            let re = new RegExp(`^\\d{${number}}$`);
+
+            // Test the input against the regular expression
+            if (re.test(value)) {
+                console.log(`validate ${prop} is passed`)
+                return value;
+            }
+        }
+        validatError(`${prop}:${value} is not code from ${prop} format`)
+    }
 }
 
 module.exports.validateStr = validateStr
@@ -210,3 +250,4 @@ module.exports.validateDouble = validateDouble
 module.exports.validateStrArray = validateStrArray
 module.exports.validateDatetimeFuture = validateDatetimeFuture
 module.exports.validatePhone = validatePhone
+module.exports.validateCode = validateCode

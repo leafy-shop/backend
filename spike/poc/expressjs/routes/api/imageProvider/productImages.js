@@ -3,11 +3,11 @@ const router = express.Router();
 path = require("path");
 const multer = require("multer");
 require('dotenv').config().parsed
-const { JwtAuth, verifyRole, FileAuthorization } = require('../../middleware/jwtAuth')
+const { JwtAuth, verifyRole, FileAuthorization } = require('../../../middleware/jwtAuth')
 
-const { bucket, s3, storage, mode } = require("../../config/minio_config");
-const { ROLE } = require("../model/enum/role");
-const { deleteAllImage, findImagePath } = require("../model/class/utils/imageList");
+const { bucket, s3, storage, mode } = require("../../../config/minio_config");
+const { ROLE } = require("../../model/enum/role");
+const { deleteAllImage, findImagePath } = require("../../model/class/utils/imageList");
 
 const upload = multer({
     storage: storage,

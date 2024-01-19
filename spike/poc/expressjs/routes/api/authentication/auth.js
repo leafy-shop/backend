@@ -1,7 +1,7 @@
 const express = require('express')
 const router = express.Router()
-const { getToken, getUser, isExpired } = require('./../model/class/utils/jwtUtils')
-const { errorRes, notFoundError, unAuthorizedError, forbiddenError } = require('./../model/error/error')
+const { getToken, getUser, isExpired } = require('../../model/class/utils/jwtUtils')
+const { errorRes, notFoundError, unAuthorizedError, forbiddenError } = require('../../model/error/error')
 const argon2 = require('argon2')
 const crypto = require('crypto')
 // const { v4: uuidv4 } = require('uuid')
@@ -12,10 +12,10 @@ const dotenv = require('dotenv');
 const cookieParser = require('cookie-parser')
 
 const { PrismaClient } = require('@prisma/client')
-const { UnstrictJwtAuth } = require('../../middleware/jwtAuth')
-const { ROLE } = require('../model/enum/role')
-const { validatePassword } = require('../validation/body')
-const { sendMail, signup_email } = require('../../config/email_config')
+const { UnstrictJwtAuth } = require('../../../middleware/jwtAuth')
+const { ROLE } = require('../../model/enum/role')
+const { validatePassword } = require('../../validation/body')
+const { sendMail, signup_email } = require('../../../config/email_config')
 const prisma = new PrismaClient()
 
 // get config vars
@@ -47,28 +47,28 @@ router.post('/', async (req, res, next) => {
         }
 
         // ตรวจสอบการยืนยันผ่าน email ของ user
-        if (!user.verifyAccount) {
-            // ตรวจสอบว่าถ้า cookie ตรงกันกับ authorization header ที่กำหนดไว้จะทำการปลดล็อค account คนนั้นให้ใช้งานได้ตามปกติ
-            if (req.cookies !== undefined && req.headers.authorization !== undefined) {
-                if (req.cookies.vf_em == req.headers.authorization.substring(7)) {
-                    // เปลี่ยนให้ user สามารถ login ได้
-                    await prisma.accounts.update({
-                        where: {
-                            email: email
-                        },
-                        data: {
-                            verifyAccount: true
-                        }
-                    })
-                    return res.json({ "message": "verify user complete please login again" })
-                } else {
-                    unAuthorizedError("verify token is invalid!!")
-                }
-            }
-            // send to email
-            await sendMail(signup_email(user.email, "signup", res), "Add new account", user.email)
-            unAuthorizedError("please activate email for avaliable!")
-        }
+        // if (!user.verifyAccount) {
+        //     // ตรวจสอบว่าถ้า cookie ตรงกันกับ authorization header ที่กำหนดไว้จะทำการปลดล็อค account คนนั้นให้ใช้งานได้ตามปกติ
+        //     if (req.cookies !== undefined && req.headers.authorization !== undefined) {
+        //         if (req.cookies.vf_em == req.headers.authorization.substring(7)) {
+        //             // เปลี่ยนให้ user สามารถ login ได้
+        //             await prisma.accounts.update({
+        //                 where: {
+        //                     email: email
+        //                 },
+        //                 data: {
+        //                     verifyAccount: true
+        //                 }
+        //             })
+        //             return res.json({ "message": "verify user complete please login again" })
+        //         } else {
+        //             unAuthorizedError("verify token is invalid!!")
+        //         }
+        //     }
+        //     // send to email
+        //     await sendMail(signup_email(user.email, "signup", res), "Add new account", user.email)
+        //     unAuthorizedError("please activate email for avaliable!")
+        // }
 
         const hashingConfig = { // based on OWASP cheat sheet recommendations (as of March, 2022)
             parallelism: 1,
