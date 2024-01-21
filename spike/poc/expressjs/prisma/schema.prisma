@@ -53,12 +53,12 @@ model items {
 
 model item_details {
   itemId Int
-  style  String @db.VarChar(50)
-  stock  Int
-  size   String @db.VarChar(4)
+  style  String  @db.VarChar(50)
+  stock  Int     @default(0)
+  size   String? @db.VarChar(4)
 
-  @@id([itemId, style, size])
-  @@index([itemId, style, size], map: "fk_ItemDetail_items_idx")
+  @@id([itemId, style])
+  @@index([itemId, style], map: "fk_ItemDetail_items_idx")
 }
 
 model item_reviews {
@@ -71,7 +71,7 @@ model item_reviews {
   rating            Int                 @default(0)
   like              Int                 @default(0)
   style             String              @db.VarChar(50)
-  size              String              @db.VarChar(4)
+  size              String?             @db.VarChar(4)
   createdAt         DateTime            @default(now())
   item_review_likes item_review_likes[]
 }
@@ -116,11 +116,11 @@ model addresses {
   userEmail    String   @db.VarChar(100)
   accounts     accounts @relation(fields: [userEmail], references: [email], map: "Addresses_userEmail_fkey")
   addressname  String   @db.VarChar(100)
-  phone        String?   @db.Char(11)
+  phone        String?  @db.Char(11)
   address      String   @db.VarChar(50)
   province     String   @db.VarChar(20)
   distrinct    String   @db.VarChar(20)
-  subDistrinct String?   @db.VarChar(20)
+  subDistrinct String?  @db.VarChar(20)
   postalCode   String   @db.Char(5)
 }
 

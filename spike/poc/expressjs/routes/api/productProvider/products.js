@@ -17,7 +17,7 @@ const prisma = new PrismaClient()
 // const crypto = require("crypto");
 // const { DateTime } = require("luxon");
 const { getDifferentTime } = require('../../model/class/utils/datetimeUtils');
-const { ITEMTYPE } = require('../../model/enum/itemType');
+const { ITEMTYPE, ITEMSIZE } = require('../../model/enum/item');
 
 // product demo
 // const product_db = [
@@ -300,7 +300,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
                 data: {
                     itemId: input.itemId,
                     style: validateStr("item style", sty.style, 50),
-                    size: validateStr("item size", sty.size, 4, true)
+                    size: (sty.sizes.length !== 0 && Array.isArray(sty.sizes)) ? validateStrArray('validate size', sty.sizes.map(size => validateRole('validate inner size', size, ITEMSIZE)), 5, 4, true) : undefined
                 }
             })
         )
@@ -409,7 +409,7 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req,
                     i == "description" ? validateStr("item description", req.body[i], 5000, true) :
                         // i == "itemOwner" ? validateEmail("item owner", req.body[i], 100) : cannot change item owner
                         // i == "type" ? validateStr("item type", req.body[i], 20) :
-                            i == "price" ? validateDouble("item price", req.body[i], true) : undefined // unused body request
+                        i == "price" ? validateDouble("item price", req.body[i], true) : undefined // unused body request
         }
     }
 
@@ -446,13 +446,11 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req,
 router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     // update product
 
-    let {size, stock} = req.body
-
-    size = size ? size : 'No'
+    let { size, stock } = req.body
 
     try {
         // find item id
-        let item = await verifyDetailId(req.params.id, req.params.style, size)
+        let item = await verifyDetailId(req.params.id, req.params.style, size ? size.join() : undefined)
 
         // check if supplier role update other email
         if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.email)
@@ -462,7 +460,7 @@ router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async 
         if (item == null) notFoundError("item id " + id + " does not exist")
 
         // switch out of stock or not
-        let outStock = { stock: validateInt('validate item stock',stock, false, 0) }
+        let outStock = { stock: validateInt('validate item stock', stock, false, 0) }
 
         // update stock
         let input = await prisma.item_details.update({
@@ -470,7 +468,8 @@ router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async 
                 itemId_style_size: {
                     itemId: Number(req.params.id),
                     style: req.params.style,
-                    size: validateStr('validate size', size, 4)
+                    size: (sty.size.length !== 0 && Array.isArray(sty.size)) ?
+                    validateRole('validate inner size', size, ITEMSIZE) : undefined
                 }
             },
             data: outStock
@@ -773,14 +772,14 @@ const verifyId = async (id) => {
 }
 
 // use model for add to cart and check stock
-const verifyDetailId = async (id, sty, size) => {
+const verifyDetailId = async (id, sty, size = undefined) => {
     // find product by id
     let item_detail = await prisma.item_details.findFirst({
         where: {
             AND: [
                 { itemId: Number(id) },
                 { style: sty },
-                { size: size }
+                { size: { contains: size } }
             ]
         }
     })

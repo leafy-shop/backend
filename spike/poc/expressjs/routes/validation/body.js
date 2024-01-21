@@ -150,9 +150,10 @@ const validateStrArray = (prop = '', values = [], ArrL, inArrL, upper = false) =
     // check values is array then value is null, undefined and empty string
     values = values.filter(v => !(v == undefined || v == null || v.trim().length == 0))
 
+    console.log(inArrL)
     // validate string in array and return to lower case values
     values = upper ? values.map((v, i) => validateStr(`${prop} - ${i + 1}:${v}`, v, inArrL).toUpperCase()) :
-        values.map((v, i) => validateStr(`${prop} - ${i + 1}:${v}`, v, inArrL).toLowerCase())
+        values.map((v, i) => validateStr(`${prop} - ${i + 1}`, v, inArrL).toLowerCase())
 
     // remove duplicated values
     values = [...new Set(values)]

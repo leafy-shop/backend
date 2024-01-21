@@ -7,7 +7,7 @@ const { deleteNullValue } = require('../../model/class/utils/modelMapping')
 const { userDetailView } = require('../../model/class/model')
 const { notFoundError, forbiddenError } = require('../../model/error/error')
 const { ROLE } = require('../../model/enum/role')
-const { BANKCODE } = require('../../model/enum/bankCode')
+const { BANKCODE } = require('../../model/enum/account')
 const { JwtAuth } = require('../../../middleware/jwtAuth')
 
 const prisma = new PrismaClient()
