@@ -34,8 +34,9 @@ const productConverter = (product, model) => {
   if (product.item_review !== undefined) product.item_review = product.item_review.map(review => timeConverter(review))
 
   // style converter
-  if (product.styles !== undefined) product.styles = product.styles.map(style => {
-    if (style.size !== undefined) style.size = style.size.split(",")
+  if (product.item_details !== undefined) product.item_details = product.item_details.map(style => {
+    if (style.size !== undefined && style.size.length !== 0) style.size = style.size.split(",")
+
     return style
   })
 

@@ -204,6 +204,13 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         // find id of product
         let item = await verifyId(req.params.id)
 
+        // find item_details and map to item
+        item.styles = await prisma.item_details.findMany({
+            where: {
+                itemId: item.itemId
+            }
+        })
+
         // check user is supplier
         if (req.user !== undefined && req.user.role === ROLE.Supplier && item.itemOwner !== req.user.email)
             forbiddenError("This supplier can view owner's item only")
@@ -216,7 +223,9 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         // list product review to page
         page = Number(req.query.rv_page)
         limit = Number(req.query.rv_limit)
-        item.item_reviews = paginationList(item.item_reviews, page, limit, 5)
+
+
+        // item.item_reviews = paginationList(item.item_reviews, page, limit, 5)
 
         // // return product by id
         // return res.json(item)
@@ -469,7 +478,7 @@ router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async 
                     itemId: Number(req.params.id),
                     style: req.params.style,
                     size: (sty.size.length !== 0 && Array.isArray(sty.size)) ?
-                    validateRole('validate inner size', size, ITEMSIZE) : undefined
+                        validateRole('validate inner size', size, ITEMSIZE) : undefined
                 }
             },
             data: outStock
@@ -569,8 +578,33 @@ router.get('/all/reviews', async (req, res, next) => {
     }
 })
 
+// GET - get all review in product id
+router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
+    try {
+        // query params
+        let { page, limit } = req.query
+
+        // page number and page size
+        let pageN = Number(page)
+        let limitN = Number(limit)
+
+        // find item id
+        let item_reviews = await findAllReviewByItemId(req.params.prodId)
+
+        // review item with pagination
+        item_reviews = paginationList(item_reviews, pageN, limitN, 5)
+
+        // change time zone
+        item_reviews.list = item_reviews.list.map(item_review => timeConverter(item_review))
+
+        return res.json(item_reviews)
+    } catch (err) {
+        next(err)
+    }
+})
+
 // POST - add reviews into product id
-router.post('/:prodId/review', JwtAuth, async (req, res, next) => {
+router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
     try {
         let { itemReviewId, comment, rating, style, size } = req.body
 
@@ -620,7 +654,7 @@ router.post('/:prodId/review', JwtAuth, async (req, res, next) => {
 
 
 // DELETE - delete review by review id and product id
-router.delete('/:prodId/review/:commentId', JwtAuth, async (req, res, next) => {
+router.delete('/:prodId/reviews/:commentId', JwtAuth, async (req, res, next) => {
     try {
         let { prodId, commentId } = req.params
 
@@ -654,7 +688,7 @@ router.delete('/:prodId/review/:commentId', JwtAuth, async (req, res, next) => {
 })
 
 // PUT - like review by review id and product id
-router.put('/:prodId/review/:commentId/like', JwtAuth, async (req, res, next) => {
+router.put('/:prodId/reviews/:commentId/like', JwtAuth, async (req, res, next) => {
     try {
         let { prodId, commentId } = req.params
 
@@ -741,25 +775,18 @@ const verifyId = async (id) => {
     let item = await prisma.items.findFirst({
         where: {
             itemId: Number(id)
-        },
-        include: {
-            item_reviews: {
-                orderBy: {
-                    createdAt: "desc"
-                }
-            }
         }
+        // include: {
+        //     item_reviews: {
+        //         orderBy: {
+        //             createdAt: "desc"
+        //         }
+        //     }
+        // }
     })
 
     // check that product is found
     if (item == null) notFoundError("item id " + id + " does not exist")
-
-    // find item_details and map to item
-    item.styles = await prisma.item_details.findMany({
-        where: {
-            itemId: item.itemId
-        }
-    })
 
     // item.styles = await item.styles.map(async style => {
     //     style.image = await getAllStyleImageItem(findImagePath('products', style.itemId + "/" + style.style))
@@ -818,6 +845,20 @@ const verifyUserEmail = async (userEmail) => {
         return productConverter(favprd.items)
     })
     return filter_user
+}
+
+const findAllReviewByItemId = async (prodId) => {
+    // get review by itemReview, item id and user email
+    let review = await prisma.item_reviews.findMany({
+        where: {
+            itemId: Number(prodId)
+        }
+    })
+
+    // check that product is found
+    if (review == null) notFoundError("item id " + prodId + " does not exist")
+
+    return review
 }
 
 const changeTotalRating = async (id) => {
