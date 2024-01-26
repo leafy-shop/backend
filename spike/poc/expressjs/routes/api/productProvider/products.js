@@ -103,9 +103,16 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
 
     // customize sorting model
     let sortModel = {}
-    if (sort_name !== undefined && ["price", "sold", "updatedAt", "totalRating"].includes(sort_name)) {
-        sortModel[sort_name] = (sort === "desc") ? "desc" : "asc"
-    } else {
+    if (sort_name == "price") {
+        sortModel.price = (sort === "desc") ? "desc" : "asc"
+    } else if (sort_name == "sales") {
+        sortModel.sold = (sort === "desc") ? "desc" : "asc"
+    } else if (sort_name == "new_arrival") {
+        sortModel.createdAt = (sort === "desc") ? "desc" : "asc"
+    }
+    // else if (sort_name == "popular") {
+    // }
+    else {
         sortModel.updatedAt = "desc"
     }
 
@@ -149,8 +156,8 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         // filter includes array : complexity best case O(n), worst case O(n*(type+tag))
         filter_pd = filter_pd.filter(product => {
             condition = (type === undefined ? true : type.split(",").includes(product.type)) &&
-                (tag === undefined ? true : product.tag.split(",").includes(tag))
-            // (tag === undefined ? true : tag.split(",").some(r => product.tag.split(",").includes(r)))
+                // (tag === undefined ? true : product.tag.split(",").includes(tag))
+            (tag === undefined ? true : tag.split(",").some(r => product.tag.split(",").includes(r)))
             // console.log(type.split(","))
             // console.log(product.type)
             // console.log(type.split(",").includes(product.type))
