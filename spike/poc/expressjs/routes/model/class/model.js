@@ -39,6 +39,30 @@ const reviewView = {
     createdAt: true
 }
 
+const reviewViewOwner = {
+    itemReviewId: true,
+    accounts: {
+        select: {
+            username: true
+        }
+    },
+    comment: true,
+    rating: true,
+    like: true,
+    style: true,
+    size: true,
+    createdAt: true
+    // "itemReviewId": "279396e6232f8e9748dab8815aec90c0",
+    // "itemId": 8,
+    // "userEmail": "sahatat44@gmail.com",
+    // "comment": "Test Okay",
+    // "rating": 4,
+    // "like": 0,
+    // "style": "light purple flower",
+    // "size": "No",
+    // "time": "1 month ago"
+}
+
 const userDetailView = {
     userId: true,
     username: true,
@@ -51,6 +75,16 @@ const userDetailView = {
     phone: true,
     createdAt: true,
     updatedAt: true
+}
+
+const supplierView = {
+    userId: true,
+    username: true,
+    firstname: true,
+    lastname: true,
+    email: true,
+    role: true,
+    createdAt: true,
 }
 
 const userViewFav = () => {
@@ -71,3 +105,5 @@ module.exports.gardenDesignerView = gardenDesignerView
 module.exports.reviewView = reviewView
 module.exports.userViewFav = userViewFav
 module.exports.prodList = prodList
+module.exports.supplierView = supplierView
+module.exports.reviewViewOwner = reviewViewOwner

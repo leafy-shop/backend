@@ -90,7 +90,9 @@ router.post('/', async (req, res, next) => {
         // สร้าง access token ภายใต้ method ที่กำหนด
         const token = getToken({
             "id": user.userId,
+            "username": user.username,
             "firstname": user.firstname,
+            "lastname": user.lastname,
             "email": user.email,
             "role": user.role,
         }, "1h");
@@ -106,7 +108,9 @@ router.post('/', async (req, res, next) => {
         // และ refresh token แต่เวลาต่างกัน
         const refreshtoken = getToken({
             "id": user.userId,
+            "username": user.username,
             "firstname": user.firstname,
+            "lastname": user.lastname,
             "email": user.email,
             "role": user.role,
         }, "24h");
@@ -123,7 +127,9 @@ router.post('/', async (req, res, next) => {
 
         res.status(200).json({
             "id": getUser(token).id,
+            "username": getUser(token).username,
             "firstname": getUser(token).firstname,
+            "lastname": getUser(token).lastname,
             "email": getUser(token).email,
             "role": getUser(token).role,
         })
@@ -142,7 +148,7 @@ router.post('/refresh', async (req, res, next) => {
         }
 
         // if refresh token expired that removed cookie and response
-        if (isExpired(jwtRefreshToken.substring(7))) {
+        if (isExpired(jwtRefreshToken.substring(7)) || jwtRefreshToken.substring(7).length === 0) {
             // clear session cookie
             const cookieConfig = {
                 httpOnly: true,
@@ -176,15 +182,24 @@ router.post('/refresh', async (req, res, next) => {
         }
 
         // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
-        const cookieConfig = {
+        const cookieConfigToken = {
+            maxAge: 60 * 60 * 1000,
+            httpOnly: true,
+            sameSite: 'Strict'
+            // secure: true
+        }
+
+
+        // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
+        const cookieConfigRefreshToken = {
             maxAge: 24 * 60 * 60 * 1000,
             httpOnly: true,
             sameSite: 'Strict'
             // secure: true
         }
 
-        res.cookie("token", token, cookieConfig);
-        res.cookie("refreshToken", refreshtoken, cookieConfig);
+        res.cookie("token", token, cookieConfigToken);
+        res.cookie("refreshToken", refreshtoken, cookieConfigRefreshToken);
 
         res.status(200).json({
             "id": user.userId,
@@ -199,11 +214,11 @@ router.post('/refresh', async (req, res, next) => {
 
 router.get("/signout", (req, res) => {
     // verify token
-    const jwtRefreshToken = req.cookies.refreshToken;
-    const jwttoken = req.cookies.token
-    if (jwttoken == undefined || jwtRefreshToken == undefined) {
-        return res.status(404).json(errorRes("this account not found", req.originalUrl))
-    }
+    // const jwtRefreshToken = req.cookies.refreshToken;
+    // const jwttoken = req.cookies.token
+    // if (jwttoken == undefined || jwtRefreshToken == undefined) {
+    //     return res.status(404).json(errorRes("this account not found", req.originalUrl))
+    // }
 
     // clear session cookie
     res.clearCookie("token")

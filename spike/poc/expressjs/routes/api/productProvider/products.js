@@ -4,7 +4,7 @@ const router = express.Router();
 const { validateStr, validateInt, validateDouble, validateEmail, validateStrArray, validateRole } = require('../../validation/body')
 const { notFoundError, forbiddenError } = require('../../model/error/error')
 // const { dateTimeZoneNow } = require('../model/class/utils/datetimeUtils')
-const { userViewFav, prodList, reviewView } = require('../../model/class/model')
+const { userViewFav, prodList, reviewView, reviewViewOwner } = require('../../model/class/model')
 const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('../../../middleware/jwtAuth')
 
 const { PrismaClient, Prisma } = require('@prisma/client');
@@ -157,7 +157,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         filter_pd = filter_pd.filter(product => {
             condition = (type === undefined ? true : type.split(",").includes(product.type)) &&
                 // (tag === undefined ? true : product.tag.split(",").includes(tag))
-            (tag === undefined ? true : tag.split(",").some(r => product.tag.split(",").includes(r)))
+                (tag === undefined ? true : tag.split(",").some(r => product.tag.split(",").includes(r)))
             // console.log(type.split(","))
             // console.log(product.type)
             // console.log(type.split(",").includes(product.type))
@@ -575,6 +575,7 @@ router.get('/all/reviews', async (req, res, next) => {
             rv.accounts = undefined
             // Replace this with the IANA timezone you desire
             rv.time = getDifferentTime(rv.createdAt)
+            rv.createdAt = undefined
             return rv
         })
 
@@ -602,7 +603,12 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
         item_reviews = paginationList(item_reviews, pageN, limitN, 5)
 
         // change time zone
-        item_reviews.list = item_reviews.list.map(item_review => timeConverter(item_review))
+        item_reviews.list = item_reviews.list.map(rv => {
+            // Replace this with the IANA timezone you desire
+            rv.time = getDifferentTime(rv.createdAt)
+            rv.createdAt = undefined
+            return rv
+        })
 
         return res.json(item_reviews)
     } catch (err) {
@@ -859,11 +865,19 @@ const findAllReviewByItemId = async (prodId) => {
     let review = await prisma.item_reviews.findMany({
         where: {
             itemId: Number(prodId)
-        }
+        },
+        select: reviewViewOwner
     })
 
     // check that product is found
     if (review == null) notFoundError("item id " + prodId + " does not exist")
+
+    // changing username to name
+    review = review.map(rv => {
+        rv.username = rv.accounts.username
+        rv.accounts = undefined
+        return rv
+    })
 
     return review
 }

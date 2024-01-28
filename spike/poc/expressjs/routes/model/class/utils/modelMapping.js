@@ -11,7 +11,7 @@ const modelMapper = (value,prismaModel) => {
 
 const deleteNullValue = (value) => {
     Object.filter = objectFilter
-    return Object.filter(value, ([name, value]) => value !== null && value.length !== 0);
+    return Object.filter(value, ([name, value]) => value !== null && value !== undefined && value.length !== 0);
 }
 
 module.exports.modelMapper = modelMapper

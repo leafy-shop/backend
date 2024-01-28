@@ -43,6 +43,7 @@ exports.UnstrictJwtAuth = (req, res, next) => {
   try {
     if (req.cookies.token !== undefined) {
       // ตรวจสอบ user ใน access token 
+      console.log(jwtToken.substring(7))
       let user = jwt.verify(jwtToken.substring(7), process.env.TOKEN_SECRET);
       console.log(user)
       // ตรวจสอบใน token มีการทำ format ของ user ถูกต้องไหม

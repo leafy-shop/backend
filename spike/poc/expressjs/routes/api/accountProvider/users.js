@@ -7,12 +7,13 @@ let { sendMail, signup_email } = require('../../../config/email_config')
 
 const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('../../../middleware/jwtAuth')
 const { ROLE } = require('../../model/enum/role')
-const { userView, userDetailView, gardenDesignerView } = require('../../model/class/model')
+const { userView, userDetailView, gardenDesignerView, supplierView } = require('../../model/class/model')
 const { PrismaClient, Prisma } = require('@prisma/client');
 const { timeConverter, userConverter, paginationList } = require('../../model/class/utils/converterUtils');
 // const { firestore } = require('firebase-admin');
 const crypto = require('crypto');
 const { listFirstImage, findImagePath } = require('../../model/class/utils/imageList');
+const { getDifferentTime } = require('../../model/class/utils/datetimeUtils');
 const prisma = new PrismaClient()
 
 // Exclude keys from user
@@ -375,11 +376,16 @@ const verifySupplier = async (email) => {
                 }
             ]
         },
-        select: userDetailView
+        select: supplierView
     })
 
     // not found checking
     if (filter_u == null) notFoundError("user email " + email + " does not exist")
+
+    // owner join time
+    console.log(filter_u.createdAt)
+    filter_u.time = getDifferentTime(filter_u.createdAt)
+    filter_u.createdAt = undefined
 
     return userConverter(filter_u)
 }
