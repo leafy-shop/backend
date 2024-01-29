@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const { getToken, getUser, isExpired } = require('../../model/class/utils/jwtUtils')
+const { getToken, getUser, isExpired, encryptInformation } = require('../../model/class/utils/jwtUtils')
 const { errorRes, notFoundError, unAuthorizedError, forbiddenError } = require('../../model/error/error')
 const argon2 = require('argon2')
 const crypto = require('crypto')
@@ -115,6 +115,14 @@ router.post('/', async (req, res, next) => {
             "role": user.role,
         }, "24h");
 
+        // เก็บเป็น cookie ให้ผู้พัฒนา frontend สามารถใช้งานได้
+        const cookieInfomation = {
+            maxAge: 24 * 60 * 60 * 1000,
+            // httpOnly: true,
+            sameSite: 'Strict'
+            // secure: true
+        }
+
         // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
         const cookieConfigRefreshToken = {
             maxAge: 24 * 60 * 60 * 1000,
@@ -124,6 +132,14 @@ router.post('/', async (req, res, next) => {
         }
         res.cookie("token", token, cookieConfigToken);
         res.cookie("refreshToken", refreshtoken, cookieConfigRefreshToken);
+        res.cookie("infomation", encryptInformation({
+            "id": getUser(token).id,
+            "username": getUser(token).username,
+            "firstname": getUser(token).firstname,
+            "lastname": getUser(token).lastname,
+            "email": getUser(token).email,
+            "role": getUser(token).role,
+        }), cookieInfomation)
 
         res.status(200).json({
             "id": getUser(token).id,
@@ -150,13 +166,14 @@ router.post('/refresh', async (req, res, next) => {
         // if refresh token expired that removed cookie and response
         if (isExpired(jwtRefreshToken.substring(7)) || jwtRefreshToken.substring(7).length === 0) {
             // clear session cookie
-            const cookieConfig = {
-                httpOnly: true,
-                sameSite: 'Strict'
-                // secure: true
-            }
-            res.clearCookie("token", cookieConfig)
-            res.clearCookie("refreshToken", cookieConfig)
+            // const cookieConfig = {
+            //     httpOnly: true,
+            //     sameSite: 'Strict'
+            //     // secure: true
+            // }
+            res.clearCookie("infomation")
+            res.clearCookie("token")
+            res.clearCookie("refreshToken")
             unAuthorizedError("token is expired, need login again")
         }
 
@@ -168,9 +185,11 @@ router.post('/refresh', async (req, res, next) => {
         // สร้าง refresh token ใหม่ทั้ง token และ refreshToken
         let userToken = {
             "id": user.userId,
+            "username": user.username,
             "firstname": user.firstname,
+            "lastname": user.lastname,
             "email": user.email,
-            "role": user.role
+            "role": user.role,
         }
 
         let token = getToken(userToken, "1h")
@@ -189,7 +208,6 @@ router.post('/refresh', async (req, res, next) => {
             // secure: true
         }
 
-
         // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
         const cookieConfigRefreshToken = {
             maxAge: 24 * 60 * 60 * 1000,
@@ -198,14 +216,32 @@ router.post('/refresh', async (req, res, next) => {
             // secure: true
         }
 
+        // เก็บเป็น cookie ให้ผู้พัฒนา frontend สามารถใช้งานได้
+        const cookieInfomation = {
+            maxAge: 24 * 60 * 60 * 1000,
+            // httpOnly: true,
+            sameSite: 'Strict'
+            // secure: true
+        }
+
         res.cookie("token", token, cookieConfigToken);
         res.cookie("refreshToken", refreshtoken, cookieConfigRefreshToken);
+        res.cookie("infomation", encryptInformation({
+            "id": getUser(token).id,
+            "username": getUser(token).username,
+            "firstname": getUser(token).firstname,
+            "lastname": getUser(token).lastname,
+            "email": getUser(token).email,
+            "role": getUser(token).role,
+        }), cookieInfomation)
 
         res.status(200).json({
-            "id": user.userId,
-            "firstname": user.firstname,
-            "email": user.email,
-            "role": user.role
+            "id": getUser(token).id,
+            "username": getUser(token).username,
+            "firstname": getUser(token).firstname,
+            "lastname": getUser(token).lastname,
+            "email": getUser(token).email,
+            "role": getUser(token).role,
         })
     } catch (err) {
         next(err)
@@ -221,6 +257,7 @@ router.get("/signout", (req, res) => {
     // }
 
     // clear session cookie
+    res.clearCookie("infomation")
     res.clearCookie("token")
     res.clearCookie("refreshToken")
     return res.status(200).json({ message: "this user is sign out !!" })

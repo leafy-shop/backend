@@ -1,5 +1,6 @@
 const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken')
+const crypto = require('crypto-js')
 
 // get config vars
 dotenv.config();
@@ -46,7 +47,12 @@ const isExpired = (jwtrefreshtoken) => {
     return isExpired
 }
 
+const encryptInformation = (obj) => {
+    return crypto.AES.encrypt(JSON.stringify(obj), process.env.TOKEN_INFO_SECRET).toString()
+}
+
 module.exports.getToken = getToken
 // module.exports.refreshToken = refreshToken
 module.exports.getUser=getUser
 module.exports.isExpired = isExpired
+module.exports.encryptInformation = encryptInformation

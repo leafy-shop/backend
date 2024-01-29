@@ -43,6 +43,7 @@ const reviewViewOwner = {
     itemReviewId: true,
     accounts: {
         select: {
+            userId: true,
             username: true
         }
     },
