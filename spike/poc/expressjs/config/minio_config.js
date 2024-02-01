@@ -19,7 +19,7 @@ module.exports.bucket = bucket
 module.exports.s3 = s3
 module.exports.mode = mode
 
-module.exports.storage = multerS3({
+module.exports.productStorage = multerS3({
   s3,
   bucket,
   contentType: multerS3.AUTO_CONTENT_TYPE,
@@ -28,8 +28,53 @@ module.exports.storage = multerS3({
     cb(null, { fieldName: file.fieldname });
   },
   key: (req, file, cb) => {
-    let path = fs.findImagePath(req.params.endpoint, req.params.id, req.params.style)
+    let path = fs.findImagePath("products", req.params.id)
+    console.log(path)
+    cb(null, `${path}/main.png`);
+  }
+});
+
+module.exports.productStyleStorage = multerS3({
+  s3,
+  bucket,
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  metadata: async (req, file, cb) => {
+    console.log(mode)
+    cb(null, { fieldName: file.fieldname });
+  },
+  key: (req, file, cb) => {
+    let path = fs.findImagePath("products", req.params.id, req.params.style)
     console.log(path)
     cb(null, `${path}/${file.originalname}`);
+  }
+});
+
+module.exports.userIconStorage = multerS3({
+  s3,
+  bucket,
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  metadata: async (req, file, cb) => {
+    console.log(mode)
+    cb(null, { fieldName: file.fieldname });
+  },
+  key: (req, file, cb) => {
+    let path = fs.findImagePath("users", req.params.id)
+    console.log(path)
+    cb(null, `${path}/main.png`);
+  }
+});
+
+module.exports.userCoverStorage = multerS3({
+  s3,
+  bucket,
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  metadata: async (req, file, cb) => {
+    console.log(mode)
+    cb(null, { fieldName: file.fieldname });
+  },
+  key: (req, file, cb) => {
+    let path = fs.findImagePath("users", req.params.id)
+    console.log(path)
+    cb(null, `${path}/cover_photo.png`);
   }
 });

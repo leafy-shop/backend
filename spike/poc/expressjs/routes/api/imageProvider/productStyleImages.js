@@ -3,14 +3,14 @@ const router = express.Router();
 path = require("path");
 const multer = require("multer");
 require('dotenv').config().parsed
-const { JwtAuth, verifyRole, FileAuthorization } = require('../../../middleware/jwtAuth')
+const { JwtAuth, verifyRole, ProductFileAuthorization } = require('../../../middleware/jwtAuth')
 
-const { bucket, s3, storage, mode } = require("../../../config/minio_config");
+const { bucket, s3, storage, mode, productStyleStorage } = require("../../../config/minio_config");
 const { ROLE } = require("../../model/enum/role");
 const { deleteAllImage, findImagePath } = require("../../model/class/utils/imageList");
 
 const upload = multer({
-    storage: storage,
+    storage: productStyleStorage,
     limits: {
         fileSize: 1024 * 1024 * 10,
     },
@@ -27,7 +27,7 @@ const upload = multer({
 
 // upload multiple image
 // condition (file size < 8 MB, file multipart, file upload per solution, file type image only, path storage property)
-router.post("/:endpoint/:id/:style", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), FileAuthorization, upload.array("file", 10), async (req, res) => {
+router.post("/:id/:style", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), ProductFileAuthorization, upload.array("file", 10), async (req, res) => {
     let locations = []
     req.files.forEach(file => {
         locations.push(file.location)
@@ -38,8 +38,8 @@ router.post("/:endpoint/:id/:style", JwtAuth, verifyRole(ROLE.Admin, ROLE.Suppli
 });
 
 // delete multiple image
-router.delete("/:endpoint/:id/:style", JwtAuth, FileAuthorization, async (req, res) => {
-    const folder = findImagePath(req.params.endpoint, req.params.id, req.params.style);
+router.delete("/:id/:style", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), ProductFileAuthorization, async (req, res) => {
+    const folder = findImagePath("products", req.params.id, req.params.style);
     const fileNames = req.body.files || []
     const numberFiles = []
 
@@ -56,6 +56,7 @@ router.delete("/:endpoint/:id/:style", JwtAuth, FileAuthorization, async (req, r
     for (let file of fileNames) {
         filePath = `${folder}/${file}`
         const params = { Bucket: bucket, Key: filePath };
+        console.log(params)
         let fileDeleted = ""
         // find object in minio, created log and keep in show status
         try {
@@ -77,12 +78,13 @@ router.delete("/:endpoint/:id/:style", JwtAuth, FileAuthorization, async (req, r
         if (fileDeleted != "") console.log(`delete files: ${fileDeleted}`)
     }
     if (numberFiles.length > 0) return res.json({ message: "All File Selected has been deleted" })
-    else return res.json({ message: "There Files have already deleted" });
+    else return res.status(404).json({ message: "There Files have already deleted" });
 });
 
 // delete all image
-router.delete("/:endpoint/:id/:style/all", JwtAuth, FileAuthorization, async (req, res) => {
-    const folder = findImagePath(req.params.endpoint, req.params.id, req.params.style);
+router.delete("/:id/:style/all", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), ProductFileAuthorization, async (req, res) => {
+    const folder = findImagePath("products", req.params.id, req.params.style);
+    console.log(folder)
 
     // delete all image
     return await deleteAllImage(res, folder)

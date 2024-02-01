@@ -12,10 +12,11 @@ const { PrismaClient, Prisma } = require('@prisma/client');
 // const { mode } = require('../../config/minio_config');
 const { productConverter, timeConverter, paginationList, generateId } = require('../../model/class/utils/converterUtils');
 const { ROLE } = require('../../model/enum/role');
-const { findImagePath, listFirstImage, getAllStyleImageItem } = require('../../model/class/utils/imageList');
+const { findImagePath, listFirstImage, listAllImage } = require('../../model/class/utils/imageList');
 const prisma = new PrismaClient()
 // const crypto = require("crypto");
 // const { DateTime } = require("luxon");
+const { deleteNullValue } = require('../../model/class/utils/modelMapping')
 const { getDifferentTime } = require('../../model/class/utils/datetimeUtils');
 const { ITEMTYPE, ITEMSIZE } = require('../../model/enum/item');
 
@@ -224,7 +225,8 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
 
         // image for product
         let path = findImagePath("products", item.itemId)
-        item.image = await listFirstImage(path)
+        item.image = await listFirstImage(path, "main.png")
+        // console.log(item.image)
 
 
         // list product review to page
@@ -590,14 +592,14 @@ router.get('/all/reviews', async (req, res, next) => {
 router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
     try {
         // query params
-        let { page, limit, sort } = req.query
+        let { page, limit, sort, style } = req.query
 
         // page number and page size
         let pageN = Number(page)
         let limitN = Number(limit)
 
         // find item id
-        let item_reviews = await findAllReviewByItemId(req.params.prodId, sort)
+        let item_reviews = await findAllReviewByItemId(req.params.prodId, sort, style)
 
         // review item with pagination
         item_reviews = paginationList(item_reviews, pageN, limitN, 5)
@@ -609,7 +611,7 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
                     // Replace this with the IANA timezone you desire
                     review.time = getDifferentTime(review.createdAt)
                     review.createdAt = undefined
-                    return getIconImage(review)
+                    return getIconImage(deleteNullValue(review))
                 })
         ).then(data => {
             // console.log(data)
@@ -617,9 +619,9 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
             // console.log(item_reviews.list)
             return res.send(item_reviews)
         })
-        .catch(err => {
-            next(err)
-        })
+            .catch(err => {
+                next(err)
+            })
     } catch (err) {
         next(err)
     }
@@ -783,17 +785,18 @@ router.put('/:prodId/reviews/:commentId/like', JwtAuth, async (req, res, next) =
 
 // -- method zone --
 const getProductImage = async (product) => {
-    product.image = await listFirstImage(findImagePath("products", product.itemId))
+    product.image = await listFirstImage(findImagePath("products", product.itemId),"main.png")
+    // console.log(product.image)
     return product
 }
 
 const getProductStyleImage = async (style) => {
-    style.images = await getAllStyleImageItem(findImagePath("products", style.itemId + '/' + style.style))
+    style.images = await listAllImage(findImagePath("products", style.itemId + '/' + style.style))
     return style
 }
 
 const getIconImage = async (user) => {
-    user.image = await listFirstImage(findImagePath("users", user.userId))
+    user.image = await listFirstImage(findImagePath("users", user.userId),"main.png")
     // console.log(user)
     return user
 }
@@ -875,13 +878,16 @@ const verifyUserEmail = async (userEmail) => {
     return filter_user
 }
 
-const findAllReviewByItemId = async (prodId, sort) => {
+const findAllReviewByItemId = async (prodId, sort, name = undefined) => {
     let sortModel = (sort === 'newest' ? { createdAt: 'desc' } : sort === 'oldest' ? { createdAt: 'asc' } : undefined)
+
+    console.log(name)
 
     // get review by itemReview, item id and user email
     let review = await prisma.item_reviews.findMany({
         where: {
-            itemId: Number(prodId)
+            AND: [{ itemId: Number(prodId) },
+            { style: name }]
         },
         select: reviewViewOwner,
         orderBy: sortModel

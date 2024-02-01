@@ -80,50 +80,54 @@ exports.verifyRole = (...roles) => {
   }
 }
 
-exports.FileAuthorization = async (req, res, next) => {
+exports.ProductFileAuthorization = async (req, res, next) => {
   try {
     // console.log(req.user)
     // console.log(req.params)
     // check endpoint upload is products
-    if (req.params.endpoint === "products") {
-      // check product is not found
-      console.log(req.params)
-      let item = await prisma.items.findFirst({
+    // check product is not found
+    let item = await prisma.items.findFirst({
+      where: {
+        itemId: Number(req.params.id)
+      }
+    })
+    // for all role
+    if (item === null) {
+      notFoundError("item id " + req.params.id + " not found")
+    }
+    // validate supplier
+    if (req.user.role === ROLE.Supplier) {
+      // find item owner by id
+      if (req.user.email !== item.itemOwner) {
+        validatError("you can't manage other item owner's images except yourself.")
+      }
+    }
+    next()
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      console.log(err.code)
+    }
+    next(err)
+  }
+}
+
+exports.UserFileAuthorization = async (req, res, next) => {
+  try {
+    // incase non admin role
+    if (req.user.role !== ROLE.Admin) {
+      // find user email by id
+      let user = await prisma.accounts.findFirst({
         where: {
-          itemId: Number(req.params.id)
+          userId: Number(req.params.id)
         }
       })
-      // for all role
-      if (item === null) {
-        notFoundError("item id " + req.params.id + " not found")
+      if (user === null) {
+        notFoundError("user id " + req.params.id + " not found")
       }
-      // validate supplier
-      if (req.user.role === ROLE.Supplier) {
-        // find item owner by id
-        if (req.user.email !== item.itemOwner) {
-          validatError("you can't manage other item owner's images except yourself.")
-        }
+      // validate other user except admin
+      if (req.user.email !== user.email) {
+        validatError("you can't manage other user icons except yourself.")
       }
-      // check endpoint upload is users
-    } else if (req.params.endpoint === "users") {
-      // incase non admin role
-      if (req.user.role !== ROLE.Admin) {
-        // find user email by id
-        let user = await prisma.accounts.findFirst({
-          where: {
-            userId: Number(req.params.id)
-          }
-        })
-        if (user === null) {
-          notFoundError("user id " + req.params.id + " not found")
-        }
-        // validate other user except admin
-        if (req.user.email !== user.email) {
-          validatError("you can't manage other user icons except yourself.")
-        }
-      }
-    } else {
-      forbiddenError("cannot use endpoint " + req.params.endpoint + " for doing file")
     }
     next()
   } catch (err) {
