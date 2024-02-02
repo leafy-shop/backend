@@ -186,6 +186,29 @@ router.get('/views/:email', async (req, res, next) => {
         let user = await verifySupplier(req.params.email)
 
         // console.log(user)
+        
+        // check if this user is supplier
+        if (user.role === ROLE.Supplier) {
+
+            // get count product with his email
+            let count = await prisma.items.count({
+                where: {itemOwner: user.email}
+            })
+            user.products = count
+
+            let allRating = await prisma.items.aggregate({
+                _avg: {
+                    totalRating: true
+                },
+                where: {
+                    AND: [
+                        {itemOwner: user.email },
+                        {totalRating : { not: 0 }}
+                    ]
+                }
+            })
+            user.rating = allRating._avg.totalRating
+        }
 
         // image for product
         let path = findImagePath("users", user.userId)
