@@ -132,7 +132,7 @@ router.post('/', async (req, res, next) => {
         }
         res.cookie("token", token, cookieConfigToken);
         res.cookie("refreshToken", refreshtoken, cookieConfigRefreshToken);
-        res.cookie("infomation", encryptInformation({
+        res.cookie("information", encryptInformation({
             "id": getUser(token).id,
             "username": getUser(token).username,
             "firstname": getUser(token).firstname,
@@ -226,7 +226,7 @@ router.post('/refresh', async (req, res, next) => {
 
         res.cookie("token", token, cookieConfigToken);
         res.cookie("refreshToken", refreshtoken, cookieConfigRefreshToken);
-        res.cookie("infomation", encryptInformation({
+        res.cookie("information", encryptInformation({
             "id": getUser(token).id,
             "username": getUser(token).username,
             "firstname": getUser(token).firstname,
@@ -257,7 +257,7 @@ router.get("/signout", (req, res) => {
     // }
 
     // clear session cookie
-    res.clearCookie("infomation")
+    res.clearCookie("information")
     res.clearCookie("token")
     res.clearCookie("refreshToken")
     return res.status(200).json({ message: "this user is sign out !!" })
