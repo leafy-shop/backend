@@ -250,7 +250,7 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
         // }
 
         account.role = validateRole("account role", role, ROLE)
-        account.description = validateStr("account description", description, 500)
+        account.description = validateStr("account description", description, 500, true)
         account.verifyAccount = true
 
         // create accounts
