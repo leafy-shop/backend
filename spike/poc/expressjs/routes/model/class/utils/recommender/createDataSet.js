@@ -3,7 +3,6 @@ const fs = require("fs")
 const { generateId } = require("../converterUtils")
 const { ROLE } = require("../../../enum/role")
 const { stringify } = require("csv-stringify");
-const { response } = require("express");
 const { ITEMTYPE } = require("../../../enum/item");
 
 const users = []
@@ -109,13 +108,13 @@ function generateItem() {
         items.push(item)
         stringifier.write(item)
     }
-    console.log(items.filter(item => item.itemOwner === users.filter(user => user.role === ROLE.Supplier)[0].userId).length)
+    // console.log(items.filter(item => item.itemOwner === users.filter(user => user.role === ROLE.Supplier)[0].userId).length)
     stringifier.pipe(writableStream);
     console.log("Finished writing data");
 }
 
 function generateEvent() {
-    const columns = ["userId", "itemId", "itemEvent"]
+    const columns = ["userId", "itemId", "itemType", "itemRating", "itemPrice", "itemEvent"]
     let writableStream = fs.createWriteStream("train/demo/leafyEvent.csv")
     const stringifier = stringify({ header: true, columns: columns });
 
@@ -129,7 +128,7 @@ function generateEvent() {
         function matchRandom(itemOwnerRandom, userRandom) {
             // console.log(itemRandom.itemOwner !== userRandom.userId)
             if (itemOwnerRandom !== userRandom) {
-                return items[itemRandom * items.length | 0].itemId
+                return items[itemRandom * items.length | 0]
             } else {
                 setTimeout(function() {
                     matchRandom(itemOwnerRandom, userRandom)
@@ -142,8 +141,11 @@ function generateEvent() {
             
         let event = {
             userId: userRandom,
-            itemId: itemIdRandom,
-            itemEvent: eventRandom < 0.9 ? "view" : eventRandom < 0.98 ? "addtocart" : "paid"
+            itemId: itemIdRandom.itemId,
+            itemType: itemIdRandom.itemType,
+            itemRating: itemIdRandom.itemRating,
+            itemPrice: itemIdRandom.itemPrice,
+            itemEvent: eventRandom < 0.9 ? "view" : eventRandom < 0.98 ? "adtc" : "paid"
         }
         stringifier.write(event)
     }

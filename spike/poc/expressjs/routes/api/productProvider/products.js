@@ -18,7 +18,17 @@ const prisma = new PrismaClient()
 // const { DateTime } = require("luxon");
 const { deleteNullValue } = require('../../model/class/utils/modelMapping')
 const { getDifferentTime } = require('../../model/class/utils/datetimeUtils');
-const { ITEMTYPE, ITEMSIZE } = require('../../model/enum/item');
+const { ITEMTYPE, ITEMSIZE, ITEMEVENT } = require('../../model/enum/item');
+const axios = require("axios")
+const http = require('http');
+
+const dotenv = require('dotenv');
+const { error } = require('console');
+
+// get config vars
+dotenv.config();
+
+const url = process.env.ML_HOST
 
 // product demo
 // const product_db = [
@@ -127,32 +137,62 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     // filter single and between value from name, price, rating and isFavPrd query
     // and return page that sorted by updateAt item
     try {
-        let filter_pd = await prisma.items.findMany({
-            include: {
-                favprd: true
-            },
-            where: {
-                AND: [{
-                    name: {
-                        contains: product
-                    },
-                    price: {
-                        lte: max_price,
-                        gte: min_price
-                    },
-                    totalRating: {
-                        gt: isNaN(rating) ? undefined : ratingScale[rating - 1][0],
-                        lte: isNaN(rating) ? undefined : ratingScale[rating - 1][1]
-                    },
-                    favprd: favFilter,
-                    itemOwner: owner
-                }]
-            },
-            include: {
-                favprd: false,
-            },
-            orderBy: sortModel
-        })
+        let filter_pd = []
+        if (sort_name !== undefined || isFav == 'true') {
+            filter_pd = await prisma.items.findMany({
+                include: {
+                    favprd: true
+                },
+                where: {
+                    AND: [{
+                        name: {
+                            contains: product
+                        },
+                        price: {
+                            lte: max_price,
+                            gte: min_price
+                        },
+                        totalRating: {
+                            gt: isNaN(rating) ? undefined : ratingScale[rating - 1][0],
+                            lte: isNaN(rating) ? undefined : ratingScale[rating - 1][1]
+                        },
+                        favprd: favFilter,
+                        itemOwner: owner
+                    }]
+                },
+                include: {
+                    favprd: false,
+                },
+                orderBy: sortModel
+            })
+        } else {
+            let pds = await prisma.items.findMany()
+            if (req.user !== undefined) {
+                axios.get(url + '/recommend?user_id=' + req.user.id).then(data => {
+                    data.forEach(prodId => {
+                        filter_pd.push(pds.filter(prod => prod.itemId == prodId)[0])
+                    })
+                }).catch(error => {
+                })
+                if (filter_pd.length == 0) filter_pd = pds
+            } else {
+                axios.get(url + '/recommend?user_id=' + 0).then(data => {
+                    data.forEach(prodId => {
+                        filter_pd.push(pds.filter(prod => prod.itemId == prodId)[0])
+                    })
+                }).catch(error => {
+                })
+                if (filter_pd.length == 0) filter_pd = pds
+            }
+            filter_pd = filter_pd.filter(prod => {
+                return (product ? prod.name.includes(product) : true) &
+                    (min_price ? prod.price > min_price : true) &
+                    (max_price ? prod.price < max_price : true) &
+                    (isNaN(rating) || rating === undefined ? true : (prod.totalRating > ratingScale[rating - 1][0] & prod.totalRating < ratingScale[rating - 1][1])) &
+                    (owner ? prod.itemOwner == owner : true)
+            })
+            // console.log(filter_pd)
+        }
 
         // filter includes array : complexity best case O(n), worst case O(n*(type+tag))
         filter_pd = filter_pd.filter(product => {
@@ -228,11 +268,22 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         item.image = await listFirstImage(path, "main.png")
         // console.log(item.image)
 
-
         // list product review to page
         page = Number(req.query.rv_page)
         limit = Number(req.query.rv_limit)
 
+        // add on event
+        console.log(req.user)
+        if (req.user !== undefined) {
+            let event = {
+                userId: req.user.id,
+                itemId: item.itemId,
+                itemEvent: ITEMEVENT.View,
+            }
+            await prisma.item_events.create({
+                data: event
+            })
+        }
 
         // item.item_reviews = paginationList(item.item_reviews, page, limit, 5)
 
@@ -785,7 +836,7 @@ router.put('/:prodId/reviews/:commentId/like', JwtAuth, async (req, res, next) =
 
 // -- method zone --
 const getProductImage = async (product) => {
-    product.image = await listFirstImage(findImagePath("products", product.itemId),"main.png")
+    product.image = await listFirstImage(findImagePath("products", product.itemId), "main.png")
     // console.log(product.image)
     return product
 }
@@ -796,7 +847,7 @@ const getProductStyleImage = async (style) => {
 }
 
 const getIconImage = async (user) => {
-    user.image = await listFirstImage(findImagePath("users", user.userId),"main.png")
+    user.image = await listFirstImage(findImagePath("users", user.userId), "main.png")
     // console.log(user)
     return user
 }

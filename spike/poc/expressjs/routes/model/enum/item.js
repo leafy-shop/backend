@@ -19,5 +19,12 @@ const ITEMSIZE = Object.freeze({
     XXXL: 'XXXL'
 })
 
+const ITEMEVENT = Object.freeze({
+    View: "view",
+    ATC: "adtc",
+    PAID: "paid"
+})
+
 module.exports.ITEMTYPE = ITEMTYPE
 module.exports.ITEMSIZE = ITEMSIZE
+module.exports.ITEMEVENT = ITEMEVENT
