@@ -99,7 +99,8 @@ router.post('/', async (req, res, next) => {
 
         // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
         const cookieConfigToken = {
-            maxAge: 60 * 60 * 1000,
+            maxAge: 5,
+            // maxAge: 60 * 60 * 1000,
             httpOnly: true,
             sameSite: 'Strict'
             // secure: true
@@ -117,7 +118,8 @@ router.post('/', async (req, res, next) => {
 
         // เก็บเป็น cookie ให้ผู้พัฒนา frontend สามารถใช้งานได้
         const cookieInfomation = {
-            maxAge: 24 * 60 * 60 * 1000,
+            // maxAge: 24 * 60 * 60 * 1000,
+            maxAge: 60 * 1000,
             // httpOnly: true,
             sameSite: 'Strict'
             // secure: true
