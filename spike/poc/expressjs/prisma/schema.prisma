@@ -41,7 +41,8 @@ model items {
   tag          String         @db.VarChar(500)
   totalRating  Decimal        @default(0.0) @db.Decimal(2, 1)
   sold         Int            @default(0)
-  price        Decimal        @default(0.00) @db.Decimal(32, 2)
+  minPrice     Decimal        @default(0.00) @db.Decimal(32, 2)
+  maxPrice     Decimal?       @db.Decimal(32, 2)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   carts        carts[]
@@ -56,10 +57,11 @@ model item_details {
   itemId Int
   style  String  @db.VarChar(50)
   stock  Int     @default(0)
-  size   String? @db.VarChar(4)
+  size   String  @default("No") @db.VarChar(4)
+  price  Decimal @default(0.00) @db.Decimal(32, 2)
 
-  @@id([itemId, style])
-  @@index([itemId, style], map: "fk_ItemDetail_items_idx")
+  @@id([itemId, style, size])
+  @@index([itemId, style, size], map: "fk_ItemDetail_items_idx")
 }
 
 model item_events {
@@ -84,7 +86,7 @@ model item_reviews {
   rating            Int                 @default(0)
   like              Int                 @default(0)
   style             String              @db.VarChar(50)
-  size              String?             @db.VarChar(4)
+  size              String              @default("No") @db.VarChar(4)
   createdAt         DateTime            @default(now())
   item_review_likes item_review_likes[]
 }

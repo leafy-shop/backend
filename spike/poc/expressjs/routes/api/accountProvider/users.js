@@ -249,7 +249,7 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
         //     await sendMail(signup_email(email, "signup", res), "Add new account", email)
         // }
 
-        account.role = validateRole("account role", role, ROLE)
+        account.role = account.role !== undefined ? validateRole("account role", role, ROLE) : ROLE.User
         account.description = validateStr("account description", description, 500, true)
         account.verifyAccount = true
 
@@ -270,9 +270,11 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
                 err.message = "user email is duplicated"
             } else if (err.meta.target == 'phone_UNIQUE') {
                 err.message = "user phone is duplicated"
-            } else if (err.meta.target == 'Fullname_UNIQUE') [
+            } else if (err.meta.target == 'Fullname_UNIQUE') {
                 err.message = "full name is duplicated"
-            ]
+            } else if (err.meta.target == 'username_UNIQUE') {
+                err.message = "user name is duplicated"
+            }
         }
         next(err)
     }
@@ -336,9 +338,11 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
                 err.message = "user email is duplicated"
             } else if (err.meta.target == 'phone_UNIQUE') {
                 err.message = "user phone is duplicated"
-            } else if (err.meta.target == 'Fullname_UNIQUE') [
+            } else if (err.meta.target == 'Fullname_UNIQUE') {
                 err.message = "full name is duplicated"
-            ]
+            } else if (err.meta.target == 'username_UNIQUE') {
+                err.message = "user name is duplicated"
+            }
         }
         next(err)
     }

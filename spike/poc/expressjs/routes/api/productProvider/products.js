@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const { validateStr, validateInt, validateDouble, validateEmail, validateStrArray, validateRole } = require('../../validation/body')
-const { notFoundError, forbiddenError } = require('../../model/error/error')
+const { notFoundError, forbiddenError, validatError } = require('../../model/error/error')
 // const { dateTimeZoneNow } = require('../model/class/utils/datetimeUtils')
 const { userViewFav, prodList, reviewView, reviewViewOwner } = require('../../model/class/model')
 const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('../../../middleware/jwtAuth')
@@ -115,7 +115,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     // customize sorting model
     let sortModel = {}
     if (sort_name == "price") {
-        sortModel.price = (sort === "desc") ? "desc" : "asc"
+        sortModel.minPrice = (sort === "desc") ? "desc" : "asc"
     } else if (sort_name == "sales") {
         sortModel.sold = (sort === "desc") ? "desc" : "asc"
     } else if (sort_name == "new_arrival") {
@@ -138,7 +138,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     // and return page that sorted by updateAt item
     try {
         let filter_pd = []
-        if (sort_name !== undefined || isFav == 'true') {
+        if (sort_name !== undefined || ['asc', 'desc'].includes(sort) || isFav == 'true') {
             filter_pd = await prisma.items.findMany({
                 include: {
                     favprd: true
@@ -168,26 +168,15 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         } else {
             let pds = await prisma.items.findMany()
             if (req.user !== undefined) {
-                axios.get(url + '/recommend?user_id=' + req.user.id).then(data => {
-                    data.forEach(prodId => {
-                        filter_pd.push(pds.filter(prod => prod.itemId == prodId)[0])
-                    })
-                }).catch(error => {
-                })
-                if (filter_pd.length == 0) filter_pd = pds
+                filter_pd = await getRecommender(pds, req.user.id)
+                // console.log(filter_pd)
             } else {
-                axios.get(url + '/recommend?user_id=' + 0).then(data => {
-                    data.forEach(prodId => {
-                        filter_pd.push(pds.filter(prod => prod.itemId == prodId)[0])
-                    })
-                }).catch(error => {
-                })
-                if (filter_pd.length == 0) filter_pd = pds
+                filter_pd = await getRecommender(pds, 0)
             }
             filter_pd = filter_pd.filter(prod => {
                 return (product ? prod.name.includes(product) : true) &
-                    (min_price ? prod.price > min_price : true) &
-                    (max_price ? prod.price < max_price : true) &
+                    (min_price ? prod.minPrice > min_price : true) &
+                    (max_price ? prod.minPrice < max_price : true) &
                     (isNaN(rating) || rating === undefined ? true : (prod.totalRating > ratingScale[rating - 1][0] & prod.totalRating < ratingScale[rating - 1][1])) &
                     (owner ? prod.itemOwner == owner : true)
             })
@@ -245,6 +234,20 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     }
 })
 
+// get recommender by fetch api on FastAPI
+let getRecommender = async (pds, id) => {
+    let filter_pd = []
+    try {
+        let { data, status } = await axios.get(url + '/recommend?user_id=' + id)
+        data.forEach(prodId => {
+            filter_pd.push(pds.filter(prod => prod.itemId == prodId)[0])
+        })
+        console.log(filter_pd)
+        return filter_pd
+    } catch (err) {
+        return pds
+    }
+}
 
 // GET - products by id
 router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
@@ -298,7 +301,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         ).then(styles => {
             item.styles = styles
             // return converter of product
-            return res.json(item)
+            return res.json(productConverter(item))
         }).catch(err => {
             next(err)
         })
@@ -346,6 +349,25 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
         // if (req.user.role == ROLE.Supplier && itemOwner !== req.user.email)
         //     forbiddenError("This supplier can create owner's item only")
 
+        let priceRange = {}
+        let priceList = []
+        if (styles.length === 0 || !Array.isArray(styles)) {
+            validatError("created item must be have 1 style item")
+        }
+        styles.forEach(sty => {
+            if (sty.style === undefined || sty.price === undefined) {
+                validatError("item detail must be have style and price")
+            }
+            // console.log(sty)
+            validateStr("item style:" + sty.style, sty.style, 50)
+            sty.size = sty.size === undefined ? ITEMSIZE.No : sty.size
+            console.log(sty.size)
+            validateRole("item size:" + sty.style, sty.size, ITEMSIZE, true)
+            validateInt("item stock:" + sty.style, sty.stock, false, 0)
+            priceList.push(validateDouble("item price:" + sty.price, sty.price, false, 0))
+        })
+        priceRange.minPrice = Math.min(...priceList)
+        priceRange.maxPrice = Math.max(...priceList) !== priceRange.minPrice ? Math.max(...priceList) : undefined
 
         let itemModel = {
             itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
@@ -353,8 +375,10 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
             description: validateStr("item description", description, 5000, true),
             type: validateRole("item type", type, ITEMTYPE),
             tag: validateStrArray("item tag", tag, 10, 20),
-            price: validateDouble("item price", price, true)
+            minPrice: priceRange.minPrice,
+            maxPrice: priceRange.maxPrice
         }
+
         if (req.user.role == ROLE.Admin) {
             itemModel.itemOwner = validateEmail("item owner", itemOwner, 100)
 
@@ -364,14 +388,19 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
             data: itemModel
         })
 
-        const item_detail = styles.map((sty) =>
-            prisma.item_details.create({
+        const item_detail = styles.map((sty) => {
+            console.log(input.itemId, sty.style, sty.size)
+            return prisma.item_details.create({
                 data: {
                     itemId: input.itemId,
-                    style: validateStr("item style", sty.style, 50),
-                    size: (sty.sizes.length !== 0 && Array.isArray(sty.sizes)) ? validateStrArray('validate size', sty.sizes.map(size => validateRole('validate inner size', size, ITEMSIZE)), 5, 4, true) : undefined
+                    style: sty.style,
+                    // size: (sty.sizes.length !== 0 && Array.isArray(sty.sizes)) ? validateStrArray('validate size', sty.sizes.map(size => validateRole('validate inner size', size, ITEMSIZE)), 5, 4, true) : undefined
+                    size: sty.size,
+                    stock: sty.stock,
+                    price: sty.price
                 }
             })
+        }
         )
 
         Promise.all(item_detail)
@@ -477,8 +506,8 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req,
                 i == "name" ? validateStr("item name", req.body[i], 100) :
                     i == "description" ? validateStr("item description", req.body[i], 5000, true) :
                         // i == "itemOwner" ? validateEmail("item owner", req.body[i], 100) : cannot change item owner
-                        // i == "type" ? validateStr("item type", req.body[i], 20) :
-                        i == "price" ? validateDouble("item price", req.body[i], true) : undefined // unused body request
+                        i == "type" ? validateStr("item type", req.body[i], 20) :
+                            i == "tag" ? validateStrArray("item tag", req.body[i], 10, 20) : undefined // unused body request
         }
     }
 
@@ -512,14 +541,14 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req,
 })
 
 // PUT - update product detail by id and style
-router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
+router.put('/:id/:style/:size', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     // update product
 
-    let { size, stock } = req.body
+    let { price, stock, style, size } = req.body
 
     try {
         // find item id
-        let item = await verifyDetailId(req.params.id, req.params.style, size ? size.join() : undefined)
+        let item = await verifyDetailId(req.params.id, req.params.style, req.params.size)
 
         // check if supplier role update other email
         if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.email)
@@ -529,7 +558,13 @@ router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async 
         if (item == null) notFoundError("item id " + id + " does not exist")
 
         // switch out of stock or not
-        let outStock = { stock: validateInt('validate item stock', stock, false, 0) }
+        let itemModel = {
+            itemId: Number(req.params.id),
+            style: style !== undefined ? validateStr("validate item price", style) : req.params.style,
+            size: size !== undefined ? validateRole('validate item size', size, ITEMSIZE, true) : req.params.size,
+            price: validateDouble("validate item price", price, false, 0),
+            stock: validateInt('validate item stock', stock, false, 0)
+        }
 
         // update stock
         let input = await prisma.item_details.update({
@@ -537,11 +572,10 @@ router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async 
                 itemId_style_size: {
                     itemId: Number(req.params.id),
                     style: req.params.style,
-                    size: (sty.size.length !== 0 && Array.isArray(sty.size)) ?
-                        validateRole('validate inner size', size, ITEMSIZE) : undefined
+                    size: req.params.size
                 }
             },
-            data: outStock
+            data: itemModel
         })
         // return update product converter
         return res.json(productConverter(input))
@@ -662,6 +696,7 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
                     // Replace this with the IANA timezone you desire
                     review.time = getDifferentTime(review.createdAt)
                     review.createdAt = undefined
+                    review.size = review.size == "No" ? undefined : review.size
                     return getIconImage(deleteNullValue(review))
                 })
         ).then(data => {
@@ -877,18 +912,18 @@ const verifyId = async (id) => {
     // })
 
     // console.log(item.styles)
-    return productConverter(item)
+    return item
 }
 
 // use model for add to cart and check stock
-const verifyDetailId = async (id, sty, size = undefined) => {
+const verifyDetailId = async (id, sty, size = "No") => {
     // find product by id
     let item_detail = await prisma.item_details.findFirst({
         where: {
             AND: [
                 { itemId: Number(id) },
                 { style: sty },
-                { size: { contains: size } }
+                { size: size }
             ]
         }
     })

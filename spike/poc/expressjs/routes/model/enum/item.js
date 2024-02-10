@@ -16,7 +16,8 @@ const ITEMSIZE = Object.freeze({
     L: 'L',
     XL: 'XL',
     XXL: 'XXL',
-    XXXL: 'XXXL'
+    XXXL: 'XXXL',
+    No: 'No'
 })
 
 const ITEMEVENT = Object.freeze({

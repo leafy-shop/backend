@@ -64,8 +64,8 @@ async def root(user_id : int = 1, limit : int = 0):
     # Get recommendations for a specific user
     # user_id=1
 
-    # Get user by interact to the train dataset
-    user_items= [event["itemId"] for event in df if event["userId"] == user_id]
+    # Get user by interact to purchase the train dataset
+    user_items= [event["itemId"] for event in df if event["userId"] == user_id and event["itemEvent"] == "paid"]
     # print(user_items)
     items = getItem()
 

@@ -5,7 +5,8 @@ const prodList = {
     type: true,
     totalRating: true,
     sold: true,
-    price: true,
+    minPrice: true,
+    maxPrice: true,
     updatedAt: true
 }
 
