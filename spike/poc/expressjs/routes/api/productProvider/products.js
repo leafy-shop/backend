@@ -150,7 +150,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                         name: {
                             contains: product
                         },
-                        price: {
+                        minPrice: {
                             lte: max_price,
                             gte: min_price
                         },
