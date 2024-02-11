@@ -24,6 +24,7 @@ const http = require('http');
 
 const dotenv = require('dotenv');
 const { error } = require('console');
+const { resolve } = require('path');
 
 // get config vars
 dotenv.config();
@@ -138,6 +139,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     // and return page that sorted by updateAt item
     try {
         let filter_pd = []
+        // if sort data or sort method or favorite product it will get mandatory data from database
         if (sort_name !== undefined || ['asc', 'desc'].includes(sort) || isFav == 'true') {
             filter_pd = await prisma.items.findMany({
                 include: {
@@ -166,6 +168,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                 orderBy: sortModel
             })
         } else {
+            // if not have sort data or sort method or favorite product it will get recommend product by check on account
             let pds = await prisma.items.findMany()
             if (req.user !== undefined) {
                 filter_pd = await getRecommender(pds, req.user.id)
@@ -203,24 +206,51 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
             return condition
         })
 
-        // check if user is supplier then see only owner product
-        if (req.user !== undefined && req.user.role === ROLE.Supplier) filter_pd = filter_pd.filter(product => product.itemOwner == req.user.email)
+        outOfStock(filter_pd).then(outStockData => {
+            // filter product have some item on stock
+            filter_pd = filter_pd.filter(product => {
+                // console.log(outStockData.filter(out => out.itemId == product.itemId))
+                return !outStockData.filter(out => out.itemId == product.itemId).length
+            })
+            // managed out product by limit 6 product
+            let itemOutStock = []
+            for (let i = 0 ; i < 5 ; i++) {
+                itemOutStock.push(outStockData[i])
+            }
 
-        // return to page with page number and page size
-        page_pd = paginationList(filter_pd, pageN, limitN, 18)
+            // check if user is supplier then see only owner product
+            if (req.user !== undefined && req.user.role === ROLE.Supplier) filter_pd = filter_pd.filter(product => product.itemOwner == req.user.email)
 
-        // array converter and image mapping
-        Promise.all(
-            // list product with image
-            page_pd.list.length === 0 ? [] :
-                page_pd.list.map(product => getProductImage(productConverter(product, prodList)))
-            // filter_pd.map(product => productConverter(product, prodList))
-        ).then(productList => {
-            page_pd.list = productList
-            return res.send(page_pd)
-        }).catch(err => {
-            next(err)
-        })
+            // return to page with page number and page size
+            page_pd = paginationList(filter_pd, pageN, limitN, 18)
+
+            // array converter and image mapping
+            Promise.all(
+                // list product with image
+                page_pd.list.length === 0 ? [] :
+                    page_pd.list.map(product => getProductImage(productConverter(product, prodList)))
+                // filter_pd.map(product => productConverter(product, prodList))
+            ).then(productList => {
+                // item is founded
+                page_pd.list = productList
+
+                // provided outstock product
+                Promise.all(
+                    itemOutStock.length === 0 ? [] :
+                    itemOutStock.map(product => getProductImage(productConverter(product, prodList)))
+                ).then(outStockData => {
+                    page_pd.outStock = outStockData
+                    return res.send(page_pd)
+                }).catch(err => {
+                    next(err)
+                })
+            }).catch(err => {
+                next(err)
+            })
+        }).catch(error => {
+            next(error)
+        });
+
     } catch (err) {
         // if favorite product is not found in this user
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -233,6 +263,28 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         next(err)
     }
 })
+
+let outOfStock = async (filter_pd) => {
+    let filteredProducts = await Promise.all(
+        filter_pd.map(async (product) => {
+            let productStock = await prisma.item_details.findMany({
+                select: {
+                    stock: true
+                },
+                where: {
+                    itemId: product.itemId
+                }
+            });
+            // console.log(productStock, productStock.every(stock => stock.stock < 1));
+            return {
+                product: product,
+                isOutOfStock: productStock.every(stock => stock.stock < 1)
+            };
+        })
+    );
+
+    return filteredProducts.filter(item => item.isOutOfStock).map(item => item.product);
+}
 
 // get recommender by fetch api on FastAPI
 let getRecommender = async (pds, id) => {
