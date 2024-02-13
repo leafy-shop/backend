@@ -96,7 +96,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     let { page, limit,
         isFav, product, min_price, max_price, rating, owner,
         type, tag,
-        sort_name, sort } = req.query
+        sort_name, sort, isRecommend } = req.query
 
     // count items
     // let count_pd = await prisma.items.count()
@@ -170,7 +170,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         } else {
             // if not have sort data or sort method or favorite product it will get recommend product by check on account
             let pds = await prisma.items.findMany()
-            if (req.user !== undefined) {
+            if (req.user !== undefined && isRecommend == "true") {
                 filter_pd = await getRecommender(pds, req.user.id)
                 // console.log(filter_pd)
             }
@@ -288,7 +288,7 @@ let outOfStock = async (filter_pd) => {
 let getRecommender = async (pds, id) => {
     let filter_pd = []
     try {
-        let { data, status } = await axios.get(url + '/recommend?user_id=' + id)
+        let { data, status } = await axios.get(url + '/api/recommend?user_id=' + id)
         data.forEach(prodId => {
             filter_pd.push(pds.filter(prod => prod.itemId == prodId)[0])
         })

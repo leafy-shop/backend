@@ -54,7 +54,7 @@ def parse_csv(df):
     parsed = json.loads(res)
     return parsed
 
-@app.get("/recommend")
+@app.get("/api/recommend")
 async def root(user_id : int = 1, limit : int = 10):
     limitN = 1 if limit <= 0 else limit
     json_event = getEvent()
