@@ -291,7 +291,7 @@ let outOfStock = async (filter_pd) => {
 let getRecommender = async (pds, id) => {
     let filter_pd = []
     try {
-        let { data, status } = await axios.get(url + '/api/recommend?user_id=' + id)
+        let { data, status } = await axios.get(url + '/ml/recommend?user_id=' + id)
         data.forEach(prodId => {
             filter_pd.push(pds.filter(prod => prod.itemId == prodId)[0])
         })
