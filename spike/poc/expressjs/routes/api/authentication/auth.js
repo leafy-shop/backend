@@ -39,7 +39,7 @@ router.post('/', async (req, res, next) => {
 
         // ถ้า email หาไม่เจอก็จะส่งกลับไปเพื่อใช้ในการทำ reset password
         if (user == null) {
-            return res.status(404).json(errorRes(`user email or phone does not exist`, req.originalUrl))
+            return res.status(404).json(errorRes(`user email, username or phone does not exist`, req.originalUrl))
         }
 
         // ตรวจสอบสถานะของ user
@@ -79,7 +79,7 @@ router.post('/', async (req, res, next) => {
 
         // ตรวจสอบ password ที่ได้จาก mysql2 ว่าเป็น hash match กับ password ที่กรอกมาหรือป่าว
         if (!(await argon2.verify(user.password, password, hashingConfig))) {
-            return res.status(401).json(errorRes("user email or password is invalid please login again", req.originalUrl))
+            return res.status(401).json(errorRes("user email, username or password is invalid please login again", req.originalUrl))
         }
 
         // ลบ password ของ user ก่อน response กลับไป
