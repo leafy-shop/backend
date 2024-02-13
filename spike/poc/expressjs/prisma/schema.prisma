@@ -65,15 +65,12 @@ model item_details {
 }
 
 model item_events {
+  timestamp DateTime @id @default(now())
   userId    Int
   itemId    Int
   items     items    @relation(fields: [itemId], references: [itemId], map: "EventItem_itemId_fkey")
   accounts  accounts @relation(fields: [userId], references: [userId], map: "EventItem_userEmail_fkey")
   itemEvent String   @db.Char(4)
-
-  @@id([itemId, userId])
-  @@index([itemId], map: "fk_EventItem_items1_idx")
-  @@index([userId], map: "fk_EventItem_users1_idx")
 }
 
 model item_reviews {
