@@ -167,19 +167,21 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                 },
                 orderBy: sortModel
             })
-        } else {
+            } else {
             // if not have sort data or sort method or favorite product it will get recommend product by check on account
             let pds = await prisma.items.findMany()
-            if (req.user !== undefined && isRecommend == "true") {
+            if (req.user !== undefined && isRecommend === "true") {
                 filter_pd = await getRecommender(pds, req.user.id)
                 // console.log(filter_pd)
+            } else {
+                filter_pd = pds
             }
             filter_pd = filter_pd.filter(prod => {
-                return (product ? prod.name.includes(product) : true) &
-                    (min_price ? prod.minPrice > min_price : true) &
-                    (max_price ? prod.minPrice < max_price : true) &
+                return (product !== undefined ? prod.name.includes(product) : true) &
+                    (min_price !== undefined ? prod.minPrice > min_price : true) &
+                    (max_price !== undefined ? prod.minPrice < max_price : true) &
                     (isNaN(rating) || rating === undefined ? true : (prod.totalRating > ratingScale[rating - 1][0] & prod.totalRating < ratingScale[rating - 1][1])) &
-                    (owner ? prod.itemOwner == owner : true)
+                    (owner !== undefined ? prod.itemOwner == owner : true)
             })
             // console.log(filter_pd)
         }
@@ -210,9 +212,10 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                 // console.log(outStockData.filter(out => out.itemId == product.itemId))
                 return !outStockData.filter(out => out.itemId == product.itemId).length
             })
+
             // managed out product by limit 6 product
             let itemOutStock = []
-            for (let i = 0 ; i < 5 ; i++) {
+            for (let i = 0 ; i < ((outStockData.length < 5) ? outStockData.length : 5) ; i++) {
                 itemOutStock.push(outStockData[i])
             }
 
