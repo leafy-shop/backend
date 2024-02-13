@@ -173,8 +173,6 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
             if (req.user !== undefined) {
                 filter_pd = await getRecommender(pds, req.user.id)
                 // console.log(filter_pd)
-            } else {
-                filter_pd = await getRecommender(pds, 0)
             }
             filter_pd = filter_pd.filter(prod => {
                 return (product ? prod.name.includes(product) : true) &

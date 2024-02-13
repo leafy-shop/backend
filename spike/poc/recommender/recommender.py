@@ -9,9 +9,9 @@ from fastapi import FastAPI
 import pandas as pd
 import logging
 import json
-import joblib
 from connection.mysqlconnect import connect
-import math
+from sklearn.metrics.pairwise import cosine_similarity
+from collaborativeFiltering import get_item_recommendations
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +36,12 @@ def getEvent():
     conn = connect()
     cursor = conn.cursor()
     query = f"""
-    SELECT * FROM item_events;
+    SELECT ie.userId, ie.itemId, i.totalRating, ie.itemEvent FROM item_events ie JOIN items i on i.itemId = ie.itemId;
     """
     cursor.execute(query)
     result = cursor.fetchall()
     for event in result:
-        itemEvents.append({"userId": event[0], "itemId": event[1], "itemEvent": event[2]})
+        itemEvents.append({"userId": event[0], "itemId": event[1], "totalRating": event[2], "itemEvent": event[3]})
     conn.close()
     return itemEvents
 
@@ -55,38 +55,21 @@ def parse_csv(df):
     return parsed
 
 @app.get("/recommend")
-async def root(user_id : int = 1, limit : int = 0):
-    df = getEvent()
-    # pd.read_csv("./train/demo/leafyEvent.csv")
-    # print(df.head(10))
-    svd = joblib.load("./train/recommendation.pkl")
+async def root(user_id : int = 1, limit : int = 10):
+    limitN = 1 if limit <= 0 else limit
+    json_event = getEvent()
 
-    # Get recommendations for a specific user
-    # user_id=1
+    # Convert dictionary to a DataFrame
+    df = pd.DataFrame(json_event)
+    print(df)
 
-    # Get user by interact to purchase the train dataset
-    user_items= [event["itemId"] for event in df if event["userId"] == user_id and event["itemEvent"] == "paid"]
-    # print(user_items)
-    items = getItem()
+    userId_type_ratings=df.pivot_table(index='userId',columns="itemId",values='totalRating')
 
-    # print(user_items)
+    userId_type_ratings=userId_type_ratings.fillna(0)
 
-    # Filter out items the user has already rated
-    unrated_items=[item for item in items if not item in user_items]
-    # print(unrated_items)
-    # Make predictions for unrated items
-    user_predictions=[svd.predict(user_id,item_id) for item_id in unrated_items]
-    # print(user_predictions)
-    # Sort predictions by estimated rating in descending order
-    sorted_predictions=sorted(user_predictions,key=lambda x:x.est,reverse=True)
-    # Get top 10 item recommendations
-    top_recommendations= sorted_predictions[:limit] if limit > 0 else sorted_predictions
-    # Print top recommendations
-    print(f"\nTop 10 item recommendations for User {user_id}:")
-    recommendList = list()
-    for recommendation in top_recommendations:
-        # print(recommendation.iid)
-        # print(items)
-        recommendList.append(recommendation.iid)
+    user_similarity=cosine_similarity(userId_type_ratings)
 
-    return recommendList[:limit] if limit > 0 else recommendList
+    user_similarity_df=pd.DataFrame(user_similarity,index=userId_type_ratings.index,columns=userId_type_ratings.index)
+
+    return get_item_recommendations(user_id,user_similarity_df, userId_type_ratings)
+
