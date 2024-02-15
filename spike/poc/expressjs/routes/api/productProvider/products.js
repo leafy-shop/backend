@@ -365,7 +365,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
 
 // POST - create product and product details
 router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
-    let { itemId, name, description, itemOwner, type, tag, styles, price } = req.body
+    let { itemId, name, description, itemOwner, type, tag, styles } = req.body
     // let numberids = []
     // product_db.sort((a, b) => a.id - b.id).forEach(item => {
     //     numberids.push(item.id)
@@ -404,20 +404,30 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
 
         let priceRange = {}
         let priceList = []
+        let styleList = []
+        let sizeList = []
         if (styles.length === 0 || !Array.isArray(styles)) {
             validatError("created item must be have 1 style item")
         }
         styles.forEach(sty => {
-            if (sty.style === undefined || sty.price === undefined) {
-                validatError("item detail must be have style and price")
+            if (sty.price === undefined) {
+                validatError("item detail must be have price")
             }
             // console.log(sty)
-            validateStr("item style:" + sty.style, sty.style, 50)
+            sty.style = sty.style === undefined ? "No" : sty.style
+            styleList.push(validateStr("item style:" + sty.style, sty.style, 50))
             sty.size = sty.size === undefined ? ITEMSIZE.No : sty.size
-            console.log(sty.size)
-            validateRole("item size:" + sty.style, sty.size, ITEMSIZE, true)
+            sizeList.push(validateRole("item size:" + sty.style, sty.size, ITEMSIZE, true))
             validateInt("item stock:" + sty.style, sty.stock, false, 0)
             priceList.push(validateDouble("item price:" + sty.price, sty.price, false, 0))
+        })
+        styles.forEach(sty => {
+            if (styleList.includes("No") && sty.style !== "No") {
+                validatError("item detail style if no style must cannot add another style")
+            }
+            if (sizeList.includes("No") && sty.size !== "No") {
+                validatError("item detail size if no size must cannot add another style")
+            }
         })
         priceRange.minPrice = Math.min(...priceList)
         priceRange.maxPrice = Math.max(...priceList) !== priceRange.minPrice ? Math.max(...priceList) : undefined
@@ -434,8 +444,10 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
 
         if (req.user.role == ROLE.Admin) {
             itemModel.itemOwner = validateEmail("item owner", itemOwner, 100)
-
+        } else {
+            itemModel.itemOwner = req.user.email
         }
+
         // create item with email owner
         let input = await prisma.items.create({
             data: itemModel
