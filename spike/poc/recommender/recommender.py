@@ -5,7 +5,7 @@
 # run server
 # uvicorn recommender:app --port 8000 --reload
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 import pandas as pd
 import logging
 import json
@@ -15,7 +15,7 @@ from collaborativeFiltering import get_item_recommendations
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+app = FastAPI(root_path="/ml/")
 
 def getItem():
     items = list()
@@ -54,8 +54,8 @@ def parse_csv(df):
     parsed = json.loads(res)
     return parsed
 
-@app.get("/ml/recommend")
-async def root(user_id : int = 1, limit : int = 10):
+@app.get("/recommend")
+async def root(request: Request,user_id : int = 1, limit : int = 10):
     limitN = 1 if limit <= 0 else limit
     json_event = getEvent()
 
@@ -71,5 +71,5 @@ async def root(user_id : int = 1, limit : int = 10):
 
     user_similarity_df=pd.DataFrame(user_similarity,index=userId_type_ratings.index,columns=userId_type_ratings.index)
 
-    return get_item_recommendations(user_id,user_similarity_df, userId_type_ratings)
+    return get_item_recommendations(user_id,user_similarity_df, userId_type_ratings, limitN)
 

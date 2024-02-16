@@ -25,6 +25,7 @@ const http = require('http');
 const dotenv = require('dotenv');
 const { error } = require('console');
 const { resolve } = require('path');
+const { getTopItems } = require('../../model/recommender/contentBasedFiltering');
 
 // get config vars
 dotenv.config();
@@ -167,12 +168,104 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                 },
                 orderBy: sortModel
             })
-            } else {
+        } else {
             // if not have sort data or sort method or favorite product it will get recommend product by check on account
             let pds = await prisma.items.findMany()
-            if (req.user !== undefined && isRecommend === "true") {
-                filter_pd = await getRecommender(pds, req.user.id)
-                // console.log(filter_pd)
+            if (isRecommend === "true") {
+                let event = await prisma.item_events.findMany({ include: { items: true } })
+                event = event.map(event => {
+                    event.itemPrice = event.items.minPrice
+                    event.itemRating = event.items.totalRating
+                    event.itemType = event.items.type
+                    delete event["items"]
+                    return event
+                })
+
+                let category = []
+                let weight = {}
+                // user case
+                if (req.user !== undefined) {
+
+                    // list latest user activities on event 
+                    let mockUser = await prisma.item_events.findMany({
+                        where: { userId: req.user.id },
+                        include: { items: true },
+                        orderBy: { timestamp: "desc" },
+                        take: 3
+                    })
+
+                    // join mockUser to item data
+                    mockUser = mockUser.map(event => {
+                        // console.log(event)
+                        event.itemType = event.items.type
+                        event.itemPrice = event.items.minPrice
+                        event.itemRating = event.items.totalRating
+                        event.itemEvent = (event.itemEvent === ITEMEVENT.View ? 0.5 : event.itemEvent === ITEMEVENT.ATC ? 0.75 : 1)
+                        delete event["items"]
+                        return event
+                    })
+                    // console.log(mockUser)
+
+                    // map latest category when user see
+                    category = mockUser.map(event => event.itemType)
+
+                    // average weight before content based filtering
+                    avg_event = mockUser.reduce((pre, cur) => pre + Number(cur.itemEvent), 0) / 3
+                    avg_rating = mockUser.reduce((pre, cur) => pre + Number(cur.itemRating), 0) / 3
+                    avg_price = mockUser.reduce((pre, cur) => pre + Number(cur.itemPrice) / 100, 0) / 3
+
+                    weight = {
+                        totalRating: avg_rating,
+                        itemEvent: avg_event,
+                        itemPrice: avg_price,
+                    }
+                
+                // guest case
+                } else {
+                    // list latest user activities on event 
+                    let mockUser = await prisma.item_events.findMany({
+                        include: { items: true },
+                        orderBy: { timestamp: "desc" },
+                        take: 50 // note this value can be change when user capacity is increase.
+                    })
+
+                    // join mockUser to item data
+                    mockUser = mockUser.map(event => {
+                        // console.log(event)
+                        event.itemType = event.items.type
+                        event.itemPrice = event.items.minPrice
+                        event.itemRating = event.items.totalRating
+                        event.itemEvent = (event.itemEvent === ITEMEVENT.View ? 0.5 : event.itemEvent === ITEMEVENT.ATC ? 0.75 : 1)
+                        delete event["items"]
+                        return event
+                    })
+                    // console.log(mockUser)
+
+                    // map latest category when user see
+                    category = mockUser.map(event => event.itemType).slice(-4,-1)
+                    // console.log(category)
+
+                    // average weight before content based filtering
+                    avg_event = mockUser.reduce((pre, cur) => pre + Number(cur.itemEvent), 0) / (mockUser.length > 50 ? 50 : mockUser.length)
+                    avg_rating = mockUser.reduce((pre, cur) => pre + Number(cur.itemRating), 0) / (mockUser.length > 50 ? 50 : mockUser.length)
+                    avg_price = mockUser.reduce((pre, cur) => pre + Number(cur.itemPrice) / 100, 0) / (mockUser.length > 50 ? 50 : mockUser.length)
+                    // console.log(avg_event)
+                    // console.log(avg_rating)
+                    // console.log(avg_price)
+
+                    weight = {
+                        totalRating: avg_rating,
+                        itemEvent: avg_event,
+                        itemPrice: avg_price,
+                    }
+                }
+                // console.log(weight)
+                topItem = getTopItems(event, category, weight, pds.length)
+                // console.log(topItem)
+                topItem.forEach(item => {
+                    filter_pd.push(pds.filter(pd => item.itemId === pd.itemId)[0])
+                })
+                console.log(filter_pd)
             } else {
                 filter_pd = pds
             }
@@ -206,6 +299,9 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
             return condition
         })
 
+        // check if user is supplier then cannot see owner product except when he get owner item
+        if (req.user !== undefined && req.user.role === ROLE.Supplier && owner === undefined) filter_pd = filter_pd.filter(product => product.itemOwner !== req.user.email)
+
         outOfStock(filter_pd).then(outStockData => {
             // filter product have some item on stock
             filter_pd = filter_pd.filter(product => {
@@ -215,12 +311,9 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
 
             // managed out product by limit 6 product
             let itemOutStock = []
-            for (let i = 0 ; i < ((outStockData.length < 5) ? outStockData.length : 5) ; i++) {
+            for (let i = 0; i < ((outStockData.length < 5) ? outStockData.length : 5); i++) {
                 itemOutStock.push(outStockData[i])
             }
-
-            // check if user is supplier then see only owner product
-            if (req.user !== undefined && req.user.role === ROLE.Supplier) filter_pd = filter_pd.filter(product => product.itemOwner == req.user.email)
 
             // return to page with page number and page size
             page_pd = paginationList(filter_pd, pageN, limitN, 18)
@@ -238,7 +331,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                 // provided outstock product
                 Promise.all(
                     itemOutStock.length === 0 ? [] :
-                    itemOutStock.map(product => getProductImage(productConverter(product, prodList)))
+                        itemOutStock.map(product => getProductImage(productConverter(product, prodList)))
                 ).then(outStockData => {
                     page_pd.outStock = outStockData
                     return res.send(page_pd)
@@ -287,20 +380,20 @@ let outOfStock = async (filter_pd) => {
     return filteredProducts.filter(item => item.isOutOfStock).map(item => item.product);
 }
 
-// get recommender by fetch api on FastAPI
-let getRecommender = async (pds, id) => {
-    let filter_pd = []
-    try {
-        let { data, status } = await axios.get(url + '/ml/recommend?user_id=' + id)
-        data.forEach(prodId => {
-            filter_pd.push(pds.filter(prod => prod.itemId == prodId)[0])
-        })
-        console.log(filter_pd)
-        return filter_pd
-    } catch (err) {
-        return pds
-    }
-}
+// // get recommender by fetch api on FastAPI
+// let getRecommender = async (pds, id) => {
+//     let filter_pd = []
+//     try {
+//         let { data, status } = await axios.get(url + '/ml/recommend?user_id=' + id)
+//         data.forEach(prodId => {
+//             filter_pd.push(pds.filter(prod => prod.itemId == prodId)[0])
+//         })
+//         console.log(filter_pd)
+//         return filter_pd
+//     } catch (err) {
+//         return pds
+//     }
+// }
 
 // GET - products by id
 router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
