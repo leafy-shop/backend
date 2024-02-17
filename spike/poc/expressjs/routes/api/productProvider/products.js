@@ -274,10 +274,10 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                 return (product !== undefined ? prod.name.includes(product) : true) &&
                     (min_price !== undefined ? Number(prod.minPrice) > min_price : true) &&
                     (max_price !== undefined ? Number(prod.minPrice) < max_price : true) &&
-                    (isNaN(rating) || rating === undefined ? true : (prod.totalRating > ratingScale[rating - 1][0] & prod.totalRating < ratingScale[rating - 1][1])) &&
+                    (isNaN(rating) || rating === undefined ? true : (Number(prod.totalRating) >= ratingScale[rating - 1][0] && Number(prod.totalRating) <= ratingScale[rating - 1][1])) &&
                     (owner !== undefined ? prod.itemOwner == owner : true)
             })
-            console.log(filter_pd)
+            // console.log(filter_pd)
         }
 
         // filter includes array : complexity best case O(n), worst case O(n*(type+tag))
