@@ -130,7 +130,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     }
 
     // rating scale format for filter
-    let ratingScale = [[0, 1], [1.1, 2], [2.1, 3], [3.1, 4], [4.1, 5]]
+    let ratingScale = [[0, 1.9], [2, 2.9], [3, 3.9], [4, 4.9], [5, 5]]
 
     // console.log(rating)
     // console.log(isNaN(rating) ? undefined : ratingScale[rating - 1][0])
