@@ -130,7 +130,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     }
 
     // rating scale format for filter
-    let ratingScale = [[0.9, 1.8], [1.8, 2.6], [2.6, 3.4], [3.4, 4.2], [4.2, 5]]
+    let ratingScale = [[0, 1], [1.1, 2], [2.1, 3], [3.1, 4], [4.1, 5]]
 
     // console.log(rating)
     // console.log(isNaN(rating) ? undefined : ratingScale[rating - 1][0])
@@ -269,14 +269,15 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
             } else {
                 filter_pd = pds
             }
+            // console.log(filter_pd)
             filter_pd = filter_pd.filter(prod => {
-                return (product !== undefined ? prod.name.includes(product) : true) &
-                    (min_price !== undefined ? prod.minPrice > min_price : true) &
-                    (max_price !== undefined ? prod.minPrice < max_price : true) &
-                    (isNaN(rating) || rating === undefined ? true : (prod.totalRating > ratingScale[rating - 1][0] & prod.totalRating < ratingScale[rating - 1][1])) &
+                return (product !== undefined ? prod.name.includes(product) : true) &&
+                    (min_price !== undefined ? Number(prod.minPrice) > min_price : true) &&
+                    (max_price !== undefined ? Number(prod.minPrice) < max_price : true) &&
+                    (isNaN(rating) || rating === undefined ? true : (prod.totalRating > ratingScale[rating - 1][0] & prod.totalRating < ratingScale[rating - 1][1])) &&
                     (owner !== undefined ? prod.itemOwner == owner : true)
             })
-            // console.log(filter_pd)
+            console.log(filter_pd)
         }
 
         // filter includes array : complexity best case O(n), worst case O(n*(type+tag))
