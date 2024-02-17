@@ -507,10 +507,10 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
                 validatError("item detail must be have price")
             }
             // console.log(sty)
-            sty.style = sty.style === undefined ? "No" : sty.style
+            sty.style = sty.style === undefined || sty.style.length === 0 ? "No" : sty.style
             styleList.push(validateStr("item style:" + sty.style, sty.style, 50))
-            sty.size = sty.size === undefined ? ITEMSIZE.No : sty.size
-            sizeList.push(validateRole("item size:" + sty.style, sty.size, ITEMSIZE, true))
+            sty.size = sty.size === undefined || sty.style.length === 0 ? ITEMSIZE.No : sty.size
+            sizeList.push(validateStr("item size:" + sty.style, sty.size, 50))
             validateInt("item stock:" + sty.style, sty.stock, false, 0)
             priceList.push(validateDouble("item price:" + sty.price, sty.price, false, 0))
         })
@@ -718,8 +718,8 @@ router.put('/:id/:style/:size', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), 
         // switch out of stock or not
         let itemModel = {
             itemId: Number(req.params.id),
-            style: style !== undefined ? validateStr("validate item price", style) : req.params.style,
-            size: size !== undefined ? validateRole('validate item size', size, ITEMSIZE, true) : req.params.size,
+            style: style !== undefined ? validateStr("validate item price", style, 50) : req.params.style,
+            size: size !== undefined ? validateStr('validate item size', size, 50) : req.params.size,
             price: validateDouble("validate item price", price, false, 0),
             stock: validateInt('validate item stock', stock, false, 0)
         }

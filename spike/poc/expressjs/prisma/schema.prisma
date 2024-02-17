@@ -57,7 +57,7 @@ model item_details {
   itemId Int
   style  String  @default("No") @db.VarChar(50)
   stock  Int     @default(0)
-  size   String  @default("No") @db.VarChar(4)
+  size   String  @default("No") @db.VarChar(50)
   price  Decimal @default(0.00) @db.Decimal(32, 2)
 
   @@id([itemId, style, size])
