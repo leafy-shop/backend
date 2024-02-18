@@ -63,7 +63,7 @@ const errorHandler = (error, req, res, next) => {
 
 app.use(errorHandler)
 
-const PORT =process.env.PORT || 5000
+const PORT =process.env.PORT || 5001
 
 // Error object used in error handling middleware function
 // class AppError extends Error{
