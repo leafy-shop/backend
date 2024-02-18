@@ -4,6 +4,7 @@ const { getToken, getUser, isExpired, encryptInformation } = require('../../mode
 const { errorRes, notFoundError, unAuthorizedError, forbiddenError } = require('../../model/error/error')
 const argon2 = require('argon2')
 const crypto = require('crypto')
+const cryptoJs = require('crypto-js')
 // const { v4: uuidv4 } = require('uuid')
 
 // const bcrypt = require('bcrypt')
@@ -134,12 +135,12 @@ router.post('/', async (req, res, next) => {
         res.cookie("token", token, cookieConfigToken);
         res.cookie("refreshToken", refreshtoken, cookieConfigRefreshToken);
         res.cookie("information", encryptInformation({
-            "id": getUser(token).id,
-            "username": getUser(token).username,
-            "firstname": getUser(token).firstname,
-            "lastname": getUser(token).lastname,
-            "email": getUser(token).email,
-            "role": getUser(token).role,
+            "id": user.id,
+            "username": user.username,
+            "firstname": user.firstname,
+            "lastname": user.lastname,
+            "email": user.email,
+            "role": user.role,
         }), cookieInfomation)
 
         res.status(200).json({
@@ -159,10 +160,10 @@ router.post('/refresh', async (req, res, next) => {
     try {
         // เรียก refresh token เพื่อใช้ในการ refresh ถ้าหากเป็น access token จะทำการลบข้อมูลของ user ทำให้ส่ง token ผิด
         const jwtRefreshToken = "Bearer " + req.cookies.refreshToken;
+        const userInfo = JSON.parse(cryptoJs.AES.decrypt(req.cookies.information, process.env.TOKEN_INFO_SECRET).toString(cryptoJs.enc.Utf8))
+        // console.log(userInfo)
         // const jwttoken = "Bearer " + req.cookies.token
-        let userInfo = {
-            "email": req.body.email,
-        }
+        // let userInfo = cryptoreq.cookies.infomation;
 
         // if refresh token expired that removed cookie and response
         if (isExpired(jwtRefreshToken.substring(7)) || jwtRefreshToken.substring(7).length === 0) {
@@ -172,9 +173,6 @@ router.post('/refresh', async (req, res, next) => {
             //     sameSite: 'Strict'
             //     // secure: true
             // }
-            res.clearCookie("infomation")
-            res.clearCookie("token")
-            res.clearCookie("refreshToken")
             unAuthorizedError("token is expired, need login again")
         }
 
@@ -245,6 +243,9 @@ router.post('/refresh', async (req, res, next) => {
             "role": getUser(token).role,
         })
     } catch (err) {
+        res.clearCookie("infomation")
+        res.clearCookie("token")
+        res.clearCookie("refreshToken")
         next(err)
     }
 })

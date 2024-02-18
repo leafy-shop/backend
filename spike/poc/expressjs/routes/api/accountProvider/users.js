@@ -186,13 +186,13 @@ router.get('/views/:email', async (req, res, next) => {
         let user = await verifySupplier(req.params.email)
 
         // console.log(user)
-        
+
         // check if this user is supplier
         if (user.role === ROLE.Supplier) {
 
             // get count product with his email
             let count = await prisma.items.count({
-                where: {itemOwner: user.email}
+                where: { itemOwner: user.email }
             })
             user.products = count
 
@@ -202,8 +202,8 @@ router.get('/views/:email', async (req, res, next) => {
                 },
                 where: {
                     AND: [
-                        {itemOwner: user.email },
-                        {totalRating : { not: 0 }}
+                        { itemOwner: user.email },
+                        { totalRating: { not: 0 } }
                     ]
                 }
             })
@@ -373,28 +373,36 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) =>
     }
 })
 
-const verifyId = async (id) => {
+const verifyId = async (email_id) => {
     let filter_u = await prisma.accounts.findFirst({
         // include: {
         //     userinfo: true
         // },
         where: {
-            userId: validateInt("userId", Number(id))
+            OR: [
+                { email: email_id }, 
+                { userId: isNaN(Number(email_id)) ? 0 : Number(email_id) }
+            ] 
         },
         select: userDetailView
     })
     // not found checking
-    if (filter_u == null) notFoundError("user id " + id + " does not exist")
+    if (filter_u == null) notFoundError("user id " + email_id + " does not exist")
 
     return userConverter(filter_u)
 }
 
-const verifySupplier = async (email) => {
+const verifySupplier = async (email_id) => {
 
     let filter_u = await prisma.accounts.findFirst({
         where: {
             AND: [
-                { email: validateEmail("user email", email, 100) },
+                { 
+                    OR: [
+                        { email: email_id }, 
+                        { userId: isNaN(Number(email_id)) ? 0 : Number(email_id) }
+                    ] 
+                },
                 {
                     OR: [
                         { role: ROLE.Supplier },
@@ -407,7 +415,7 @@ const verifySupplier = async (email) => {
     })
 
     // not found checking
-    if (filter_u == null) notFoundError("user email " + email + " does not exist")
+    if (filter_u == null) notFoundError("user email " + email_id + " does not exist")
 
     // owner join time
     console.log(filter_u.createdAt)
