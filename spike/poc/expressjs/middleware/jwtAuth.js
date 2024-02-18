@@ -39,8 +39,8 @@ exports.JwtAuth = (req, res, next) => {
 exports.UnstrictJwtAuth = (req, res, next) => {
 
   // const informationCookie = req.cookies.information;
-  console.log()
-  console.log(crypto.AES.decrypt("U2FsdGVkX19yJENV3pk7wzaTg5Y6KOmn%2Bhy6JN3NEpZcv%2BC1zoqegUHaXae1k8niaiWe779hlP9%2BD53r27GzcKYjiiF1fyXxaLYyJeBDDbI3iqfWMmbYPlbyUp9pl8l1Y1xuEdribgV7lz9UXarORzRr4sjLFFoYBjbKYrMsX%2BofusnMohjC6UZ07H%2FPkZRa", process.env.TOKEN_INFO_SECRET).toString(crypto.enc.Utf8))
+  // console.log()
+  // console.log(crypto.AES.decrypt("U2FsdGVkX19yJENV3pk7wzaTg5Y6KOmn%2Bhy6JN3NEpZcv%2BC1zoqegUHaXae1k8niaiWe779hlP9%2BD53r27GzcKYjiiF1fyXxaLYyJeBDDbI3iqfWMmbYPlbyUp9pl8l1Y1xuEdribgV7lz9UXarORzRr4sjLFFoYBjbKYrMsX%2BofusnMohjC6UZ07H%2FPkZRa", process.env.TOKEN_INFO_SECRET).toString(crypto.enc.Utf8))
   // เอา token จาก headers or cookies
   const jwtToken = "Bearer " + req.cookies.token;
   // const jwtRefreshToken = req.headers.refresh || "Bearer " + req.cookies.refreshToken ;
