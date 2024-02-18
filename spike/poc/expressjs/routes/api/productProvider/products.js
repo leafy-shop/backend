@@ -410,8 +410,8 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         })
 
         // check user is supplier
-        if (req.user !== undefined && req.user.role === ROLE.Supplier && item.itemOwner !== req.user.email)
-            forbiddenError("This supplier can view owner's item only")
+        // if (req.user !== undefined && req.user.role === ROLE.Supplier && item.itemOwner !== req.user.email)
+        //     forbiddenError("This supplier can view owner's item only")
 
         // image for product
         let path = findImagePath("products", item.itemId)
