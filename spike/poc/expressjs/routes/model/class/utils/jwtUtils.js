@@ -48,7 +48,7 @@ const isExpired = (jwtrefreshtoken) => {
 }
 
 const encryptInformation = (obj) => {
-    return crypto.AES.encrypt(JSON.stringify(obj), process.env.TOKEN_INFO_SECRET).toString()
+    return crypto.AES.encrypt(JSON.stringify({obj}), process.env.TOKEN_INFO_SECRET).toString()
 }
 
 module.exports.getToken = getToken
