@@ -204,6 +204,7 @@ const validatePhone = (prop = '', value = undefined) => {
 
 const validateCode = (prop = '', value = '', length = 0, arrayCodeDigit = []) => {
 
+
     // validate is null or null value or negative value
     if (value == undefined || value.length == 0) {
         validatError(`${prop} is null`)
@@ -219,12 +220,14 @@ const validateCode = (prop = '', value = '', length = 0, arrayCodeDigit = []) =>
     if (value.length > length) {
         validatError(`${prop}:${value} have length more than ${length} characters`)
     }
+    
     // validate is number in string
     if (arrayCodeDigit.length == 0) {
         let re = new RegExp(`^\\d{${length}}$`);
         if (!re.test(value)) {
             validatError(`${prop}:${value} is not code from ${prop} format`)
         }
+        return value
     } else {
         // Loop through the array of custom numbers
         for (number of arrayCodeDigit) {
@@ -234,8 +237,10 @@ const validateCode = (prop = '', value = '', length = 0, arrayCodeDigit = []) =>
             // Test the input against the regular expression
             if (re.test(value)) {
                 console.log(`validate ${prop} is passed`)
+                console.log(value)
                 return value;
             }
+            
         }
         validatError(`${prop}:${value} is not code from ${prop} format`)
     }
