@@ -524,7 +524,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
             }
         })
         priceRange.minPrice = Math.min(...priceList)
-        priceRange.maxPrice = Math.max(...priceList) !== priceRange.minPrice ? Math.max(...priceList) : undefined
+        priceRange.maxPrice = Math.max(...priceList) !== priceRange.minPrice ? Math.max(...priceList) : 0
 
         let itemModel = {
             itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
