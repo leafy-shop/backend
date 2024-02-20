@@ -117,13 +117,13 @@ router.post('/', async (req, res, next) => {
             "role": user.role,
         }, "24h");
 
-        // เก็บเป็น cookie ให้ผู้พัฒนา frontend สามารถใช้งานได้
-        const cookieInfomation = {
-            maxAge: 24 * 60 * 60 * 1000,
-            // httpOnly: true,
-            sameSite: 'Strict'
-            // secure: true
-        }
+        // // เก็บเป็น cookie ให้ผู้พัฒนา frontend สามารถใช้งานได้
+        // const cookieInfomation = {
+        //     maxAge: 24 * 60 * 60 * 1000,
+        //     // httpOnly: true,
+        //     sameSite: 'Strict'
+        //     // secure: true
+        // }
 
         // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
         const cookieConfigRefreshToken = {
@@ -134,14 +134,14 @@ router.post('/', async (req, res, next) => {
         }
         res.cookie("token", token, cookieConfigToken);
         res.cookie("refreshToken", refreshtoken, cookieConfigRefreshToken);
-        res.cookie("information", encryptInformation({
-            "id": user.id,
-            "username": user.username,
-            "firstname": user.firstname,
-            "lastname": user.lastname,
-            "email": user.email,
-            "role": user.role,
-        }), cookieInfomation)
+        // res.cookie("information", encryptInformation({
+        //     "id": user.id,
+        //     "username": user.username,
+        //     "firstname": user.firstname,
+        //     "lastname": user.lastname,
+        //     "email": user.email,
+        //     "role": user.role,
+        // }), cookieInfomation)
 
         res.status(200).json({
             "id": getUser(token).id,
@@ -215,24 +215,24 @@ router.post('/refresh', async (req, res, next) => {
             // secure: true
         }
 
-        // เก็บเป็น cookie ให้ผู้พัฒนา frontend สามารถใช้งานได้
-        const cookieInfomation = {
-            maxAge: 24 * 60 * 60 * 1000,
-            // httpOnly: true,
-            sameSite: 'Strict'
-            // secure: true
-        }
+        // // เก็บเป็น cookie ให้ผู้พัฒนา frontend สามารถใช้งานได้
+        // const cookieInfomation = {
+        //     maxAge: 24 * 60 * 60 * 1000,
+        //     // httpOnly: true,
+        //     sameSite: 'Strict'
+        //     // secure: true
+        // }
 
         res.cookie("token", token, cookieConfigToken);
         res.cookie("refreshToken", refreshtoken, cookieConfigRefreshToken);
-        res.cookie("information", encryptInformation({
-            "id": getUser(token).id,
-            "username": getUser(token).username,
-            "firstname": getUser(token).firstname,
-            "lastname": getUser(token).lastname,
-            "email": getUser(token).email,
-            "role": getUser(token).role,
-        }), cookieInfomation)
+        // res.cookie("information", encryptInformation({
+        //     "id": getUser(token).id,
+        //     "username": getUser(token).username,
+        //     "firstname": getUser(token).firstname,
+        //     "lastname": getUser(token).lastname,
+        //     "email": getUser(token).email,
+        //     "role": getUser(token).role,
+        // }), cookieInfomation)
 
         res.status(200).json({
             "id": getUser(token).id,
