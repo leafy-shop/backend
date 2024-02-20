@@ -13,7 +13,7 @@ const dotenv = require('dotenv');
 const cookieParser = require('cookie-parser')
 
 const { PrismaClient } = require('@prisma/client')
-const { UnstrictJwtAuth } = require('../../../middleware/jwtAuth')
+const { UnstrictJwtAuth, JwtAuth } = require('../../../middleware/jwtAuth')
 const { ROLE } = require('../../model/enum/role')
 const { validatePassword } = require('../../validation/body')
 const { sendMail, signup_email } = require('../../../config/email_config')
@@ -156,11 +156,12 @@ router.post('/', async (req, res, next) => {
     }
 })
 
-router.post('/refresh', async (req, res, next) => {
+router.post('/refresh', JwtAuth, async (req, res, next) => {
     try {
         // เรียก refresh token เพื่อใช้ในการ refresh ถ้าหากเป็น access token จะทำการลบข้อมูลของ user ทำให้ส่ง token ผิด
         const jwtRefreshToken = "Bearer " + req.cookies.refreshToken;
-        const userInfo = JSON.parse(cryptoJs.AES.decrypt(req.cookies.information, process.env.TOKEN_INFO_SECRET).toString(cryptoJs.enc.Utf8))
+        // console.log(jwtRefreshToken)
+        // const userInfo = JSON.parse(cryptoJs.AES.decrypt(req.cookies.information, process.env.TOKEN_INFO_SECRET).toString(cryptoJs.enc.Utf8))
         // console.log(userInfo)
         // const jwttoken = "Bearer " + req.cookies.token
         // let userInfo = cryptoreq.cookies.infomation;
@@ -173,12 +174,15 @@ router.post('/refresh', async (req, res, next) => {
             //     sameSite: 'Strict'
             //     // secure: true
             // }
+            res.clearCookie("token")
+            res.clearCookie("refreshToken")
             unAuthorizedError("token is expired, need login again")
         }
+        console.log(req.user)
 
         // เรียกข้อมูล user โดยใช้ email
         let user = await prisma.accounts.findFirst({
-            where: { email: userInfo.email }
+            where: { email: req.user.email }
         })
 
         // สร้าง refresh token ใหม่ทั้ง token และ refreshToken
@@ -195,7 +199,7 @@ router.post('/refresh', async (req, res, next) => {
         let refreshtoken = getToken(userToken, "24h")
 
         // ตรวจดูว่า token ถูกต้องไหมก่อนส่ง
-        if (user === undefined) {
+        if (user === undefined ) {
             unAuthorizedError("please input valid refresh token")
         }
 
@@ -243,9 +247,6 @@ router.post('/refresh', async (req, res, next) => {
             "role": getUser(token).role,
         })
     } catch (err) {
-        res.clearCookie("infomation")
-        res.clearCookie("token")
-        res.clearCookie("refreshToken")
         next(err)
     }
 })
