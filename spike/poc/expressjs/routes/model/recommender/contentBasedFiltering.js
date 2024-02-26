@@ -37,11 +37,11 @@ const getTopItems = (data, category, weights, top_n = 10) => {
         itemPriceList.push(item.itemPrice)
     });
     const mean = meanP(itemPriceList)
-    console.log(mean)
+    // console.log(mean)
     const sdp = sd(itemPriceList, mean)
-    console.log(sdp)
+    // console.log(sdp)
     return _.chain(data)
-        .map((item) => [item.itemId, calculateWeight(item, sdp, weights, category)])
+        .map((item) => [item.itemId, calculateWeight(item, mean, sdp, weights, category)])
         .groupBy((item) => item[0])
         .map((items) => {
             const totalWeights = _.sumBy(items, (item) => item[1]);
@@ -65,20 +65,24 @@ const weights = {
 
 const maxWeight = (weights) => Math.max(...Object.values(weights));
 const meanP = (arr) => arr.reduce((pre, cur) => pre + Number(cur), 0) / arr.length // arithmetic mean
-const sd = (arr, mean) => Math.sqrt(arr.reduce((pre, cur) => pre + (Number(cur) - mean ^ 2 / arr.length), 0)) // standard deviration
-const normalProp = (x, weight, sd) => (1 / (Math.sqrt(2 * Math.PI) * sd)) * Math.exp(-((x - weight) ^ 2 / (2 * sd))) // area of under normal distribution
+const sd = (arr, mean) => Math.sqrt(arr.reduce((pre, cur) => pre + Math.pow(Number(cur) - mean, 2)/ arr.length, 0)) // standard deviration
+const normalProp = (x, mean, sd) => (1 / (Math.sqrt(2 * Math.PI) * sd)) * Math.exp(-(Math.pow(x - mean, 2) / (2 * sd))) // area of under normal distribution
 
-const calculateWeight = (userData, sdp, weights, category = []) => {
+const calculateWeight = (userData, mean, sdp, weights, category = []) => {
     let maxWeightValue = maxWeight(weights)
     const { itemType, itemRating, itemPrice, itemEvent } = userData;
     // console.log(category)
     // console.log(weights.totalRating)
     // console.log(itemRating)
     // console.log(itemRating > weights.totalRating)
-    // console.log(normalProp(itemPrice/100, maxWeightValue, sdp))
-    const weight = (itemRating > weights.totalRating) ? ((category.includes(itemType)) ? 1 : 0) + (normalProp(itemPrice/100, maxWeightValue, sdp)) + (itemEvent == "view" ? 0.5 : itemEvent == "adtc" ? 0.75 : 1) / maxWeightValue : 0
-    console.log(weight)
-    return (weight / (0.5 + weights.totalRating + weights.itemPrice + weights.itemEvent)) * 100;
+    // console.log(normalProp(itemPrice / 100, maxWeightValue, sdp))
+    const weight = itemRating / maxWeightValue +
+    ((category.includes(itemType)) ? 1 : -1) / maxWeightValue +
+    (normalProp(itemPrice / 100, mean, sdp)) / maxWeightValue +
+    (itemEvent == "view" ? 0.5 : itemEvent == "adtc" ? 0.75 : 1) / maxWeightValue
+    const weightType = category.filter(cate => cate === itemType).length;
+    // console.log(category)
+    return (weight / (weightType + weights.totalRating + weights.itemPrice + weights.itemEvent)) * 100;
 };
 
 // init()

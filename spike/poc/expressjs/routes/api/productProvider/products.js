@@ -95,9 +95,10 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
 
     // query params
     let { page, limit,
-        isFav, product, min_price, max_price, rating, owner,
-        type, tag,
-        sort_name, sort, isRecommend } = req.query
+        isFav, isRecommend,
+        product,
+        min_price, max_price, rating, owner, type, tag,
+        sort_name, sort } = req.query
 
     // count items
     // let count_pd = await prisma.items.count()
@@ -148,9 +149,17 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                 },
                 where: {
                     AND: [{
-                        name: {
-                            contains: product
-                        },
+                        OR: [
+                            {
+                                name: {
+                                    contains: product
+                                }
+                            },
+                            {
+                                description: {
+                                    contains: product
+                                }
+                            }],
                         minPrice: {
                             lte: max_price,
                             gte: min_price
@@ -183,95 +192,71 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
 
                 let category = []
                 let weight = {}
+                let mockUser = []
                 // user case
                 if (req.user !== undefined) {
-
                     // list latest user activities on event 
-                    let mockUser = await prisma.item_events.findMany({
+                    mockUser = await prisma.item_events.findMany({
                         where: { userId: req.user.id },
                         include: { items: true },
                         orderBy: { timestamp: "desc" },
-                        take: 3
+                        take: 6,
+                        skip: 1
                     })
 
-                    // join mockUser to item data
-                    mockUser = mockUser.map(event => {
-                        // console.log(event)
-                        event.itemType = event.items.type
-                        event.itemPrice = event.items.minPrice
-                        event.itemRating = event.items.totalRating
-                        event.itemEvent = (event.itemEvent === ITEMEVENT.View ? 0.5 : event.itemEvent === ITEMEVENT.ATC ? 0.75 : 1)
-                        delete event["items"]
-                        return event
-                    })
-                    // console.log(mockUser)
-
-                    // map latest category when user see
-                    category = mockUser.map(event => event.itemType)
-
-                    // average weight before content based filtering
-                    avg_event = mockUser.reduce((pre, cur) => pre + Number(cur.itemEvent), 0) / 3
-                    avg_rating = mockUser.reduce((pre, cur) => pre + Number(cur.itemRating), 0) / 3
-                    avg_price = mockUser.reduce((pre, cur) => pre + Number(cur.itemPrice) / 100, 0) / 3
-
-                    weight = {
-                        totalRating: avg_rating,
-                        itemEvent: avg_event,
-                        itemPrice: avg_price,
-                    }
-                
-                // guest case
+                    // guest case
                 } else {
                     // list latest user activities on event 
-                    let mockUser = await prisma.item_events.findMany({
+                    mockUser = await prisma.item_events.findMany({
                         include: { items: true },
                         orderBy: { timestamp: "desc" },
-                        take: 50 // note this value can be change when user capacity is increase.
+                        take: 6, // note this value can be change when user capacity is increase.
+                        skip: 1
                     })
+                }
 
-                    // join mockUser to item data
-                    mockUser = mockUser.map(event => {
-                        // console.log(event)
-                        event.itemType = event.items.type
-                        event.itemPrice = event.items.minPrice
-                        event.itemRating = event.items.totalRating
-                        event.itemEvent = (event.itemEvent === ITEMEVENT.View ? 0.5 : event.itemEvent === ITEMEVENT.ATC ? 0.75 : 1)
-                        delete event["items"]
-                        return event
-                    })
-                    // console.log(mockUser)
+                // join mockUser to item data
+                mockUser = mockUser.map(event => {
+                    // console.log(event)
+                    event.itemType = event.items.type
+                    event.itemPrice = event.items.minPrice
+                    event.itemRating = event.items.totalRating
+                    event.itemEvent = (event.itemEvent === ITEMEVENT.View ? 0.5 : event.itemEvent === ITEMEVENT.ATC ? 0.75 : 1)
+                    delete event["items"]
+                    return event
+                })
 
-                    // map latest category when user see
-                    category = mockUser.map(event => event.itemType).slice(-4,-1)
-                    // console.log(category)
+                // map latest category when user see
+                category = mockUser.map(event => event.itemType)
+                // console.log(category)
 
-                    // average weight before content based filtering
-                    avg_event = mockUser.reduce((pre, cur) => pre + Number(cur.itemEvent), 0) / (mockUser.length > 50 ? 50 : mockUser.length)
-                    avg_rating = mockUser.reduce((pre, cur) => pre + Number(cur.itemRating), 0) / (mockUser.length > 50 ? 50 : mockUser.length)
-                    avg_price = mockUser.reduce((pre, cur) => pre + Number(cur.itemPrice) / 100, 0) / (mockUser.length > 50 ? 50 : mockUser.length)
-                    // console.log(avg_event)
-                    // console.log(avg_rating)
-                    // console.log(avg_price)
+                // average weight before content based filtering
+                avg_event = mockUser.reduce((pre, cur) => pre + Number(cur.itemEvent), 0) / (mockUser.length > 5 ? 5 : mockUser.length)
+                avg_rating = mockUser.reduce((pre, cur) => pre + Number(cur.itemRating), 0) / (mockUser.length > 5 ? 5 : mockUser.length)
+                avg_price = mockUser.reduce((pre, cur) => pre + Number(cur.itemPrice) / 100, 0) / (mockUser.length > 5 ? 5 : mockUser.length)
+                // console.log(avg_event)
+                // console.log(avg_rating)
+                // console.log(avg_price)
 
-                    weight = {
-                        totalRating: avg_rating,
-                        itemEvent: avg_event,
-                        itemPrice: avg_price,
-                    }
+                weight = {
+                    totalRating: avg_rating,
+                    itemEvent: avg_event,
+                    itemPrice: avg_price,
                 }
                 // console.log(weight)
+                // console.log(mockUser)
                 topItem = getTopItems(event, category, weight, pds.length)
-                // console.log(topItem)
+
                 topItem.forEach(item => {
                     filter_pd.push(pds.filter(pd => item.itemId === pd.itemId)[0])
                 })
-                console.log(filter_pd)
+                // console.log(filter_pd)
             } else {
                 filter_pd = pds
             }
             // console.log(filter_pd)
             filter_pd = filter_pd.filter(prod => {
-                return (product !== undefined ? prod.name.includes(product) : true) &&
+                return (product !== undefined ? prod.name.includes(product) || prod.description.includes(product) : true) &&
                     (min_price !== undefined ? Number(prod.minPrice) > min_price : true) &&
                     (max_price !== undefined ? Number(prod.minPrice) < max_price : true) &&
                     (isNaN(rating) || rating === undefined ? true : (Number(prod.totalRating) >= ratingScale[rating - 1][0] && Number(prod.totalRating) <= ratingScale[rating - 1][1])) &&
@@ -423,7 +408,6 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         limit = Number(req.query.rv_limit)
 
         // add on event
-        console.log(req.user)
         if (req.user !== undefined) {
             let event = {
                 userId: req.user.id,
