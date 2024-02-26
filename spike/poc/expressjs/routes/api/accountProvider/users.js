@@ -59,6 +59,7 @@ const user_db = [
     }
 ]
 
+// get all user
 router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     // let sorting = req.query.sort == 'desc' ? 'desc' : 'asc'
     // console.log(req.query.name)
@@ -106,6 +107,7 @@ router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     // return res.json({ "page": page, "pageSize": varLimit, "AllPage": Math.ceil(filter_u.length / varLimit), "users": page_u.map(user => timeConverter(user)) })
 })
 
+// get all garden designer reviews
 router.get('/garden_designer', async (req, res, next) => {
     // let sorting = req.query.sort == 'desc' ? 'desc' : 'asc'
     // console.log(req.query.name)
@@ -155,6 +157,7 @@ const getUserIcon = async (user) => {
 //     return user
 // }
 
+// view user by id or email
 router.get('/:id', JwtAuth, async (req, res, next) => {
     try {
         // sendMail("test massage","test",req.user.email)
@@ -173,13 +176,13 @@ router.get('/:id', JwtAuth, async (req, res, next) => {
         let path = findImagePath("users", user.userId)
         user.image = await listFirstImage(res, path)
 
-
         return res.json(user)
     } catch (err) {
         next(err)
     }
 })
 
+// view profile owner with id or email
 router.get('/views/:email', async (req, res, next) => {
     try {
         // sendMail("test massage","test",req.user.email)
@@ -220,7 +223,8 @@ router.get('/views/:email', async (req, res, next) => {
     }
 })
 
-router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
+// create user
+router.post('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     let { userId, username, email, role, password, firstname, lastname, description, phone } = req.body
 
     try {
@@ -231,8 +235,11 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
             firstname: validateStr("account firstname", firstname, 50),
             lastname: validateStr("account lastname", lastname, 50),
             email: validateEmail("account email", email, 100),
+            role: role ? validateRole("account role", role, ROLE) : ROLE.User,
+            description: validateStr("account description", description, 500, true),
             password: await validatePassword("account password", password, 8, 20),
-            phone: validatePhone("account phone", phone)
+            phone: validatePhone("account phone", phone),
+            verifyAccount: true
         }
         // console.log(req.user !== undefined)
 
@@ -248,10 +255,6 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
         //     // send to email
         //     await sendMail(signup_email(email, "signup", res), "Add new account", email)
         // }
-
-        account.role = account.role !== undefined ? validateRole("account role", role, ROLE) : ROLE.User
-        account.description = validateStr("account description", description, 500, true)
-        account.verifyAccount = true
 
         // create accounts
         let input = await prisma.accounts.create({
@@ -280,13 +283,70 @@ router.post('/', UnstrictJwtAuth, verifyRole(ROLE.Admin), async (req, res, next)
     }
 })
 
+// signup user
+router.post('/register', async (req, res, next) => {
+    let { userId, username, email, password, firstname, lastname, phone } = req.body
+
+    try {
+        // accounts data
+        let account = {
+            userId: isNaN(userId) ? undefined : validateInt("item id", userId, true),
+            username: validateStr("account username", username, 50),
+            firstname: validateStr("account firstname", firstname, 50),
+            lastname: validateStr("account lastname", lastname, 50),
+            email: validateEmail("account email", email, 100),
+            role: ROLE.User,
+            password: await validatePassword("account password", password, 8, 20),
+            phone: validatePhone("account phone", phone),
+            verifyAccount: true
+        }
+        // console.log(req.user !== undefined)
+
+        // check role is admin when they is admin they can config role, description and activate account
+        // if (req.user !== undefined && req.user.role === ROLE.Admin) {
+        //     account.role = validateRole("account role", role, ROLE)
+        //     account.description = validateStr("account description", description, 500)
+        //     account.verifyAccount = true
+        // } else {
+        //     // send email for verify account
+        //     account.verifyAccount = false
+
+        //     // send to email
+        //     await sendMail(signup_email(email, "signup", res), "Add new account", email)
+        // }
+
+        // create accounts
+        let input = await prisma.accounts.create({
+            data: account,
+            select: userView
+        })
+
+        return res.status(201).json(timeConverter(input))
+    } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            // console.log(err.meta)
+            if (err.meta.target === 'PRIMARY') {
+                err.message = "this user is duplicated"
+            } else if (err.meta.target === 'Users_email_key') {
+                err.message = "user email is duplicated"
+            } else if (err.meta.target == 'phone_UNIQUE') {
+                err.message = "user phone is duplicated"
+            } else if (err.meta.target == 'Fullname_UNIQUE') {
+                err.message = "full name is duplicated"
+            } else if (err.meta.target == 'username_UNIQUE') {
+                err.message = "user name is duplicated"
+            }
+        }
+        next(err)
+    }
+})
+
+// update user
 router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     try {
-        // convert string to int
-        let id = Number(req.params.id)
-
         // check user exist
-        await verifyId(id)
+        let user = await verifyId(req.params.id)
 
         // user accounts
         let mapUser = {}
@@ -303,6 +363,8 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
         // dob: validateDatetimeFuture("user information date of birth", userinfo.dob),
         // phone: validatePhone("user information phone", userinfo.phone),
         // address: validateStr("user information address", userinfo.address, 500, true)
+
+        // in admin role
         for (let i in req.body) {
             if (req.body[i] != undefined) {
                 mapUser[i] =
@@ -317,6 +379,59 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
                                                 i == "phone" ? validatePhone("account information phone", req.body[i]) : undefined
             }
         }
+
+        // console.log(mapUser)
+        // console.log(mapUserInfo)
+
+        // update data in user account table
+        let input = await prisma.accounts.update({
+            where: {
+                userId: user.userId
+            },
+            data: mapUser,
+            select: userDetailView
+        })
+
+        return res.json(userConverter(input))
+    } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            // console.log(err.meta)
+            if (err.meta.target === 'Users_email_key') {
+                err.message = "user email is duplicated"
+            } else if (err.meta.target == 'phone_UNIQUE') {
+                err.message = "user phone is duplicated"
+            } else if (err.meta.target == 'Fullname_UNIQUE') {
+                err.message = "full name is duplicated"
+            } else if (err.meta.target == 'username_UNIQUE') {
+                err.message = "user name is duplicated"
+            }
+        }
+        next(err)
+    }
+})
+
+// update user account
+router.patch('/views/edit', JwtAuth, async (req, res, next) => {
+    try {
+        // convert string to int
+        let id = Number(req.user.id)
+
+        // user accounts
+        let mapUser = {}
+
+        // in admin role
+        for (let i in req.body) {
+            if (req.body[i] != undefined) {
+                mapUser[i] =
+                    i == "username" ? validateStr("account username", req.body[i], 50) :
+                        i == "firstname" ? validateStr("account firstname", req.body[i], 50) :
+                            i == "lastname" ? validateStr("account lastname", req.body[i], 50) :
+                                i == "description" ? validateStr("account desciption", req.body[i], 500) :
+                                    i == "phone" ? validatePhone("account information phone", req.body[i]) : undefined
+            }
+        }
+
         // console.log(mapUser)
         // console.log(mapUserInfo)
 
@@ -348,6 +463,7 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
     }
 })
 
+// delete user by id
 router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     try {
         let user = await verifyId(req.params.id)
@@ -380,9 +496,9 @@ const verifyId = async (email_id) => {
         // },
         where: {
             OR: [
-                { email: email_id }, 
+                { email: email_id },
                 { userId: isNaN(Number(email_id)) ? 0 : Number(email_id) }
-            ] 
+            ]
         },
         select: userDetailView
     })
@@ -397,11 +513,11 @@ const verifySupplier = async (email_id) => {
     let filter_u = await prisma.accounts.findFirst({
         where: {
             AND: [
-                { 
+                {
                     OR: [
-                        { email: email_id }, 
+                        { email: email_id },
                         { userId: isNaN(Number(email_id)) ? 0 : Number(email_id) }
-                    ] 
+                    ]
                 },
                 {
                     OR: [
