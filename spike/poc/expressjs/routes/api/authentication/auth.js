@@ -156,30 +156,36 @@ router.post('/', async (req, res, next) => {
     }
 })
 
-router.post('/refresh', JwtAuth, async (req, res, next) => {
+router.post('/refresh', UnstrictJwtAuth, async (req, res, next) => {
     try {
-        // เรียก refresh token เพื่อใช้ในการ refresh ถ้าหากเป็น access token จะทำการลบข้อมูลของ user ทำให้ส่ง token ผิด
-        const jwtRefreshToken = "Bearer " + req.cookies.refreshToken;
-        // console.log(jwtRefreshToken)
-        // const userInfo = JSON.parse(cryptoJs.AES.decrypt(req.cookies.information, process.env.TOKEN_INFO_SECRET).toString(cryptoJs.enc.Utf8))
-        // console.log(userInfo)
-        // const jwttoken = "Bearer " + req.cookies.token
-        // let userInfo = cryptoreq.cookies.infomation;
+        if (isExpired(req.cookies.token)) {
+            // เรียก refresh token เพื่อใช้ในการ refresh ถ้าหากเป็น access token จะทำการลบข้อมูลของ user ทำให้ส่ง token ผิด
+            const jwtRefreshToken = "Bearer " + req.cookies.refreshToken;
+            // console.log(jwtRefreshToken)
+            // const userInfo = JSON.parse(cryptoJs.AES.decrypt(req.cookies.information, process.env.TOKEN_INFO_SECRET).toString(cryptoJs.enc.Utf8))
+            // console.log(userInfo)
+            // const jwttoken = "Bearer " + req.cookies.token
+            // let userInfo = cryptoreq.cookies.infomation;
 
-        // if refresh token expired that removed cookie and response
-        if (isExpired(jwtRefreshToken.substring(7)) || jwtRefreshToken.substring(7).length === 0) {
-            // clear session cookie
-            // const cookieConfig = {
-            //     httpOnly: true,
-            //     sameSite: 'Strict'
-            //     // secure: true
-            // }
-            res.clearCookie("token")
-            res.clearCookie("refreshToken")
-            unAuthorizedError("token is expired, need login again")
+            // if refresh token expired that removed cookie and response
+            if (isExpired(jwtRefreshToken.substring(7)) || jwtRefreshToken.substring(7).length === 0) {
+                // clear session cookie
+                // const cookieConfig = {
+                //     httpOnly: true,
+                //     sameSite: 'Strict'
+                //     // secure: true
+                // }
+                res.clearCookie("token")
+                res.clearCookie("refreshToken")
+                unAuthorizedError("token is expired, need login again")
+            } else {
+                // assign refresh valiable
+                req.user = {}
+                req.user.email = getUser(jwtRefreshToken.substring(7)).email
+            }
+
+            // console.log(req.user)
         }
-        console.log(req.user)
-
         // เรียกข้อมูล user โดยใช้ email
         let user = await prisma.accounts.findFirst({
             where: { email: req.user.email }
@@ -199,7 +205,7 @@ router.post('/refresh', JwtAuth, async (req, res, next) => {
         let refreshtoken = getToken(userToken, "24h")
 
         // ตรวจดูว่า token ถูกต้องไหมก่อนส่ง
-        if (user === undefined ) {
+        if (user === undefined) {
             unAuthorizedError("please input valid refresh token")
         }
 
@@ -249,8 +255,8 @@ router.post('/refresh', JwtAuth, async (req, res, next) => {
     } catch (err) {
         next(err)
     }
-})
-
+}
+)
 router.get("/signout", (req, res) => {
     // verify token
     // const jwtRefreshToken = req.cookies.refreshToken;
