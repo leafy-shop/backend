@@ -8,16 +8,25 @@ datasource db {
 }
 
 model carts {
-  cartId    Int      @id @default(autoincrement())
-  userEmail String   @db.VarChar(100)
-  itemId    Int
-  qty       Int      @default(0)
-  isPaid    Boolean  @default(false)
-  items     items    @relation(fields: [itemId], references: [itemId], map: "Carts_itemId_fkey")
-  accounts  accounts @relation(fields: [userEmail], references: [email], map: "Carts_userEmail_fkey")
+  cartId       String       @id @db.Char(32)
+  sessionId    String       @db.Char(32)
+  itemId       Int
+  itemStyle    String       @db.VarChar(50)
+  itemSize     String       @db.VarChar(50)
+  qty          Int          @default(0)
+  item_details item_details @relation(fields: [itemId, itemStyle, itemSize], references: [itemId, style, size], map: "Carts_item_details_fkey")
 
-  @@index([itemId], map: "fk_carts_items_idx")
-  @@index([userEmail], map: "fk_carts_users_idx")
+  sessions       session_cart @relation(fields: [sessionId], references: [sessionCartId], map: "Carts_session_fkey")
+}
+
+model session_cart {
+  sessionCartId String   @id @db.Char(32)
+  userEmail     String   @db.VarChar(100)
+  total    Decimal  @default(0.00) @db.Decimal(32, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  accounts      accounts @relation(fields: [userEmail], references: [email], map: "Session_cart_userEmail_fkey")
+  carts         carts[]
 }
 
 model favprd {
@@ -32,33 +41,33 @@ model favprd {
 }
 
 model items {
-  itemId       Int            @id @default(autoincrement())
-  name         String         @db.VarChar(100)
-  description  String         @db.VarChar(5000)
-  itemOwner    String
-  items        accounts       @relation(fields: [itemOwner], references: [email], map: "Items_itemOwner_fkey")
-  type         String         @db.VarChar(20)
-  tag          String         @db.VarChar(500)
-  totalRating  Decimal        @default(0.0) @db.Decimal(2, 1)
-  sold         Int            @default(0)
-  minPrice     Decimal        @default(0.00) @db.Decimal(32, 2)
-  maxPrice     Decimal?       @db.Decimal(32, 2)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  carts        carts[]
-  favprd       favprd[]
-  item_reviews item_reviews[]
-  item_events  item_events[]
+  itemId      Int           @id @default(autoincrement())
+  name        String        @db.VarChar(100)
+  description String        @db.VarChar(5000)
+  itemOwner   String
+  items       accounts      @relation(fields: [itemOwner], references: [email], map: "Items_itemOwner_fkey")
+  type        String        @db.VarChar(20)
+  tag         String        @db.VarChar(500)
+  totalRating Decimal       @default(0.0) @db.Decimal(2, 1)
+  sold        Int           @default(0)
+  minPrice    Decimal       @default(0.00) @db.Decimal(32, 2)
+  maxPrice    Decimal?      @db.Decimal(32, 2)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  favprd      favprd[]
+  item_events item_events[]
 
   @@index([itemId], map: "fk_items_users1_idx")
 }
 
 model item_details {
-  itemId Int
-  style  String  @default("No") @db.VarChar(50)
-  stock  Int     @default(0)
-  size   String  @default("No") @db.VarChar(50)
-  price  Decimal @default(0.00) @db.Decimal(32, 2)
+  itemId       Int
+  style        String         @default("No") @db.VarChar(50)
+  stock        Int            @default(0)
+  size         String         @default("No") @db.VarChar(50)
+  price        Decimal        @default(0.00) @db.Decimal(32, 2)
+  carts        carts[]
+  item_reviews item_reviews[]
 
   @@id([itemId, style, size])
   @@index([itemId, style, size], map: "fk_ItemDetail_items_idx")
@@ -77,15 +86,17 @@ model item_reviews {
   itemReviewId      String              @id @db.Char(32)
   itemId            Int
   userEmail         String              @db.VarChar(100)
-  items             items               @relation(fields: [itemId], references: [itemId], map: "ItemReview_itemId_fkey")
+  item_details      item_details        @relation(fields: [itemId, style, size], references: [itemId, style, size], map: "ItemReview_itemId_style_size_fkey")
   accounts          accounts            @relation(fields: [userEmail], references: [email], map: "Itemreview_userEmail_fkey")
   comment           String              @db.VarChar(500)
   rating            Int                 @default(0)
   like              Int                 @default(0)
   style             String              @db.VarChar(50)
-  size              String              @default("No") @db.VarChar(4)
+  size              String              @default("No") @db.VarChar(50)
   createdAt         DateTime            @default(now())
   item_review_likes item_review_likes[]
+
+  @@index([itemId, style, size], map: "fk_ItemReview_items_idx")
 }
 
 model item_review_likes {
@@ -114,7 +125,6 @@ model accounts {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  carts             carts[]
   favprd            favprd[]
   items             items[]
   item_reviews      item_reviews[]
@@ -122,6 +132,7 @@ model accounts {
   addresses         addresses[]
   payments          payments[]
   item_events       item_events[]
+  session_cart      session_cart[]
 }
 
 model addresses {

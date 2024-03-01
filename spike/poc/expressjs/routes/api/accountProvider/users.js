@@ -92,17 +92,25 @@ router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     let page_u = paginationList(filter_u, page, limit, 10)
 
     // array converter and image mapping
-    Promise.all(
-        // list user with image
-        page_u.list.length === 0 ? [] :
-            page_u.list.map(user => timeConverter(user))
-        // filter_pd.map(user => userConverter(user, userList))
-    ).then(userList => {
-        page_u.list = userList
-        return res.json(page_u)
-    }).catch(err => {
-        next(err)
-    })
+    // Promise.all(
+    //     // list user with image
+    //     page_u.list.length === 0 ? [] :
+    //         page_u.list.map(user => timeConverter(user))
+    //     // filter_pd.map(user => userConverter(user, userList))
+    // ).then(userList => {
+    //     page_u.list = userList
+    //     return res.json(page_u)
+    // }).catch(err => {
+    //     next(err)
+    // })
+    const userList = await Promise.all(
+        page_u.list.map(async (user) => {
+            return await timeConverter(user);
+        })
+    );
+
+    page_u.list = userList;
+    return res.json(page_u);
 
     // return res.json({ "page": page, "pageSize": varLimit, "AllPage": Math.ceil(filter_u.length / varLimit), "users": page_u.map(user => timeConverter(user)) })
 })
@@ -131,23 +139,33 @@ router.get('/garden_designer', async (req, res, next) => {
     let page_u = paginationList(filter_u, page, limit, 10)
 
     // array converter and image mapping
-    Promise.all(
-        // list user with image
-        page_u.list.length === 0 ? [] :
-            page_u.list.map(user => getUserIcon(timeConverter(user)))
-        // filter_pd.map(user => userConverter(user, userList))
-    ).then(userList => {
-        page_u.list = userList
-        return res.json(page_u)
-    }).catch(err => {
-        next(err)
-    })
+    // Promise.all(
+    //     // list user with image
+    //     page_u.list.length === 0 ? [] :
+    //         page_u.list.map(user => getUserIcon(timeConverter(user)))
+    //     // filter_pd.map(user => userConverter(user, userList))
+    // ).then(userList => {
+    //     page_u.list = userList
+    //     return res.json(page_u)
+    // }).catch(err => {
+    //     next(err)
+    // })
+    const userList = await Promise.all(
+        page_u.list.map(async (user) => {
+            const convertedUser = timeConverter(user);
+            return await getUserIcon(convertedUser);
+        })
+    );
+
+    page_u.list = userList;
+    return res.json(page_u);
 
     // return res.json({ "page": page, "pageSize": varLimit, "AllPage": Math.ceil(filter_u.length / varLimit), "users": page_u.map(user => timeConverter(user)) })
 })
 
 const getUserIcon = async (user) => {
-    user.image = await listFirstImage(findImagePath("users", user.userId))
+    user.image = await listFirstImage(findImagePath("users", user.userId), "main.png")
+    user.cover = await listFirstImage(findImagePath("users", user.userId),"cover_photo.png")
     return user
 }
 

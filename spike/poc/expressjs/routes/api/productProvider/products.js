@@ -288,48 +288,77 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         // check if user is supplier then cannot see owner product except when he get owner item
         if (req.user !== undefined && req.user.role === ROLE.Supplier && owner === undefined) filter_pd = filter_pd.filter(product => product.itemOwner !== req.user.email)
 
-        outOfStock(filter_pd).then(outStockData => {
-            // filter product have some item on stock
-            filter_pd = filter_pd.filter(product => {
-                // console.log(outStockData.filter(out => out.itemId == product.itemId))
-                return !outStockData.filter(out => out.itemId == product.itemId).length
-            })
+        // outOfStock(filter_pd).then(outStockData => {
+        //     // filter product have some item on stock
+        //     filter_pd = filter_pd.filter(product => {
+        //         // console.log(outStockData.filter(out => out.itemId == product.itemId))
+        //         return !outStockData.filter(out => out.itemId == product.itemId).length
+        //     })
 
-            // managed out product by limit 6 product
-            let itemOutStock = []
-            for (let i = 0; i < ((outStockData.length < 5) ? outStockData.length : 5); i++) {
-                itemOutStock.push(outStockData[i])
-            }
+        //     // managed out product by limit 6 product
+        //     let itemOutStock = []
+        //     for (let i = 0; i < ((outStockData.length < 5) ? outStockData.length : 5); i++) {
+        //         itemOutStock.push(outStockData[i])
+        //     }
 
-            // return to page with page number and page size
-            page_pd = paginationList(filter_pd, pageN, limitN, 18)
+        //     // return to page with page number and page size
+        //     page_pd = paginationList(filter_pd, pageN, limitN, 18)
 
-            // array converter and image mapping
-            Promise.all(
-                // list product with image
-                page_pd.list.length === 0 ? [] :
-                    page_pd.list.map(product => getProductImage(productConverter(product, prodList)))
-                // filter_pd.map(product => productConverter(product, prodList))
-            ).then(productList => {
-                // item is founded
-                page_pd.list = productList
+        //     // array converter and image mapping
+        //     Promise.all(
+        //         // list product with image
+        //         page_pd.list.length === 0 ? [] :
+        //             page_pd.list.map(product => getProductImage(productConverter(product, prodList)))
+        //         // filter_pd.map(product => productConverter(product, prodList))
+        //     ).then(productList => {
+        //         // item is founded
+        //         page_pd.list = productList
 
-                // provided outstock product
-                Promise.all(
-                    itemOutStock.length === 0 ? [] :
-                        itemOutStock.map(product => getProductImage(productConverter(product, prodList)))
-                ).then(outStockData => {
-                    page_pd.outStock = outStockData
-                    return res.send(page_pd)
-                }).catch(err => {
-                    next(err)
-                })
-            }).catch(err => {
-                next(err)
-            })
-        }).catch(error => {
-            next(error)
+        //         // provided outstock product
+        //         Promise.all(
+        //             itemOutStock.length === 0 ? [] :
+        //                 itemOutStock.map(product => getProductImage(productConverter(product, prodList)))
+        //         ).then(outStockData => {
+        //             page_pd.outStock = outStockData
+        //             return res.send(page_pd)
+        //         }).catch(err => {
+        //             next(err)
+        //         })
+        //     }).catch(err => {
+        //         next(err)
+        //     })
+        // }).catch(error => {
+        //     next(error)
+        // });
+
+        const outStockData = await outOfStock(filter_pd);
+
+        // Filter products that are in stock
+        filter_pd = filter_pd.filter(product => {
+            return !outStockData.some(out => out.itemId === product.itemId);
         });
+    
+        // Limit out-of-stock products to 5 items
+        const itemOutStock = outStockData.slice(0, 5);
+    
+        // Paginate the filtered product list
+        const page_pd = paginationList(filter_pd, pageN, limitN, 18);
+    
+        // Fetch images for in-stock products
+        const productList = await Promise.all(page_pd.list.map(async (product) => {
+            return await getProductImage(productConverter(product, prodList));
+        }));
+    
+        page_pd.list = productList;
+    
+        // Fetch images for out-of-stock products
+        const outStockImages = await Promise.all(itemOutStock.map(async (product) => {
+            return await getProductImage(productConverter(product, prodList));
+        }));
+    
+        page_pd.outStock = outStockImages;
+    
+        return res.send(page_pd);
 
     } catch (err) {
         // if favorite product is not found in this user
@@ -425,17 +454,27 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         // return res.json(item)
 
         // array converter and image mapping
-        Promise.all(
-            // list product style with image
-            item.styles.map(product => getProductStyleImage(productConverter(product)))
-            // filter_pd.map(product => productConverter(product, prodList))
-        ).then(styles => {
-            item.styles = styles
-            // return converter of product
-            return res.json(productConverter(item))
-        }).catch(err => {
-            next(err)
-        })
+        // Promise.all(
+        //     // list product style with image
+        //     item.styles.map(product => getProductStyleImage(productConverter(product)))
+        //     // filter_pd.map(product => productConverter(product, prodList))
+        // ).then(styles => {
+        //     item.styles = styles
+        //     // return converter of product
+        //     return res.json(productConverter(item))
+        // }).catch(err => {
+        //     next(err)
+        // })
+        const stylesWithImages = await Promise.all(
+            item.styles.map(async (product) => {
+                // Fetch image for each product style
+                return await getProductStyleImage(productConverter(product));
+            })
+        );
+    
+        item.styles = stylesWithImages;
+        // Respond with the updated product object
+        return res.json(productConverter(item));
     } catch (err) {
         next(err)
     }
@@ -531,29 +570,21 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
             data: itemModel
         })
 
-        const item_detail = styles.map((sty) => {
-            console.log(input.itemId, sty.style, sty.size)
-            return prisma.item_details.create({
+        const item_detail = await Promise.all(styles.map(async (sty) => {
+            // Create item detail for each style
+            return await prisma.item_details.create({
                 data: {
                     itemId: input.itemId,
                     style: sty.style,
-                    // size: (sty.sizes.length !== 0 && Array.isArray(sty.sizes)) ? validateStrArray('validate size', sty.sizes.map(size => validateRole('validate inner size', size, ITEMSIZE)), 5, 4, true) : undefined
                     size: sty.size,
                     stock: sty.stock,
                     price: sty.price
                 }
-            })
-        }
-        )
+            });
+        }));
 
-        Promise.all(item_detail)
-            .then(data => {
-                input.styles = data
-                return res.status(201).json(productConverter(input))
-            })
-            .catch(err => {
-                next(err)
-            })
+        input.styles = item_detail;
+        return res.status(201).json(productConverter(input));
 
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -565,39 +596,6 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
         next(err)
     }
 })
-
-// router.post('/addtocart', JwtAuth, async (req, res, next) => {
-//     let { productId, qty } = req.body
-
-//     try {
-//         let choosePd = await verifyId(productId)
-
-//         let cart = await prisma.carts.aggregate({
-//             _sum: {
-//                 qty: true
-//             },
-//             where: {
-//                 AND: [
-//                     { productId: choosePd.productId },
-//                     { isPaid: false }
-//                 ]
-//             }
-//         })
-
-//         if (cart._sum.qty + validateInt("quantity", qty, true) > choosePd.stock) validatError(`product ${productId}:${choosePd.product} have quantity more than their stocks`)
-
-//         let input = await prisma.carts.create({
-//             data: {
-//                 userEmail: req.user.email,
-//                 productId: productId,
-//                 qty: qty
-//             }
-//         })
-//         return res.status(201).json({ msg: `your product ${choosePd.productId} ${choosePd.product} - ${choosePd.price} baht that add in your cart` })
-//     } catch (err) {
-//         next(err)
-//     }
-// })
 
 // PUT - change favorite product by id
 router.put('/isFav/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.User), async (req, res, next) => {
@@ -832,25 +830,38 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
         // review item with pagination
         item_reviews = paginationList(item_reviews, pageN, limitN, 5)
 
-        Promise.all(
-            // change time zone and icon
-            item_reviews.list.length === 0 ? [] :
-                item_reviews.list.map(review => {
-                    // Replace this with the IANA timezone you desire
-                    review.time = getDifferentTime(review.createdAt)
-                    review.createdAt = undefined
-                    review.size = review.size == "No" ? undefined : review.size
-                    return getIconImage(deleteNullValue(review))
-                })
-        ).then(data => {
-            // console.log(data)
-            item_reviews.list = data
-            // console.log(item_reviews.list)
-            return res.send(item_reviews)
-        })
-            .catch(err => {
-                next(err)
-            })
+        // Promise.all(
+        //     // change time zone and icon
+        //     item_reviews.list.length === 0 ? [] :
+        //         item_reviews.list.map(review => {
+        //             // Replace this with the IANA timezone you desire
+        //             review.time = getDifferentTime(review.createdAt)
+        //             review.createdAt = undefined
+        //             review.size = review.size == "No" ? undefined : review.size
+        //             return getIconImage(deleteNullValue(review))
+        //         })
+        // ).then(data => {
+        //     // console.log(data)
+        //     item_reviews.list = data
+        //     // console.log(item_reviews.list)
+        //     return res.send(item_reviews)
+        // })
+        // .catch(err => {
+        //     next(err)
+        // })
+
+        let updatedReviews = [];
+
+        for (let review of item_reviews.list) {
+            // Replace this with the IANA timezone you desire
+            review.time = getDifferentTime(review.createdAt);
+            review.createdAt = undefined;
+            review.size = review.size === "No" ? undefined : review.size;
+            updatedReviews.push(await getIconImage(deleteNullValue(review)));
+        }
+
+        item_reviews.list = updatedReviews;
+        res.send(item_reviews);
     } catch (err) {
         next(err)
     }

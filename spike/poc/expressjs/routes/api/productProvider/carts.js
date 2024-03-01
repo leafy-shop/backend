@@ -1,137 +1,355 @@
 const express = require('express');
 const router = express.Router();
 
-const { validateInt } = require('../../validation/body')
+const { validateInt, validateStr } = require('../../validation/body')
 const { notFoundError, forbiddenError, validatError } = require('../../model/error/error')
 const { JwtAuth } = require('../../../middleware/jwtAuth')
 
 const { PrismaClient } = require('@prisma/client');
+const { ITEMSIZE } = require('../../model/enum/item');
+const { generateId, timeConverter } = require('../../model/class/utils/converterUtils');
+const { ROLE } = require('../../model/enum/role');
+const { listFirstImage, findImagePath } = require('../../model/class/utils/imageList');
 const prisma = new PrismaClient()
 
 router.get('/', JwtAuth, async (req, res, next) => {
     try {
+        let my_session = await verifySession(req.user.email, true)
+
         let mycart = await prisma.carts.findMany({
             where: {
-                AND: [
-                    { userEmail: req.user.email },
-                    { qty: { not: 0 } },
-                    { isPaid: false }
-                ]
-            },
-            select: {
-                cartId: true,
-                qty: true,
-                product: true
+                sessionId: my_session.sessionCartId
             }
         })
-        mycart.forEach(p => {
-            p.totalPrice = p.qty * p.product.price
-        })
-        return res.json({carts: mycart, total: mycart.reduce((pre, cur) => pre + cur.totalPrice, 0)})
+
+        // Promise.all(
+        //     mycart.map(async cart => {
+        //         product = await verifyProductId(cart.itemId, cart.itemStyle, cart.itemSize)
+        //         cart.priceEach = product.price
+        //         cart.sessionId = undefined
+        //         return cart
+        //     })
+        // ).then(mycart => {
+        //     my_session.cart = mycart
+        //     return res.json(timeConverter(my_session))
+        // }).catch(err => {
+        //     next(err)
+        // })
+
+        for (let cart of mycart) {
+            let product = await verifyProductId(cart.itemId, cart.itemStyle, cart.itemSize);
+            cart.image = await listFirstImage(findImagePath("products", cart.itemId), "main.png")
+            cart.priceEach = product.price;
+            cart.sessionId = undefined;
+        }
+    
+        my_session.shipping = 0;
+        my_session.tax = 0;
+        my_session.cart = mycart;
+        res.json(timeConverter(my_session));
     } catch (err) {
         next(err)
     }
 })
 
-router.get('/:id', JwtAuth, async (req, res, next) => {
+// router.get('/:id', JwtAuth, async (req, res, next) => {
+//     try {
+//         let mycart = await verifyId(req.params.id)
+//         if (mycart.userEmail !== req.user.email) forbiddenError("your cannot see other user carts except yourself")
+
+//         // console.log(mycart)
+//         mycart.totalPrice = mycart.qty * mycart.product.price
+
+//         return res.json(mycart)
+//     } catch (err) {
+//         next(err)
+//     }
+// })
+
+// create carts from item details
+router.post('/products', JwtAuth, async (req, res, next) => {
+    let { itemId, style, size } = req.body
+    itemId = Number(itemId)
+    style = style ? style : ITEMSIZE.No
+    size = size ? size : ITEMSIZE.No
+
     try {
-        let mycart = await verifyId(req.params.id)
-        if(mycart.userEmail !== req.user.email) forbiddenError("your cannot see other user carts except yourself")
+        let choosePd = await verifyProductId(
+            validateInt("product id", itemId),
+            validateStr("product style", style, 50),
+            validateStr("product size", size, 50)
+        )
 
-        // console.log(mycart)
-        mycart.totalPrice = mycart.qty * mycart.product.price
+        // create cart item
+        let cart = {}
+        let session_cart = await verifySession(req.user.email)
+        let cart_item = await verifyId(itemId, size, style)
 
-        return res.json(mycart)
+        // check quantity
+        cart_item = cart_item ? cart_item : { qty: 0 }
+        // console.log(choosePd.stock)
+        // console.log(cart_item.qty)
+        if (choosePd.stock <= cart_item.qty) validatError(`product:${itemId} at style:${style} and size:${size} have out stocks`)
+
+        if (cart_item.cartId && session_cart) {
+            // update quantity item
+            cart = await prisma.carts.update({
+                data: {
+                    qty: { increment: 1 }
+                },
+                where: {
+                    cartId: cart_item.cartId,
+                }
+            })
+            // update total price
+            session_cart = await prisma.session_cart.update({
+                data: {
+                    total: { increment: choosePd.price }
+                },
+                where: {
+                    sessionCartId: cart.sessionId
+                }
+            })
+        } else if (!cart_item.cartId && session_cart) {
+            let cartId = generateId(16)
+            cart = await prisma.carts.create({
+                data: {
+                    cartId: cartId,
+                    sessionId: session_cart.sessionCartId,
+                    itemId: choosePd.itemId,
+                    itemStyle: choosePd.style,
+                    itemSize: choosePd.size,
+                    qty: 1
+                }
+            })
+
+            // update create session cart
+            session_cart = await prisma.session_cart.update({
+                data: {
+                    total: { increment: choosePd.price }
+                },
+                where: {
+                    sessionCartId: session_cart.sessionCartId
+                }
+            })
+        } else {
+            let sessionId = generateId(16);
+            session_cart = await prisma.session_cart.create({
+                data: {
+                    sessionCartId: sessionId,
+                    userEmail: req.user.email,
+                    total: choosePd.price
+                }
+            })
+
+            let cartId = generateId(16)
+            cart = await prisma.carts.create({
+                data: {
+                    cartId: cartId,
+                    sessionId: session_cart.sessionCartId,
+                    itemId: choosePd.itemId,
+                    itemStyle: choosePd.style,
+                    itemSize: choosePd.size,
+                    qty: 1
+                }
+            })
+        }
+
+        return res.status(201).json({ msg: `your product ${choosePd.itemId} price ${session_cart.total} baht that add in your cart with quantity ${cart.qty}` })
     } catch (err) {
         next(err)
     }
 })
 
-router.put('/:id/increment', JwtAuth, async (req, res, next) => {
+// increment quantity
+router.put('/:id', JwtAuth, async (req, res, next) => {
     try {
-        let mycart = await verifyId(req.params.id)
-        let qty = 1
-        await verifyQty(mycart.product.productId, qty)
-        if(mycart.userEmail !== req.user.email) forbiddenError("your cannot edit other user carts except yourself")
+        let my_session = await verifySession(req.user.email, true)
+        let mycart = await verifyIdByCart(req.params.id)
+        let item_detail = await verifyProductId(mycart.itemId, mycart.itemStyle, mycart.itemSize)
+        let qty = validateInt("validate quantity", req.body.qty, false, 0, item_detail.stock)
+        if (my_session === null) forbiddenError("your must create new session")
 
-        let increment = await prisma.carts.update({
-            where: { cartId: validateInt("cartId",Number(req.params.id)) },
-            data: { qty: { increment: qty } },
-            include: { product: true }
-        })
-        return res.json({message: `cart of ${increment.userEmail}, name: ${increment.product.product} has increment quantity`})
+        if (qty) {
+            await prisma.carts.update({
+                where: { cartId: req.params.id },
+                data: { qty: qty }
+            })
+
+            let myallcart = await prisma.carts.findMany({
+                where: {
+                    sessionId: my_session.sessionCartId
+                }
+            })
+
+            let promises = myallcart.map(async (cur) => {
+                let product = await verifyProductId(cur.itemId, cur.itemStyle, cur.itemSize);
+                return cur.qty * product.price;
+            });
+
+            let totalPrices = await Promise.all(promises);
+
+            let sumTotal = totalPrices.reduce((acc, curr) => acc + curr, 0);
+
+            await prisma.session_cart.update({
+                data: {
+                    total: sumTotal
+                },
+                where: {
+                    sessionCartId: my_session.sessionCartId
+                }
+            });
+            return res.json({ message: `cart id ${mycart.cartId} of ${req.user.email} has updated` })
+
+        } else {
+            // delete cart
+            await prisma.carts.delete({
+                where: { cartId: mycart.cartId }
+            })
+
+            // update new price
+            await prisma.session_cart.update({
+                data: {
+                    total: {
+                        decrement: mycart.qty * item_detail.price
+                    }
+                },
+                where: {
+                    sessionCartId: mycart.sessionId
+                }
+            })
+            return res.json({ message: `cart id ${req.params.id} has been canceled` })
+        }
     } catch (err) {
         next(err)
     }
 })
 
-router.put('/:id/decrement', JwtAuth, async (req, res, next) => {
+// delete cart
+router.delete('/:id', JwtAuth, async (req, res, next) => {
     try {
-        let mycart = await verifyId(req.params.id)
-        let qty = 1
-        if(mycart.qty <= 1) validatError("your cart must have at least 1 quantity")
-        await verifyQty(mycart.product.productId, -qty, next)
-        if(mycart.userEmail !== req.user.email) forbiddenError("your cannot edit other user carts except yourself")
+        await verifySession(req.user.email, true)
+        let mycart = await verifyIdByCart(req.params.id)
+        let item_detail = await verifyProductId(mycart.itemId, mycart.itemStyle, mycart.itemSize)
 
-        let increment = await prisma.carts.update({
-            where: { cartId: validateInt("cartId",Number(req.params.id)) },
-            data: { qty: { decrement: qty } },
-            include: { product: true }
+        // delete cart
+        await prisma.carts.delete({
+            where: { cartId: mycart.cartId }
         })
-        return res.json({message: `cart of ${increment.userEmail}, name: ${increment.product.product} has decrement quantity`})
+
+        // update new price
+        await prisma.session_cart.update({
+            data: {
+                total: {
+                    decrement: mycart.qty * item_detail.price
+                }
+            },
+            where: {
+                sessionCartId: mycart.sessionId
+            }
+        })
+
+        return res.json({ message: `cart id ${req.params.id} has been canceled` })
     } catch (err) {
         next(err)
     }
 })
 
-router.delete('/:id', async (req, res, next) => {
+// delete session
+router.delete('/:id/session', JwtAuth, async (req, res, next) => {
     try {
-        let mycart = await verifyId(req.params.id)
-        if(mycart.userEmail !== req.user.email) forbiddenError("your cannot edit other user carts except yourself")
+        let mysession = await verifySessionById(req.params.id, true)
+        if (req.user.role !== ROLE.admin && mysession.userEmail !== req.user.email) {
+            forbiddenError("your cannot delete other user carts session except yourself")
+        }
 
-        let increment = await prisma.carts.delete({
-            where: { cartId: validateInt("cartId",Number(req.params.id)) }
+        await prisma.session_cart.delete({
+            where: { sessionCartId: mysession.sessionCartId }
         })
-        return res.json({message: `cart id ${req.params.id} has been canceled`})
+        return res.json({ message: `cart session id ${req.params.id} has been delete` })
     } catch (err) {
         next(err)
     }
 })
 
-const verifyId = async (id) => {
-    let mycart = await prisma.carts.findFirst({
+//----------------------------------------- method zone ----------------------------------------------------
+
+const verifyProductId = async (id, style, size) => {
+    let mycart = await prisma.item_details.findFirst({
         where: {
-            AND: [{cartId: validateInt("cartId",Number(id))},{isPaid: false}]
-        },
-        select: {
-            cartId: true,
-            qty: true,
-            product: true,
-            userEmail: true
+            AND: [
+                { itemId: Number(id) },
+                { style: style },
+                { size: size }
+            ]
         }
     })
-    if(mycart == null) notFoundError("cart id " + id + " does not exist")
+    if (mycart == null) notFoundError("cart id " + id + " does not exist")
     return mycart
 }
 
-const verifyQty = async (id, qty) => {
-    let product = await prisma.products.findFirst({
-        where: {
-            productId: validateInt("productId",Number(id))
-        }
-    })
-    let cart = await prisma.carts.aggregate({
-        _sum: {
-            qty: true
-        },
+const verifyId = async (id, size, style) => {
+    let mycart = await prisma.carts.findFirst({
         where: {
             AND: [
-                {productId: product.productId},
-                {isPaid: false}
+                { itemId: id },
+                { itemSize: size },
+                { itemStyle: style }
             ]
         }
-    }) 
-    if(cart._sum.qty + qty > product.stock) validatError(`product ${product.productId}:${product.product} have quantity more than their stocks`)
+    })
+    // if (mycart == null) notFoundError("cart id " + id + " does not exist")
+    return mycart
 }
+
+const verifyIdByCart = async (id) => {
+    let mycart = await prisma.carts.findFirst({
+        where: {
+            cartId: id
+        }
+    })
+    if (mycart == null) notFoundError("cart id " + id + " does not exist")
+    return mycart
+}
+
+const verifySession = async (email, isError = false) => {
+    let mycart = await prisma.session_cart.findFirst({
+        where: {
+            userEmail: email
+        }
+    })
+    if (mycart == null && isError) notFoundError("session cart with email " + email + " does not exist")
+    return mycart
+}
+
+const verifySessionById = async (id) => {
+    let mycart = await prisma.session_cart.findFirst({
+        where: {
+            sessionCartId: id
+        }
+    })
+    if (mycart == null) notFoundError("session cart id " + id + " does not exist")
+    return mycart
+}
+
+// const verifyQty = async (id, qty) => {
+//     let product = await prisma.products.findFirst({
+//         where: {
+//             productId: validateInt("productId", Number(id))
+//         }
+//     })
+//     let cart = await prisma.carts.aggregate({
+//         _sum: {
+//             qty: true
+//         },
+//         where: {
+//             AND: [
+//                 { productId: product.productId },
+//                 { isPaid: false }
+//             ]
+//         }
+//     })
+//     if (cart._sum.qty + qty > product.stock) validatError(`product ${product.productId}:${product.product} have quantity more than their stocks`)
+// }
 
 module.exports = router

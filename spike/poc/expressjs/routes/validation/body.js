@@ -23,7 +23,7 @@ const validateStr = (prop = '', value = '', length = 0, isEmpty = false) => {
 const validateInt = (prop = '', value = 0, isNan = false, min = 0, max = Infinity) => {
     console.log("validate number of " + prop)
     // validate is null or null value or negative value
-    if (!isNan && (isNaN(value) || value <= min)) {
+    if (!isNan && isNaN(value)) {
         validatError(`${prop} is nan`)
     }
 
@@ -45,7 +45,7 @@ const validateInt = (prop = '', value = 0, isNan = false, min = 0, max = Infinit
 const validateDouble = (prop = '', value = 0, isNan = false, min = 0, max = Infinity) => {
     console.log("validate number of " + prop)
     // validate is null or null value or negative value
-    if (!isNan && (isNaN(value) || value <= min)) {
+    if (!isNan && isNaN(value)) {
         validatError(`${prop} is nan`)
     }
     // validate double format

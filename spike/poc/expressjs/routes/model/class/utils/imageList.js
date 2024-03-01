@@ -1,4 +1,4 @@
-const { param } = require("../../../api/imageProvider/productImage");
+
 const storage = require("./../../../../config/minio_config");
 
 // require('dotenv').config().parsed
@@ -34,7 +34,7 @@ let listAllImage = async (folder) => {
     }
 }
 
-let listFirstImage = async (folder, filename) => {
+let listFirstImage = async (folder, filename = "main.png") => {
     let s3 = storage.s3
     let bucket = storage.bucket
     // create list path
