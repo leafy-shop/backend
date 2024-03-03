@@ -95,7 +95,7 @@ const userConverter = (user) => {
   user = deleteNullValue(user)
 
   // phone format
-  if (user.phone !== undefined) user.phone = reformatPhoneNumber(user.phone)
+  // if (user.phone !== undefined) user.phone = reformatPhoneNumber(user.phone)
 
   // time converter
   user = timeConverter(user)
