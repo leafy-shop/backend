@@ -108,7 +108,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     // console.log(Boolean(req.query.isFav))
 
     // favFilter mode by show some user who are favorite
-    let favFilter = (req.user === undefined || isFav === undefined || isFav.toLocaleLowerCase() !== 'true') ? {} : { some: { userEmail: req.user.email } }
+    let favFilter = (req.user === undefined || isFav === undefined || isFav.toLocaleLowerCase() !== 'true') ? {} : { some: { username: req.user.username } }
 
     // page number and page size
     let pageN = Number(page)
@@ -286,7 +286,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         })
 
         // check if user is supplier then cannot see owner product except when he get owner item
-        if (req.user !== undefined && req.user.role === ROLE.Supplier && owner === undefined) filter_pd = filter_pd.filter(product => product.itemOwner !== req.user.email)
+        if (req.user !== undefined && req.user.role === ROLE.Supplier && owner === undefined) filter_pd = filter_pd.filter(product => product.itemOwner !== req.user.username)
 
         // outOfStock(filter_pd).then(outStockData => {
         //     // filter product have some item on stock
@@ -562,10 +562,10 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
         if (req.user.role == ROLE.Admin) {
             itemModel.itemOwner = validateEmail("item owner", itemOwner, 100)
         } else {
-            itemModel.itemOwner = req.user.email
+            itemModel.itemOwner = req.user.username
         }
 
-        // create item with email owner
+        // create item with username owner
         let input = await prisma.items.create({
             data: itemModel
         })
@@ -601,14 +601,14 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
 router.put('/isFav/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.User), async (req, res, next) => {
     try {
         let item = await verifyId(Number(req.params.id))
-        let userMatching = await findFavPdById(req.user.email,
+        let userMatching = await findFavPdById(req.user.username,
             // find product by id
             item.itemId)
         // if user hasn't favorite in this product id then add favorite product item
         if (userMatching == null) {
             await prisma.favprd.create({
                 data: {
-                    userEmail: req.user.email,
+                    username: req.user.username,
                     itemId: item.itemId
                 }
             })
@@ -616,14 +616,14 @@ router.put('/isFav/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.User), async (req,
         } else {
             await prisma.favprd.delete({
                 where: {
-                    itemId_userEmail: {
+                    itemId_username: {
                         itemId: item.itemId,
-                        userEmail: req.user.email
+                        username: req.user.username
                     }
                 }
             })
         }
-        return res.json(await verifyUserEmail(req.user.email))
+        return res.json(await verifyUsername(req.user.username))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -657,8 +657,8 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req,
         // find item id
         let item = await verifyId(req.params.id)
 
-        // check if supplier role update other email
-        if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.email)
+        // check if supplier role update other username
+        if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.username)
             forbiddenError("This supplier can update owner's item only")
 
         let input = await prisma.items.update({
@@ -691,8 +691,8 @@ router.put('/:id/:style/:size', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), 
         // find item id
         let item = await verifyDetailId(req.params.id, req.params.style, req.params.size)
 
-        // check if supplier role update other email
-        if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.email)
+        // check if supplier role update other username
+        if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.username)
             forbiddenError("This supplier can update owner's item only")
 
         // check that product is found
@@ -738,9 +738,9 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req
         // find item id
         let item = await verifyId(req.params.id)
 
-        // check if supplier role delete other email
-        if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.email)
-            forbiddenError("This supplier can delete owner's item only")
+        // check if supplier role update other username
+        if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.username)
+            forbiddenError("This supplier can update owner's item only")
 
         // find id to delete product
         let input = await prisma.items.delete({
@@ -890,7 +890,7 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
             data: {
                 itemReviewId: itemReviewId !== undefined ? itemReviewId : id,
                 itemId: item.itemId,
-                userEmail: req.user.email,
+                username: req.user.username,
                 comment: validateStr("item comment", comment, 200),
                 rating: validateInt("item rating", rating, 500, 1, 5),
                 size: size,
@@ -925,8 +925,8 @@ router.delete('/:prodId/reviews/:commentId', JwtAuth, async (req, res, next) => 
         // find item id
         let item = await findReviewById(prodId, commentId)
 
-        // check if supplier role delete other email that not same finding commend that throw to exception
-        if ([ROLE.Supplier, ROLE.User].includes(req.user.role) && review.userEmail !== req.user.email) forbiddenError("user can delete your comment only")
+        // check if supplier role delete other username that not same finding commend that throw to exception
+        if ([ROLE.Supplier, ROLE.User].includes(req.user.role) && review.username !== req.user.username) forbiddenError("user can delete your comment only")
 
         // find id to delete product
         await prisma.item_reviews.delete({
@@ -958,7 +958,7 @@ router.put('/:prodId/reviews/:commentId/like', JwtAuth, async (req, res, next) =
 
         // get average value of rating in item id
         let review = await findReviewById(prodId, commentId)
-        let like = await findReviewLike(req.user.email, commentId)
+        let like = await findReviewLike(req.user.username, commentId)
 
         let comment
         // check if review is undefined
@@ -967,7 +967,7 @@ router.put('/:prodId/reviews/:commentId/like', JwtAuth, async (req, res, next) =
             let input = await prisma.item_review_likes.create({
                 data: {
                     itemReviewId: commentId,
-                    userEmail: req.user.email
+                    username: req.user.username
                 }
             })
 
@@ -987,9 +987,9 @@ router.put('/:prodId/reviews/:commentId/like', JwtAuth, async (req, res, next) =
             // revert like message on log
             await prisma.item_review_likes.delete({
                 where: {
-                    itemReviewId_userEmail: {
+                    itemReviewId_username: {
                         itemReviewId: commentId,
-                        userEmail: req.user.email
+                        username: req.user.username
                     }
                 }
             })
@@ -1096,17 +1096,17 @@ const verifyDetailId = async (id, sty, size = "No") => {
     return productConverter(item)
 }
 
-const verifyUserEmail = async (userEmail) => {
-    // find user by account email
+const verifyUsername = async (username) => {
+    // find user by account username
     let filter_user = await prisma.accounts.findFirst({
         select: userViewFav(),
         where: {
-            email: userEmail
+            username: username
         }
     })
 
     // check user exist
-    if (filter_user == null) notFoundError("user email " + email + " does not exist")
+    if (filter_user == null) notFoundError("user name " + username + " does not exist")
 
     // time format
     filter_user = timeConverter(filter_user)
@@ -1123,7 +1123,7 @@ const findAllReviewByItemId = async (prodId, sort, name = undefined) => {
 
     console.log(name)
 
-    // get review by itemReview, item id and user email
+    // get review by itemReview, item id and username
     let review = await prisma.item_reviews.findMany({
         where: {
             AND: [{ itemId: Number(prodId) },
@@ -1171,7 +1171,7 @@ const changeTotalRating = async (id) => {
 }
 
 const findReviewById = async (prodId, commendId) => {
-    // get review by itemReview, item id and user email
+    // get review by itemReview, item id and username
     let review = await prisma.item_reviews.findFirst({
         where: {
             AND: [
@@ -1187,13 +1187,13 @@ const findReviewById = async (prodId, commendId) => {
     return review
 }
 
-const findReviewLike = async (email, commendId) => {
-    // get review by itemReview, item id and user email
+const findReviewLike = async (username, commendId) => {
+    // get review by itemReview, item id and username
     let like = await prisma.item_review_likes.findFirst({
         where: {
             AND: [
                 { itemReviewId: commendId },
-                { userEmail: email }
+                { username: username }
             ]
         }
     })
@@ -1202,13 +1202,13 @@ const findReviewLike = async (email, commendId) => {
 }
 
 
-const findFavPdById = async (email, id) => {
-    // find product that match to user email
+const findFavPdById = async (username, id) => {
+    // find product that match to username
     let fav_pd = await prisma.favprd.findFirst({
         where: {
             AND: [
                 { itemId: Number(id) },
-                { userEmail: email }
+                { username: username }
             ]
         }
     })

@@ -2,7 +2,7 @@
 const { validatError } = require('./../model/error/error')
 const argon2 = require("argon2")
 
-const validateStr = (prop = '', value = '', length = 0, isEmpty = false) => {
+const validateStr = (prop = '', value = '', length = 0, isEmpty = false, isNumber = false, RSC=true) => {
     console.log("validate string of " + prop)
     // validate is null or null value or negative value
     if (!isEmpty && (value == undefined || value.length == 0)) {
@@ -16,6 +16,18 @@ const validateStr = (prop = '', value = '', length = 0, isEmpty = false) => {
     if (value.length > length) {
         validatError(`${prop}:${value} have length more than ${length} characters`)
     }
+
+    // validate string if they is number
+    if (!isNaN(Number(value)) && !isNumber) {
+        validatError(`${prop}:${value} is must not number`)
+    }
+
+    let regex = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/;
+    // validate special character
+    if (String(value).match(regex) && !RSC) {
+        validatError(`${prop}:${value} have not special character`)
+    }
+
     console.log(`validate ${prop} is passed`)
     return value.trim()
 }
@@ -220,7 +232,7 @@ const validateCode = (prop = '', value = '', length = 0, arrayCodeDigit = []) =>
     if (value.length > length) {
         validatError(`${prop}:${value} have length more than ${length} characters`)
     }
-    
+
     // validate is number in string
     if (arrayCodeDigit.length == 0) {
         let re = new RegExp(`^\\d{${length}}$`);
@@ -240,7 +252,7 @@ const validateCode = (prop = '', value = '', length = 0, arrayCodeDigit = []) =>
                 console.log(value)
                 return value;
             }
-            
+
         }
         validatError(`${prop}:${value} is not code from ${prop} format`)
     }

@@ -12,11 +12,11 @@ const { JwtAuth } = require('../../../middleware/jwtAuth')
 
 const prisma = new PrismaClient()
 
-// GET - All payment by user email
-router.get('/:userEmail', JwtAuth, async (req, res, next) => {
+// GET - All payment by user name
+router.get('/:username', JwtAuth, async (req, res, next) => {
     try {
-        // check user by email
-        let user = await verifyEmail(req.params.userEmail)
+        // check user by name
+        let user = await verifyName(req.params.username)
 
         // check role and same user email
         if (req.user.role !== ROLE.Admin && user.email !== req.user.email) forbiddenError('This user can see yourself only')
@@ -24,7 +24,7 @@ router.get('/:userEmail', JwtAuth, async (req, res, next) => {
         // find all payment of user
         let payments = await prisma.payments.findMany({
             where: {
-                userEmail: user.email
+                username: user.username
             }
         })
 
@@ -37,20 +37,20 @@ router.get('/:userEmail', JwtAuth, async (req, res, next) => {
     }
 })
 
-// GET - All payment by user email and payment id
-router.get('/:userEmail/:paymentId', JwtAuth, async (req, res, next) => {
+// GET - All payment by user name and payment id
+router.get('/:username/:paymentId', JwtAuth, async (req, res, next) => {
     try {
         // request data from parameter
-        let { userEmail, paymentId } = req.params
+        let { username, paymentId } = req.params
 
-        // check user by email
-        let user = await verifyEmail(userEmail)
+        // check user by name
+        let user = await verifyName(username)
 
         // check role and same user email
         if (req.user.role !== ROLE.Admin && user.email !== req.user.email) forbiddenError('This user can see yourself only')
 
-        // get payment detail by payment email and user email
-        let payment = await verifypayment(user.email, paymentId)
+        // get payment detail by payment name and user name
+        let payment = await verifypayment(user.username, paymentId)
 
         return res.json(deleteNullValue(payment))
     } catch (err) {
@@ -71,7 +71,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
         // validate data model
         let paymentModel = {
             paymentId: id,
-            userEmail: req.user.email,
+            username: req.user.name,
             bankname: validateStr("validate bank name", bankname, 100),
             bankCode: validateRole("valiadate bank code", bankCode, BANKCODE),
             bankAccount: validateCode("validate bank account number", bankAccount, 16, [10, 12, 14, 15, 16])
@@ -87,20 +87,20 @@ router.post('/', JwtAuth, async (req, res, next) => {
     }
 })
 
-// PATCH - update user payment by user email and payment id
-router.patch('/:userEmail/:paymentId', JwtAuth, async (req, res, next) => {
+// PATCH - update user payment by user name and payment id
+router.patch('/:username/:paymentId', JwtAuth, async (req, res, next) => {
     try {
         // request data from request body
-        let { userEmail, paymentId } = req.params
+        let { username, paymentId } = req.params
 
-        // check user by email
-        let user = await verifyEmail(userEmail)
+        // check user by name
+        let user = await verifyName(username)
 
         // check role and same user email
         if (req.user.role !== ROLE.Admin && user.email !== req.user.email) forbiddenError('This user can see yourself only')
 
-        // find user email and payment
-        await verifypayment(user.email, paymentId)
+        // find user name and payment
+        await verifypayment(user.username, paymentId)
 
         // validate data model
         let mappayment = {}
@@ -118,7 +118,7 @@ router.patch('/:userEmail/:paymentId', JwtAuth, async (req, res, next) => {
         let paymentResponse = await prisma.payments.update({
             where: {
                 paymentId: paymentId,
-                userEmail: userEmail
+                username: username
             },
             data: mappayment
         })
@@ -128,58 +128,58 @@ router.patch('/:userEmail/:paymentId', JwtAuth, async (req, res, next) => {
     }
 })
 
-// DELETE - delete user payment by user email and payment id
-router.delete('/:userEmail/:paymentId', JwtAuth, async (req, res, next) => {
+// DELETE - delete user payment by user name and payment id
+router.delete('/:username/:paymentId', JwtAuth, async (req, res, next) => {
     try {
         // request data from request body
-        let { userEmail, paymentId } = req.params
+        let { username, paymentId } = req.params
 
-        // check user by email
-        let user = await verifyEmail(userEmail)
+        // check user by name
+        let user = await verifyName(username)
 
         // check role and same user email
         if (req.user.role !== ROLE.Admin && user.email !== req.user.email) forbiddenError('This user can see yourself only')
 
-        // find user email and payment
-        await verifypayment(user.email, paymentId)
+        // find user name and payment
+        await verifypayment(user.username, paymentId)
 
         // dalete payment and return
         await prisma.payments.delete({
             where: {
                 paymentId: paymentId,
-                userEmail: userEmail
+                username: username
             },
         })
-        return res.json({ message: "user payment " + paymentId + " in " + userEmail + " has been deleted" })
+        return res.json({ message: "user payment " + paymentId + " in " + username + " has been deleted" })
     } catch (err) {
         next(err)
     }
 })
 
 // ----------------------------- method zone -------------------------------------
-const verifyEmail = async (email) => {
+const verifyName = async (name) => {
     let filter_u = await prisma.accounts.findFirst({
         where: {
-            email: validateStr("valiadte user email", email, 100)
+            username: validateStr("valiadte user name", name, 100)
         },
         select: userDetailView
     })
     // not found checking
-    if (filter_u == null) notFoundError("user email " + email + " does not exist")
+    if (filter_u == null) notFoundError("user name " + name + " does not exist")
 
     return filter_u
 }
 
-const verifypayment = async (email, paymentId) => {
+const verifypayment = async (name, paymentId) => {
     let payment = await prisma.payments.findFirst({
         where: {
             AND: [
-                { userEmail: email },
+                { username: name },
                 { paymentId: paymentId }
             ]
         }
     })
-    if (payment == null) notFoundError("user email " + email + " with payment " + paymentId + " does not exist")
+    if (payment == null) notFoundError("user name " + name + " with payment " + paymentId + " does not exist")
 
     return payment
 }

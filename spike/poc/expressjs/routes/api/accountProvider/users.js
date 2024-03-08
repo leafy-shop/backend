@@ -27,37 +27,37 @@ const prisma = new PrismaClient()
 // }
 
 // user demo
-const user_db = [
-    {
-        "firstname": "sahathat",
-        "lastname": "yingsakulkiet",
-        "email": "sahatat44@gmail.com",
-        "password": "abcd1234",
-        "role": "admin",
-        "phone": "090-000-0000",
-    },
-    {
-        "email": "piraphat123@gmail.com",
-        "password": "abcd1234",
-        "role": "user",
-    },
-    {
-        "firstname": "piraphat",
-        "lastname": "kakerd",
-        "email": "piraphat1234@gmail.com",
-        "password": "abcd1234",
-        "role": "admin",
-        "phone": "090-100-0000",
-    },
-    {
-        "firstname": "panalee",
-        "lastname": "palasri",
-        "email": "panalee.fern@mail.kmutt.ac.th",
-        "password": "abcd1234",
-        "role": "user",
-        "phone": "090-200-0000"
-    }
-]
+// const user_db = [
+//     {
+//         "firstname": "sahathat",
+//         "lastname": "yingsakulkiet",
+//         "email": "sahatat44@gmail.com",
+//         "password": "abcd1234",
+//         "role": "admin",
+//         "phone": "090-000-0000",
+//     },
+//     {
+//         "email": "piraphat123@gmail.com",
+//         "password": "abcd1234",
+//         "role": "user",
+//     },
+//     {
+//         "firstname": "piraphat",
+//         "lastname": "kakerd",
+//         "email": "piraphat1234@gmail.com",
+//         "password": "abcd1234",
+//         "role": "admin",
+//         "phone": "090-100-0000",
+//     },
+//     {
+//         "firstname": "panalee",
+//         "lastname": "palasri",
+//         "email": "panalee.fern@mail.kmutt.ac.th",
+//         "password": "abcd1234",
+//         "role": "user",
+//         "phone": "090-200-0000"
+//     }
+// ]
 
 // get all user
 router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
@@ -165,7 +165,7 @@ router.get('/garden_designer', async (req, res, next) => {
 
 const getUserIcon = async (user) => {
     user.image = await listFirstImage(findImagePath("users", user.userId), "main.png")
-    user.cover = await listFirstImage(findImagePath("users", user.userId),"cover_photo.png")
+    user.cover = await listFirstImage(findImagePath("users", user.userId), "cover_photo.png")
     return user
 }
 
@@ -200,20 +200,20 @@ router.get('/:id', JwtAuth, async (req, res, next) => {
     }
 })
 
-// view profile owner with id or email
-router.get('/views/:email', async (req, res, next) => {
+// view profile owner with id or username
+router.get('/views/:username', async (req, res, next) => {
     try {
         // sendMail("test massage","test",req.user.email)
-        let user = await verifySupplier(req.params.email)
+        let user = await verifySupplier(req.params.username)
 
         // console.log(user)
 
         // check if this user is supplier
         if (user.role === ROLE.Supplier) {
 
-            // get count product with his email
+            // get count product with his username
             let count = await prisma.items.count({
-                where: { itemOwner: user.email }
+                where: { itemOwner: user.username }
             })
             user.products = count
 
@@ -223,7 +223,7 @@ router.get('/views/:email', async (req, res, next) => {
                 },
                 where: {
                     AND: [
-                        { itemOwner: user.email },
+                        { itemOwner: user.username },
                         { totalRating: { not: 0 } }
                     ]
                 }
@@ -249,7 +249,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
         // accounts data
         let account = {
             userId: isNaN(userId) ? undefined : validateInt("item id", userId, true),
-            username: validateStr("account username", username, 50),
+            username: validateStr("account username", username, 50, false, false, false),
             firstname: validateStr("account firstname", firstname, 50),
             lastname: validateStr("account lastname", lastname, 50),
             email: validateEmail("account email", email, 100),
@@ -280,7 +280,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
             select: userView
         })
 
-        return res.status(201).json(timeConverter(input))
+        return res.status(201).json(userConverter(input))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -309,7 +309,7 @@ router.post('/register', async (req, res, next) => {
         // accounts data
         let account = {
             userId: isNaN(userId) ? undefined : validateInt("item id", userId, true),
-            username: validateStr("account username", username, 50),
+            username: validateStr("account username", username, 50, false, false, false),
             firstname: validateStr("account firstname", firstname, 50),
             lastname: validateStr("account lastname", lastname, 50),
             email: validateEmail("account email", email, 100),
@@ -339,7 +339,7 @@ router.post('/register', async (req, res, next) => {
             select: userView
         })
 
-        return res.status(201).json(timeConverter(input))
+        return res.status(201).json(userConverter(input))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -386,11 +386,11 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
         for (let i in req.body) {
             if (req.body[i] != undefined) {
                 mapUser[i] =
-                    i == "username" ? validateStr("account username", req.body[i], 50) :
-                        i == "firstname" ? validateStr("account firstname", req.body[i], 50) :
-                            i == "lastname" ? validateStr("account lastname", req.body[i], 50) :
-                                i == "description" ? validateStr("account desciption", req.body[i], 500) :
-                                    // i == "email" ? validateEmail("user email", req.body[i], 100) : cannot edit email
+                    // i == "username" ? validateStr("account username", req.body[i], 50) : cannot edit username
+                    i == "firstname" ? validateStr("account firstname", req.body[i], 50) :
+                        i == "lastname" ? validateStr("account lastname", req.body[i], 50) :
+                            i == "description" ? validateStr("account desciption", req.body[i], 500) :
+                                i == "email" ? validateEmail("account email", req.body[i], 100) :
                                     i == "role" ? validateRole("account role", req.body[i], ROLE) :
                                         i == "password" ? await validatePassword("account password", req.body[i], 8, 20) :
                                             i == "status" ? validateBoolean("account status", req.body[i]) :
@@ -442,7 +442,7 @@ router.patch('/views/edit', JwtAuth, async (req, res, next) => {
         for (let i in req.body) {
             if (req.body[i] != undefined) {
                 mapUser[i] =
-                    i == "username" ? validateStr("account username", req.body[i], 50) :
+                    i == "email" ? validateEmail("account email", req.body[i], 100) :
                         i == "firstname" ? validateStr("account firstname", req.body[i], 50) :
                             i == "lastname" ? validateStr("account lastname", req.body[i], 50) :
                                 i == "description" ? validateStr("account desciption", req.body[i], 500) :

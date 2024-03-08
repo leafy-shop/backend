@@ -3,11 +3,11 @@ const { months } = require("moment");
 
 const dateTimeZoneNow = (date) => {
     // Set the target timezone to UTC+7:00
-    const timeZone = 'Asia/Bangkok';
+    // const timeZone = 'Asia/Bangkok';
 
     // Format the date with the new timezone
     const options = {
-        timeZone,
+        timeZone: 'UTC',
         year: 'numeric',
         month: 'numeric',
         day: 'numeric',
@@ -23,17 +23,19 @@ const dateTimeZoneNow = (date) => {
 
 const getDifferentTime = (jsdate) => {
     // create compare values
-    const dateTime = DateTime.fromJSDate(jsdate, 'MM/dd/yyyy, HH:mm:ss', { zone: 'Asia/Bangkok' }).toISO();
-    const now = DateTime.now();
+    const dateTime = new Date(jsdate.getTime() - 1000 * 60 * 60 * 7);;
+    const now = DateTime.local();
+    // console.log(dateTime)
+    // console.log(now)
 
     // find different at time by luxon
-    const second = now.diff(DateTime.fromISO(dateTime), 'seconds').toObject().seconds;
-    const minute = now.diff(DateTime.fromISO(dateTime), 'minutes').toObject().minutes;
-    const hour = now.diff(DateTime.fromISO(dateTime), 'hours').toObject().hours;
-    const day = now.diff(DateTime.fromISO(dateTime), 'days').toObject().days;
-    const week = now.diff(DateTime.fromISO(dateTime), 'weeks').toObject().weeks;
-    const month = now.diff(DateTime.fromISO(dateTime), 'months').toObject().months;
-    const year = now.diff(DateTime.fromISO(dateTime), 'years').toObject().years;
+    const second = now.diff(DateTime.fromJSDate(dateTime), 'seconds').toObject().seconds;
+    const minute = now.diff(DateTime.fromJSDate(dateTime), 'minutes').toObject().minutes;
+    const hour = now.diff(DateTime.fromJSDate(dateTime), 'hours').toObject().hours;
+    const day = now.diff(DateTime.fromJSDate(dateTime), 'days').toObject().days;
+    const week = now.diff(DateTime.fromJSDate(dateTime), 'weeks').toObject().weeks;
+    const month = now.diff(DateTime.fromJSDate(dateTime), 'months').toObject().months;
+    const year = now.diff(DateTime.fromJSDate(dateTime), 'years').toObject().years;
 
     // check condition and return time status
     if (year >= 2) {

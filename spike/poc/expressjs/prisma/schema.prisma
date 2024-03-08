@@ -15,29 +15,31 @@ model carts {
   itemSize     String       @db.VarChar(50)
   qty          Int          @default(0)
   item_details item_details @relation(fields: [itemId, itemStyle, itemSize], references: [itemId, style, size], map: "Carts_item_details_fkey")
+  createdAt     DateTime @default(dbgenerated("NOW()"))
+  updatedAt     DateTime? @default(dbgenerated("NOW()"))
 
-  sessions       session_cart @relation(fields: [sessionId], references: [sessionCartId], map: "Carts_session_fkey")
+  sessions session_cart @relation(fields: [sessionId], references: [sessionCartId], map: "Carts_session_fkey")
 }
 
 model session_cart {
   sessionCartId String   @id @db.Char(32)
-  userEmail     String   @db.VarChar(100)
-  total    Decimal  @default(0.00) @db.Decimal(32, 2)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  accounts      accounts @relation(fields: [userEmail], references: [email], map: "Session_cart_userEmail_fkey")
+  username      String   @db.VarChar(100)
+  total         Decimal  @default(0.00) @db.Decimal(32, 2)
+  createdAt     DateTime @default(dbgenerated("NOW()"))
+  updatedAt     DateTime? @default(dbgenerated("NOW()"))
+  accounts      accounts @relation(fields: [username], references: [username], map: "Session_cart_username_fkey")
   carts         carts[]
 }
 
 model favprd {
-  userEmail String   @db.VarChar(100)
-  itemId    Int
-  items     items    @relation(fields: [itemId], references: [itemId], map: "FavPrd_itemId_fkey")
-  accounts  accounts @relation(fields: [userEmail], references: [email], map: "FavPrd_userEmail_fkey")
+  username String   @db.VarChar(100)
+  itemId   Int
+  items    items    @relation(fields: [itemId], references: [itemId], map: "FavPrd_itemId_fkey")
+  accounts accounts @relation(fields: [username], references: [username], map: "FavPrd_username_fkey")
 
-  @@id([itemId, userEmail])
+  @@id([itemId, username])
   @@index([itemId], map: "fk_FavPRD_items1_idx")
-  @@index([userEmail], map: "fk_FavPRD_users1_idx")
+  @@index([username], map: "fk_FavPRD_users1_idx")
 }
 
 model items {
@@ -45,15 +47,15 @@ model items {
   name        String        @db.VarChar(100)
   description String        @db.VarChar(5000)
   itemOwner   String
-  items       accounts      @relation(fields: [itemOwner], references: [email], map: "Items_itemOwner_fkey")
+  items       accounts      @relation(fields: [itemOwner], references: [username], map: "Items_itemOwner_fkey")
   type        String        @db.VarChar(20)
   tag         String        @db.VarChar(500)
   totalRating Decimal       @default(0.0) @db.Decimal(2, 1)
   sold        Int           @default(0)
   minPrice    Decimal       @default(0.00) @db.Decimal(32, 2)
   maxPrice    Decimal?      @db.Decimal(32, 2)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt     DateTime @default(dbgenerated("NOW()"))
+  updatedAt     DateTime? @default(dbgenerated("NOW()"))
   favprd      favprd[]
   item_events item_events[]
 
@@ -78,41 +80,41 @@ model item_events {
   userId    Int
   itemId    Int
   items     items    @relation(fields: [itemId], references: [itemId], map: "EventItem_itemId_fkey")
-  accounts  accounts @relation(fields: [userId], references: [userId], map: "EventItem_userEmail_fkey")
+  accounts  accounts @relation(fields: [userId], references: [userId], map: "EventItem_username_fkey")
   itemEvent String   @db.Char(4)
 }
 
 model item_reviews {
   itemReviewId      String              @id @db.Char(32)
   itemId            Int
-  userEmail         String              @db.VarChar(100)
+  username          String              @db.VarChar(100)
   item_details      item_details        @relation(fields: [itemId, style, size], references: [itemId, style, size], map: "ItemReview_itemId_style_size_fkey")
-  accounts          accounts            @relation(fields: [userEmail], references: [email], map: "Itemreview_userEmail_fkey")
+  accounts          accounts            @relation(fields: [username], references: [username], map: "Itemreview_username_fkey")
   comment           String              @db.VarChar(500)
   rating            Int                 @default(0)
   like              Int                 @default(0)
   style             String              @db.VarChar(50)
   size              String              @default("No") @db.VarChar(50)
-  createdAt         DateTime            @default(now())
+  createdAt         DateTime            @default(dbgenerated("NOW()"))
   item_review_likes item_review_likes[]
 
   @@index([itemId, style, size], map: "fk_ItemReview_items_idx")
 }
 
 model item_review_likes {
-  userEmail    String       @db.VarChar(100)
+  username     String       @db.VarChar(100)
   itemReviewId String       @db.Char(32)
   item_reviews item_reviews @relation(fields: [itemReviewId], references: [itemReviewId], map: "UserreviewLike_itemreviewId_fkey")
-  accounts     accounts     @relation(fields: [userEmail], references: [email], map: "UserreviewLike_userEmail_fkey")
+  accounts     accounts     @relation(fields: [username], references: [username], map: "UserreviewLike_username_fkey")
 
-  @@id([itemReviewId, userEmail])
+  @@id([itemReviewId, username])
   @@index([itemReviewId], map: "fk_UserReviewLike_items_review1_idx")
-  @@index([userEmail], map: "fk_UserReviewLike_users1_idx")
+  @@index([username], map: "fk_UserReviewLike_users1_idx")
 }
 
 model accounts {
   userId        Int      @id @default(autoincrement())
-  username      String   @db.VarChar(50)
+  username      String   @unique(map: "username_UNIQUE") @db.VarChar(50)
   firstname     String?  @db.VarChar(50)
   lastname      String?  @db.VarChar(50)
   description   String?  @db.VarChar(500)
@@ -122,8 +124,8 @@ model accounts {
   status        Boolean  @default(true)
   verifyAccount Boolean  @default(false)
   phone         String?  @db.Char(11)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(dbgenerated("NOW()"))
+  updatedAt     DateTime? @default(dbgenerated("NOW()"))
 
   favprd            favprd[]
   items             items[]
@@ -137,8 +139,8 @@ model accounts {
 
 model addresses {
   addressId    String   @id @db.Char(32)
-  userEmail    String   @db.VarChar(100)
-  accounts     accounts @relation(fields: [userEmail], references: [email], map: "Addresses_userEmail_fkey")
+  username     String   @db.VarChar(100)
+  accounts     accounts @relation(fields: [username], references: [username], map: "Addresses_username_fkey")
   addressname  String   @db.VarChar(100)
   phone        String?  @db.Char(11)
   address      String   @db.VarChar(50)
@@ -150,8 +152,8 @@ model addresses {
 
 model payments {
   paymentId   String   @id @db.Char(32)
-  userEmail   String   @db.VarChar(100)
-  accounts    accounts @relation(fields: [userEmail], references: [email], map: "Payments_userEmail_fkey")
+  username    String   @db.VarChar(100)
+  accounts    accounts @relation(fields: [username], references: [username], map: "Payments_username_fkey")
   bankname    String   @db.VarChar(100)
   bankCode    String   @db.VarChar(10)
   bankAccount String   @db.VarChar(16)

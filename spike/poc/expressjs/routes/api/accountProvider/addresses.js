@@ -11,11 +11,11 @@ const { JwtAuth } = require('../../../middleware/jwtAuth')
 
 const prisma = new PrismaClient()
 
-// GET - All address by user email
-router.get('/:userEmail', JwtAuth, async (req, res, next) => {
+// GET - All address by user name
+router.get('/:username', JwtAuth, async (req, res, next) => {
     try {
-        // check user by email
-        let user = await verifyEmail(req.params.userEmail)
+        // check user by name
+        let user = await verifyName(req.params.username)
 
         // check role and same user email
         if (req.user.role !== ROLE.Admin && user.email !== req.user.email) forbiddenError('This user can see yourself only')
@@ -23,7 +23,7 @@ router.get('/:userEmail', JwtAuth, async (req, res, next) => {
         // find all address of user
         let addresses = await prisma.addresses.findMany({
             where: {
-                userEmail: user.email
+                username: user.username
             }
         })
 
@@ -36,20 +36,20 @@ router.get('/:userEmail', JwtAuth, async (req, res, next) => {
     }
 })
 
-// GET - All address by user email and address id
-router.get('/:userEmail/:addressId', JwtAuth, async (req, res, next) => {
+// GET - All address by user name and address id
+router.get('/:username/:addressId', JwtAuth, async (req, res, next) => {
     try {
         // request data from parameter
-        let { userEmail, addressId } = req.params
+        let { username, addressId } = req.params
 
-        // check user by email
-        let user = await verifyEmail(userEmail)
+        // check user by name
+        let user = await verifyName(username)
 
         // check role and same user email
         if (req.user.role !== ROLE.Admin && user.email !== req.user.email) forbiddenError('This user can see yourself only')
 
-        // get address detail by address email and user email
-        let address = await verifyAddress(user.email, addressId)
+        // get address detail by address name and user name
+        let address = await verifyAddress(user.username, addressId)
 
         return res.json(deleteNullValue(address))
     } catch (err) {
@@ -70,7 +70,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
         // validate data model
         let addressModel = {
             addressId: id,
-            userEmail: req.user.email,
+            username: req.user.name,
             addressname: validateStr("validate address name", addressname, 100),
             phone: validatePhone("validate address phone", phone),
             address: validateStr("valiadate address", address, 50),
@@ -90,20 +90,20 @@ router.post('/', JwtAuth, async (req, res, next) => {
     }
 })
 
-// PATCH - update user address by user email and address id
-router.patch('/:userEmail/:addressId', JwtAuth, async (req, res, next) => {
+// PATCH - update user address by user name and address id
+router.patch('/:username/:addressId', JwtAuth, async (req, res, next) => {
     try {
         // request data from request body
-        let { userEmail, addressId } = req.params
+        let { username, addressId } = req.params
 
-        // check user by email
-        let user = await verifyEmail(userEmail)
+        // check user by name
+        let user = await verifyName(username)
 
         // check role and same user email
         if (req.user.role !== ROLE.Admin && user.email !== req.user.email) forbiddenError('This user can see yourself only')
 
-        // find user email and address
-        await verifyAddress(userEmail, addressId)
+        // find user name and address
+        await verifyAddress(username, addressId)
 
         // validate data model
         let mapAddress = {}
@@ -125,7 +125,7 @@ router.patch('/:userEmail/:addressId', JwtAuth, async (req, res, next) => {
         let addressResponse = await prisma.addresses.update({
             where: {
                 addressId: addressId,
-                userEmail: userEmail
+                username: username
             },
             data: mapAddress
         })
@@ -135,58 +135,58 @@ router.patch('/:userEmail/:addressId', JwtAuth, async (req, res, next) => {
     }
 })
 
-// DELETE - delete user address by user email and address id
-router.delete('/:userEmail/:addressId', JwtAuth, async (req, res, next) => {
+// DELETE - delete user address by user name and address id
+router.delete('/:username/:addressId', JwtAuth, async (req, res, next) => {
     try {
         // request data from request body
-        let { userEmail, addressId } = req.params
+        let { username, addressId } = req.params
 
-        // check user by email
-        let user = await verifyEmail(userEmail)
+        // check user by name
+        let user = await verifyName(username)
 
         // check role and same user email
         if (req.user.role !== ROLE.Admin && user.email !== req.user.email) forbiddenError('This user can see yourself only')
 
-        // find user email and address
-        await verifyAddress(userEmail, addressId)
+        // find user name and address
+        await verifyAddress(username, addressId)
 
         // dalete address and return
         await prisma.addresses.delete({
             where: {
                 addressId: addressId,
-                userEmail: userEmail
+                username: username
             },
         })
-        return res.json({ message: "user address " + addressId + " in " + userEmail + " has been deleted" })
+        return res.json({ message: "user address " + addressId + " in " + username + " has been deleted" })
     } catch (err) {
         next(err)
     }
 })
 
 // ----------------------------- method zone -------------------------------------
-const verifyEmail = async (email) => {
+const verifyName = async (name) => {
     let filter_u = await prisma.accounts.findFirst({
         where: {
-            email: validateStr("valiadte user email", email, 100)
+            name: validateStr("valiadte user name", name, 100)
         },
         select: userDetailView
     })
     // not found checking
-    if (filter_u == null) notFoundError("user email " + email + " does not exist")
+    if (filter_u == null) notFoundError("user name " + name + " does not exist")
 
     return filter_u
 }
 
-const verifyAddress = async (email, addressId) => {
+const verifyAddress = async (name, addressId) => {
     let address = await prisma.addresses.findFirst({
         where: {
             AND: [
-                { userEmail: email },
+                { username: name },
                 { addressId: addressId }
             ]
         }
     })
-    if (address == null) notFoundError("user email " + email + " with address " + addressId + " does not exist")
+    if (address == null) notFoundError("user name " + name + " with address " + addressId + " does not exist")
 
     return address
 }

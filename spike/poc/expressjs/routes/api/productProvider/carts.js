@@ -14,7 +14,7 @@ const prisma = new PrismaClient()
 
 router.get('/', JwtAuth, async (req, res, next) => {
     try {
-        let my_session = await verifySession(req.user.email, true)
+        let my_session = await verifySession(req.user.username, true)
 
         let mycart = await prisma.carts.findMany({
             where: {
@@ -36,16 +36,35 @@ router.get('/', JwtAuth, async (req, res, next) => {
         //     next(err)
         // })
 
+        // create cart and loop by their image, price and group
+        let groupCart = new Set()
         for (let cart of mycart) {
             let product = await verifyProductId(cart.itemId, cart.itemStyle, cart.itemSize);
             cart.image = await listFirstImage(findImagePath("products", cart.itemId), "main.png")
             cart.priceEach = product.price;
             cart.sessionId = undefined;
+            cart = timeConverter(cart)
+            groupCart.add(cart.itemId)
         }
-    
+
+        // loop group of cart and separate item owner
+        let resultCart = []
+        for (cartId of groupCart) {
+            let filterGroupCart = mycart.filter(cart => cartId == cart.itemId)
+            console.log(filterGroupCart)
+            let item = await prisma.items.findFirst({
+                where: {
+                    itemId: cartId
+                }
+            })
+            let cartObj = {}
+            cartObj[item.itemOwner] = filterGroupCart
+            resultCart.push(cartObj)
+        }
+
         my_session.shipping = 0;
         my_session.tax = 0;
-        my_session.cart = mycart;
+        my_session.cart = resultCart;
         res.json(timeConverter(my_session));
     } catch (err) {
         next(err)
@@ -55,7 +74,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
 // router.get('/:id', JwtAuth, async (req, res, next) => {
 //     try {
 //         let mycart = await verifyId(req.params.id)
-//         if (mycart.userEmail !== req.user.email) forbiddenError("your cannot see other user carts except yourself")
+//         if (mycart.username !== req.user.name) forbiddenError("your cannot see other user carts except yourself")
 
 //         // console.log(mycart)
 //         mycart.totalPrice = mycart.qty * mycart.product.price
@@ -82,7 +101,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
 
         // create cart item
         let cart = {}
-        let session_cart = await verifySession(req.user.email)
+        let session_cart = await verifySession(req.user.username)
         let cart_item = await verifyId(itemId, size, style)
 
         // check quantity
@@ -137,7 +156,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             session_cart = await prisma.session_cart.create({
                 data: {
                     sessionCartId: sessionId,
-                    userEmail: req.user.email,
+                    username: req.user.username,
                     total: choosePd.price
                 }
             })
@@ -164,7 +183,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
 // increment quantity
 router.put('/:id', JwtAuth, async (req, res, next) => {
     try {
-        let my_session = await verifySession(req.user.email, true)
+        let my_session = await verifySession(req.user.username, true)
         let mycart = await verifyIdByCart(req.params.id)
         let item_detail = await verifyProductId(mycart.itemId, mycart.itemStyle, mycart.itemSize)
         let qty = validateInt("validate quantity", req.body.qty, false, 0, item_detail.stock)
@@ -199,7 +218,7 @@ router.put('/:id', JwtAuth, async (req, res, next) => {
                     sessionCartId: my_session.sessionCartId
                 }
             });
-            return res.json({ message: `cart id ${mycart.cartId} of ${req.user.email} has updated` })
+            return res.json({ message: `cart id ${mycart.cartId} of ${req.user.username} has updated` })
 
         } else {
             // delete cart
@@ -228,7 +247,7 @@ router.put('/:id', JwtAuth, async (req, res, next) => {
 // delete cart
 router.delete('/:id', JwtAuth, async (req, res, next) => {
     try {
-        await verifySession(req.user.email, true)
+        await verifySession(req.user.username, true)
         let mycart = await verifyIdByCart(req.params.id)
         let item_detail = await verifyProductId(mycart.itemId, mycart.itemStyle, mycart.itemSize)
 
@@ -259,7 +278,7 @@ router.delete('/:id', JwtAuth, async (req, res, next) => {
 router.delete('/:id/session', JwtAuth, async (req, res, next) => {
     try {
         let mysession = await verifySessionById(req.params.id, true)
-        if (req.user.role !== ROLE.admin && mysession.userEmail !== req.user.email) {
+        if (req.user.role !== ROLE.admin && mysession.username !== req.user.username) {
             forbiddenError("your cannot delete other user carts session except yourself")
         }
 
@@ -312,13 +331,13 @@ const verifyIdByCart = async (id) => {
     return mycart
 }
 
-const verifySession = async (email, isError = false) => {
+const verifySession = async (name, isError = false) => {
     let mycart = await prisma.session_cart.findFirst({
         where: {
-            userEmail: email
+            username: name
         }
     })
-    if (mycart == null && isError) notFoundError("session cart with email " + email + " does not exist")
+    if (mycart == null && isError) notFoundError("session cart with name " + name + " does not exist")
     return mycart
 }
 

@@ -282,7 +282,8 @@ router.get('/verify', async (req, res, next) => {
             where: {
                 OR: [
                     { email: email_phone },
-                    { phone: email_phone }
+                    { phone: email_phone },
+                    { username: email_phone }
                 ]
             }
         })
