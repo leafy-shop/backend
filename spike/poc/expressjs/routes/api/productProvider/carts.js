@@ -62,6 +62,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
             resultCart.push(cartObj)
         }
 
+        my_session.total = parseFloat(my_session.total).toFixed(2)
         my_session.shipping = 0;
         my_session.tax = 0;
         my_session.cart = resultCart;
@@ -101,27 +102,27 @@ router.post('/products', JwtAuth, async (req, res, next) => {
 
         // create cart item
         let cart = {}
-        let session_cart = await verifySession(req.user.username)
-        let cart_item = await verifyId(itemId, size, style)
+        let sessionCart = await verifySession(req.user.username)
+        let cartItem = await verifyId(itemId, size, style)
 
         // check quantity
-        cart_item = cart_item ? cart_item : { qty: 0 }
+        cartItem = cartItem ? cartItem : { qty: 0 }
         // console.log(choosePd.stock)
-        // console.log(cart_item.qty)
-        if (choosePd.stock <= cart_item.qty) validatError(`product:${itemId} at style:${style} and size:${size} have out stocks`)
+        // console.log(cartItem.qty)
+        if (choosePd.stock <= cartItem.qty) validatError(`product:${itemId} at style:${style} and size:${size} have out stocks`)
 
-        if (cart_item.cartId && session_cart) {
+        if (cartItem.cartId && sessionCart) {
             // update quantity item
             cart = await prisma.carts.update({
                 data: {
                     qty: { increment: 1 }
                 },
                 where: {
-                    cartId: cart_item.cartId,
+                    cartId: cartItem.cartId,
                 }
             })
             // update total price
-            session_cart = await prisma.session_cart.update({
+            sessionCart = await prisma.session_cart.update({
                 data: {
                     total: { increment: choosePd.price }
                 },
@@ -129,12 +130,12 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                     sessionCartId: cart.sessionId
                 }
             })
-        } else if (!cart_item.cartId && session_cart) {
+        } else if (!cartItem.cartId && sessionCart) {
             let cartId = generateId(16)
             cart = await prisma.carts.create({
                 data: {
                     cartId: cartId,
-                    sessionId: session_cart.sessionCartId,
+                    sessionId: sessionCart.sessionCartId,
                     itemId: choosePd.itemId,
                     itemStyle: choosePd.style,
                     itemSize: choosePd.size,
@@ -143,17 +144,17 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             })
 
             // update create session cart
-            session_cart = await prisma.session_cart.update({
+            sessionCart = await prisma.session_cart.update({
                 data: {
                     total: { increment: choosePd.price }
                 },
                 where: {
-                    sessionCartId: session_cart.sessionCartId
+                    sessionCartId: sessionCart.sessionCartId
                 }
             })
         } else {
             let sessionId = generateId(16);
-            session_cart = await prisma.session_cart.create({
+            sessionCart = await prisma.session_cart.create({
                 data: {
                     sessionCartId: sessionId,
                     username: req.user.username,
@@ -165,7 +166,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             cart = await prisma.carts.create({
                 data: {
                     cartId: cartId,
-                    sessionId: session_cart.sessionCartId,
+                    sessionId: sessionCart.sessionCartId,
                     itemId: choosePd.itemId,
                     itemStyle: choosePd.style,
                     itemSize: choosePd.size,
@@ -174,7 +175,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             })
         }
 
-        return res.status(201).json({ msg: `your product ${choosePd.itemId} price ${session_cart.total} baht that add in your cart with quantity ${cart.qty}` })
+        return res.status(201).json({ msg: `your product ${choosePd.itemId} price ${sessionCart.total} baht that add in your cart with quantity ${cart.qty}` })
     } catch (err) {
         next(err)
     }

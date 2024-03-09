@@ -68,55 +68,61 @@ router.get('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     // let varPage = page > 0 ? (page - 1) * limit : 0
     // let varLimit = (limit <= 0 || isNaN(limit)) ? 0 : limit >= 10 ? 10 : limit
     // let count_user = await prisma.accounts.count()
-    let filter_u = await prisma.accounts.findMany({
-        where: {
-            AND: [{
-                username: {
-                    contains: req.query.name
-                }
+    try {
+        let filter_u = await prisma.accounts.findMany({
+            where: {
+                AND: [{
+                    username: {
+                        contains: req.query.name
+                    }
+                },
+                {
+                    email: {
+                        contains: req.query.email
+                    }
+                },
+                {
+                    role: req.query.role
+                }]
             },
-            {
-                email: {
-                    contains: req.query.email
-                }
-            },
-            {
-                role: req.query.role
-            }]
-        },
-        select: userView,
-        orderBy: { updatedAt: "desc" }
-    })
-
-    // make to page
-    let page_u = paginationList(filter_u, page, limit, 10)
-
-    // array converter and image mapping
-    // Promise.all(
-    //     // list user with image
-    //     page_u.list.length === 0 ? [] :
-    //         page_u.list.map(user => timeConverter(user))
-    //     // filter_pd.map(user => userConverter(user, userList))
-    // ).then(userList => {
-    //     page_u.list = userList
-    //     return res.json(page_u)
-    // }).catch(err => {
-    //     next(err)
-    // })
-    const userList = await Promise.all(
-        page_u.list.map(async (user) => {
-            return await timeConverter(user);
+            select: userView,
+            orderBy: { updatedAt: "desc" }
         })
-    );
 
-    page_u.list = userList;
-    return res.json(page_u);
+        // make to page
+        let page_u = paginationList(filter_u, page, limit, 10)
 
-    // return res.json({ "page": page, "pageSize": varLimit, "AllPage": Math.ceil(filter_u.length / varLimit), "users": page_u.map(user => timeConverter(user)) })
+        // array converter and image mapping
+        // Promise.all(
+        //     // list user with image
+        //     page_u.list.length === 0 ? [] :
+        //         page_u.list.map(user => timeConverter(user))
+        //     // filter_pd.map(user => userConverter(user, userList))
+        // ).then(userList => {
+        //     page_u.list = userList
+        //     return res.json(page_u)
+        // }).catch(err => {
+        //     next(err)
+        // })
+        const userList = await Promise.all(
+            page_u.list.map(async (user) => {
+                return await timeConverter(user);
+            })
+        );
+
+        page_u.list = userList;
+        return res.json(page_u);
+
+        // return res.json({ "page": page, "pageSize": varLimit, "AllPage": Math.ceil(filter_u.length / varLimit), "users": page_u.map(user => timeConverter(user)) })
+    } catch {
+        next(err)
+    }
+
 })
 
 // get all garden designer reviews
 router.get('/garden_designer', async (req, res, next) => {
+
     // let sorting = req.query.sort == 'desc' ? 'desc' : 'asc'
     // console.log(req.query.name)
     let page = Number(req.query.page)
@@ -124,43 +130,48 @@ router.get('/garden_designer', async (req, res, next) => {
     // let varPage = page > 0 ? (page - 1) * limit : 0
     // let varLimit = (limit <= 0 || isNaN(limit)) ? 0 : limit >= 10 ? 10 : limit
     // let count_user = await prisma.accounts.count()
-    let filter_u = await prisma.accounts.findMany({
-        where: {
-            AND: [
-                { role: ROLE.GD_DESIGNER },
-                { status: true }
-            ]
-        },
-        select: gardenDesignerView,
-        orderBy: { updatedAt: "desc" }
-    })
-
-    // make to page
-    let page_u = paginationList(filter_u, page, limit, 10)
-
-    // array converter and image mapping
-    // Promise.all(
-    //     // list user with image
-    //     page_u.list.length === 0 ? [] :
-    //         page_u.list.map(user => getUserIcon(timeConverter(user)))
-    //     // filter_pd.map(user => userConverter(user, userList))
-    // ).then(userList => {
-    //     page_u.list = userList
-    //     return res.json(page_u)
-    // }).catch(err => {
-    //     next(err)
-    // })
-    const userList = await Promise.all(
-        page_u.list.map(async (user) => {
-            const convertedUser = timeConverter(user);
-            return await getUserIcon(convertedUser);
+    try {
+        let filter_u = await prisma.accounts.findMany({
+            where: {
+                AND: [
+                    { role: ROLE.GD_DESIGNER },
+                    { status: true }
+                ]
+            },
+            select: gardenDesignerView,
+            orderBy: { updatedAt: "desc" }
         })
-    );
 
-    page_u.list = userList;
-    return res.json(page_u);
+        // make to page
+        let page_u = paginationList(filter_u, page, limit, 10)
 
-    // return res.json({ "page": page, "pageSize": varLimit, "AllPage": Math.ceil(filter_u.length / varLimit), "users": page_u.map(user => timeConverter(user)) })
+        // array converter and image mapping
+        // Promise.all(
+        //     // list user with image
+        //     page_u.list.length === 0 ? [] :
+        //         page_u.list.map(user => getUserIcon(timeConverter(user)))
+        //     // filter_pd.map(user => userConverter(user, userList))
+        // ).then(userList => {
+        //     page_u.list = userList
+        //     return res.json(page_u)
+        // }).catch(err => {
+        //     next(err)
+        // })
+        const userList = await Promise.all(
+            page_u.list.map(async (user) => {
+                const convertedUser = timeConverter(user);
+                return await getUserIcon(convertedUser);
+            })
+        );
+
+        page_u.list = userList;
+        return res.json(page_u);
+
+        // return res.json({ "page": page, "pageSize": varLimit, "AllPage": Math.ceil(filter_u.length / varLimit), "users": page_u.map(user => timeConverter(user)) })
+    } catch (err) {
+        next(err)
+    }
+
 })
 
 const getUserIcon = async (user) => {
@@ -249,7 +260,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
         // accounts data
         let account = {
             userId: isNaN(userId) ? undefined : validateInt("item id", userId, true),
-            username: validateStr("account username", username, 50, false, false, false),
+            username: validateStr("account username", username, 20, false, false, false),
             firstname: validateStr("account firstname", firstname, 50),
             lastname: validateStr("account lastname", lastname, 50),
             email: validateEmail("account email", email, 100),
@@ -309,7 +320,7 @@ router.post('/register', async (req, res, next) => {
         // accounts data
         let account = {
             userId: isNaN(userId) ? undefined : validateInt("item id", userId, true),
-            username: validateStr("account username", username, 50, false, false, false),
+            username: validateStr("account username", username, 20, false, false, false),
             firstname: validateStr("account firstname", firstname, 50),
             lastname: validateStr("account lastname", lastname, 50),
             email: validateEmail("account email", email, 100),

@@ -103,6 +103,24 @@ const userConverter = (user) => {
   return user
 }
 
+// inner object
+const orderConverter = (order) => {
+
+  // delete null value
+  order = deleteNullValue(order)
+
+  // time converter
+  order = timeConverter(order)
+
+  // shipped date
+  order.shippedDate = dateTimeZoneNow(order.phone)
+
+  // order details
+  order.order_details = order.order_details.map(order => timeConverter(order))
+
+  return order
+}
+
 // phone string
 const reformatPhoneNumber = (phoneNumber) => {
   if (phoneNumber.length === 10) {
@@ -155,6 +173,7 @@ const generateId = (halfNumber) => {
 module.exports.productConverter = productConverter
 module.exports.timeConverter = timeConverter
 module.exports.userConverter = userConverter
+module.exports.orderConverter = orderConverter
 module.exports.paginationList = paginationList
 module.exports.capitalizeFirstLetter = capitalizeFirstLetter
 module.exports.generateId = generateId

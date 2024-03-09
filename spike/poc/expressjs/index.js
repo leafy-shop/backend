@@ -46,6 +46,7 @@ app.use('/api/images/products',require('./routes/api/imageProvider/productStyleI
 app.use('/api/image/users',require('./routes/api/imageProvider/userImage.js'))
 app.use('/api/addresses',require('./routes/api/accountProvider/addresses.js'))
 app.use('/api/payments',require('./routes/api/accountProvider/payments.js'))
+app.use('/api/orders',require('./routes/api/paymentProvider/orders.js'))
 // app.use('/api/send-mail',require('./routes/api/mailer.js'))
 
 const errorHandler = (error, req, res, next) => {

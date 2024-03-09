@@ -70,7 +70,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
         // validate data model
         let addressModel = {
             addressId: id,
-            username: req.user.name,
+            username: req.user.username,
             addressname: validateStr("validate address name", addressname, 100),
             phone: validatePhone("validate address phone", phone),
             address: validateStr("valiadate address", address, 50),

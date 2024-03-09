@@ -71,7 +71,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
         // validate data model
         let paymentModel = {
             paymentId: id,
-            username: req.user.name,
+            username: req.user.username,
             bankname: validateStr("validate bank name", bankname, 100),
             bankCode: validateRole("valiadate bank code", bankCode, BANKCODE),
             bankAccount: validateCode("validate bank account number", bankAccount, 16, [10, 12, 14, 15, 16])
