@@ -108,17 +108,13 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
 router.get('/addresses/:addressId', JwtAuth, async (req, res, next) => {
     try {
         let orders = await verifyOrderIdByAddress(req.params.addressId)
-        let orderResult = { totalPrice: 0, list: [] }
 
         orders = orders.map(order => {
             order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
-            orderResult.totalPrice += order.total
             return orderConverter(order)
         })
 
-        orderResult.list = orders
-
-        return res.json(orderResult)
+        return res.json(orders)
     } catch (err) {
         next(err)
     }
