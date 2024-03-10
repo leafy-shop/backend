@@ -84,7 +84,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
         let addressResponse = await prisma.addresses.create({
             data: addressModel
         })
-        return res.json(deleteNullValue(addressResponse))
+        return res.status(201).json(deleteNullValue(addressResponse))
     } catch (err) {
         next(err)
     }

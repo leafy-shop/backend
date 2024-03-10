@@ -223,7 +223,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
                 }
             })
         }
-        return res.json(orderConverter(order))
+        return res.status(201).json(orderConverter(order))
     } catch (err) {
         next(err)
     }

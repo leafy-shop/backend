@@ -81,7 +81,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
         let paymentResponse = await prisma.payments.create({
             data: paymentModel
         })
-        return res.json(deleteNullValue(paymentResponse))
+        return res.status(201).json(deleteNullValue(paymentResponse))
     } catch (err) {
         next(err)
     }
