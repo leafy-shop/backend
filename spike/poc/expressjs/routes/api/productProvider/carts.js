@@ -155,7 +155,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             // add to cart on item event behaviour
             await prisma.item_events.create({
                 data: {
-                    itemId: cartItem.itemId,
+                    itemId: cart.itemId,
                     userId: req.user.id,
                     itemEvent: ITEMEVENT.ATC
                 }
