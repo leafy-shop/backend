@@ -167,7 +167,7 @@ router.delete('/:username/:addressId', JwtAuth, async (req, res, next) => {
 const verifyName = async (name) => {
     let filter_u = await prisma.accounts.findFirst({
         where: {
-            name: validateStr("valiadte user name", name, 100)
+            username: validateStr("valiadte user name", name, 100)
         },
         select: userDetailView
     })

@@ -116,9 +116,16 @@ const orderConverter = (order) => {
   order.shippedDate = dateTimeZoneNow(order.phone)
 
   // order details
-  order.order_details = order.order_details.map(order => timeConverter(order))
+  order.order_details = order.order_details.map(order => {
+    return orderDetailConverter(order)
+  })
 
   return order
+}
+
+const orderDetailConverter = (order) => {
+  order.priceEach = parseFloat(order.priceEach).toFixed(2)
+  return timeConverter(order)
 }
 
 // phone string
@@ -174,6 +181,7 @@ module.exports.productConverter = productConverter
 module.exports.timeConverter = timeConverter
 module.exports.userConverter = userConverter
 module.exports.orderConverter = orderConverter
+module.exports.orderDetailConverter = orderDetailConverter
 module.exports.paginationList = paginationList
 module.exports.capitalizeFirstLetter = capitalizeFirstLetter
 module.exports.generateId = generateId

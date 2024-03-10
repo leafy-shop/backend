@@ -457,7 +457,8 @@ router.patch('/views/edit', JwtAuth, async (req, res, next) => {
                         i == "firstname" ? validateStr("account firstname", req.body[i], 50) :
                             i == "lastname" ? validateStr("account lastname", req.body[i], 50) :
                                 i == "description" ? validateStr("account desciption", req.body[i], 500) :
-                                    i == "phone" ? validatePhone("account information phone", req.body[i]) : undefined
+                                    i == "password" ? await validatePassword("account password", req.body[i], 8, 20) :
+                                        i == "phone" ? validatePhone("account information phone", req.body[i]) : undefined
             }
         }
 

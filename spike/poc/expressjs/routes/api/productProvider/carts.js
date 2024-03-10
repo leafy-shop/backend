@@ -6,7 +6,7 @@ const { notFoundError, forbiddenError, validatError } = require('../../model/err
 const { JwtAuth } = require('../../../middleware/jwtAuth')
 
 const { PrismaClient } = require('@prisma/client');
-const { ITEMSIZE } = require('../../model/enum/item');
+const { ITEMSIZE, ITEMEVENT } = require('../../model/enum/item');
 const { generateId, timeConverter } = require('../../model/class/utils/converterUtils');
 const { ROLE } = require('../../model/enum/role');
 const { listFirstImage, findImagePath } = require('../../model/class/utils/imageList');
@@ -14,54 +14,51 @@ const prisma = new PrismaClient()
 
 router.get('/', JwtAuth, async (req, res, next) => {
     try {
+        // find my session
         let my_session = await verifySession(req.user.username, true)
 
-        let mycart = await prisma.carts.findMany({
+        // list all group item id
+        let mycart = await prisma.carts.groupBy({
+            by: ["itemId"],
             where: {
                 sessionId: my_session.sessionCartId
             }
         })
 
-        // Promise.all(
-        //     mycart.map(async cart => {
-        //         product = await verifyProductId(cart.itemId, cart.itemStyle, cart.itemSize)
-        //         cart.priceEach = product.price
-        //         cart.sessionId = undefined
-        //         return cart
-        //     })
-        // ).then(mycart => {
-        //     my_session.cart = mycart
-        //     return res.json(timeConverter(my_session))
-        // }).catch(err => {
-        //     next(err)
-        // })
-
-        // create cart and loop by their image, price and group
-        let groupCart = new Set()
-        for (let cart of mycart) {
-            let product = await verifyProductId(cart.itemId, cart.itemStyle, cart.itemSize);
-            cart.image = await listFirstImage(findImagePath("products", cart.itemId), "main.png")
-            cart.priceEach = product.price;
-            cart.sessionId = undefined;
-            cart = timeConverter(cart)
-            groupCart.add(cart.itemId)
-        }
-
-        // loop group of cart and separate item owner
+        // create cart and loop by their image, price
         let resultCart = []
-        for (cartId of groupCart) {
-            let filterGroupCart = mycart.filter(cart => cartId == cart.itemId)
-            console.log(filterGroupCart)
-            let item = await prisma.items.findFirst({
+        for (let cartGroup of mycart) {
+            // find all cart in item group
+            let carts = await prisma.carts.findMany({
                 where: {
-                    itemId: cartId
+                    itemId: cartGroup.itemId
                 }
             })
-            let cartObj = {}
-            cartObj[item.itemOwner] = filterGroupCart
-            resultCart.push(cartObj)
+
+            // store all cart in item group like their image, price
+            let ownerCart = []
+            for (let cart of carts) {
+                let product = await verifyProductId(cart.itemId, cart.itemStyle, cart.itemSize);
+                // console.log(filterGroupCart)
+                cart.image = await listFirstImage(findImagePath("products", cart.itemId), "main.png")
+                cart.priceEach = parseFloat(product.price).toFixed(2);
+                cart.sessionId = undefined;
+                cart = timeConverter(cart)
+                ownerCart.push(cart)
+            }
+
+            // list item owner and mapping before add on result cart
+            let item = await prisma.items.findFirst({
+                where: {
+                    itemId: cartGroup.itemId
+                }
+            })
+            cartGroup[item.itemOwner] = ownerCart
+            cartGroup.itemId = undefined
+            resultCart.push(cartGroup)
         }
 
+        // declare value for return on my cart session
         my_session.total = parseFloat(my_session.total).toFixed(2)
         my_session.shipping = 0;
         my_session.tax = 0;
@@ -94,6 +91,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
     size = size ? size : ITEMSIZE.No
 
     try {
+        // select item detail by item id, style and size
         let choosePd = await verifyProductId(
             validateInt("product id", itemId),
             validateStr("product style", style, 50),
@@ -107,10 +105,9 @@ router.post('/products', JwtAuth, async (req, res, next) => {
 
         // check quantity
         cartItem = cartItem ? cartItem : { qty: 0 }
-        // console.log(choosePd.stock)
-        // console.log(cartItem.qty)
         if (choosePd.stock <= cartItem.qty) validatError(`product:${itemId} at style:${style} and size:${size} have out stocks`)
 
+        // if user already has cart item input and owner session cart
         if (cartItem.cartId && sessionCart) {
             // update quantity item
             cart = await prisma.carts.update({
@@ -121,6 +118,16 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                     cartId: cartItem.cartId,
                 }
             })
+
+            // add to cart on item event behaviour
+            await prisma.item_events.create({
+                data: {
+                    itemId: cartItem.itemId,
+                    userId: req.user.id,
+                    itemEvent: ITEMEVENT.ATC
+                }
+            })
+
             // update total price
             sessionCart = await prisma.session_cart.update({
                 data: {
@@ -130,7 +137,9 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                     sessionCartId: cart.sessionId
                 }
             })
+            // if user already has owner session cart but in owner cart item input is empty
         } else if (!cartItem.cartId && sessionCart) {
+            // create cart item
             let cartId = generateId(16)
             cart = await prisma.carts.create({
                 data: {
@@ -143,6 +152,15 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                 }
             })
 
+            // add to cart on item event behaviour
+            await prisma.item_events.create({
+                data: {
+                    itemId: cartItem.itemId,
+                    userId: req.user.id,
+                    itemEvent: ITEMEVENT.ATC
+                }
+            })
+
             // update create session cart
             sessionCart = await prisma.session_cart.update({
                 data: {
@@ -152,7 +170,9 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                     sessionCartId: sessionCart.sessionCartId
                 }
             })
+            // if user has not owner session cart
         } else {
+            // create session cart
             let sessionId = generateId(16);
             sessionCart = await prisma.session_cart.create({
                 data: {
@@ -162,6 +182,16 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                 }
             })
 
+            // add to cart on item event behaviour
+            await prisma.item_events.create({
+                data: {
+                    itemId: cartItem.itemId,
+                    userId: req.user.id,
+                    itemEvent: ITEMEVENT.ATC
+                }
+            })
+            
+            // create cart item
             let cartId = generateId(16)
             cart = await prisma.carts.create({
                 data: {
@@ -184,24 +214,37 @@ router.post('/products', JwtAuth, async (req, res, next) => {
 // increment quantity
 router.put('/:id', JwtAuth, async (req, res, next) => {
     try {
+        // find session by username
         let my_session = await verifySession(req.user.username, true)
+
+        // find cart by cart id
         let mycart = await verifyIdByCart(req.params.id)
+
+        // find item detail by item id, style and size
         let item_detail = await verifyProductId(mycart.itemId, mycart.itemStyle, mycart.itemSize)
+
+        // validate quantities in cart
         let qty = validateInt("validate quantity", req.body.qty, false, 0, item_detail.stock)
+
+        // validate session owner
         if (my_session === null) forbiddenError("your must create new session")
 
+        // update cart quantity check
         if (qty) {
+            // update quantity
             await prisma.carts.update({
                 where: { cartId: req.params.id },
                 data: { qty: qty }
             })
 
+            // find session by session id
             let myallcart = await prisma.carts.findMany({
                 where: {
                     sessionId: my_session.sessionCartId
                 }
             })
 
+            // map product all price in each cart on promise
             let promises = myallcart.map(async (cur) => {
                 let product = await verifyProductId(cur.itemId, cur.itemStyle, cur.itemSize);
                 return cur.qty * product.price;
@@ -209,8 +252,10 @@ router.put('/:id', JwtAuth, async (req, res, next) => {
 
             let totalPrices = await Promise.all(promises);
 
+            // return sum total of product price
             let sumTotal = totalPrices.reduce((acc, curr) => acc + curr, 0);
 
+            // update new price
             await prisma.session_cart.update({
                 data: {
                     total: sumTotal
@@ -221,6 +266,7 @@ router.put('/:id', JwtAuth, async (req, res, next) => {
             });
             return res.json({ message: `cart id ${mycart.cartId} of ${req.user.username} has updated` })
 
+            // delete cart by quantity check
         } else {
             // delete cart
             await prisma.carts.delete({
@@ -248,8 +294,13 @@ router.put('/:id', JwtAuth, async (req, res, next) => {
 // delete cart
 router.delete('/:id', JwtAuth, async (req, res, next) => {
     try {
+        // find session by username
         await verifySession(req.user.username, true)
+
+        // find cart by cart id
         let mycart = await verifyIdByCart(req.params.id)
+
+        // find item detail by item id, style and size
         let item_detail = await verifyProductId(mycart.itemId, mycart.itemStyle, mycart.itemSize)
 
         // delete cart
@@ -275,14 +326,18 @@ router.delete('/:id', JwtAuth, async (req, res, next) => {
     }
 })
 
-// delete session
+// delete session by id
 router.delete('/:id/session', JwtAuth, async (req, res, next) => {
     try {
+        // find all session
         let mysession = await verifySessionById(req.params.id, true)
+
+        // authorization validation check
         if (req.user.role !== ROLE.admin && mysession.username !== req.user.username) {
             forbiddenError("your cannot delete other user carts session except yourself")
         }
 
+        // delete session
         await prisma.session_cart.delete({
             where: { sessionCartId: mysession.sessionCartId }
         })

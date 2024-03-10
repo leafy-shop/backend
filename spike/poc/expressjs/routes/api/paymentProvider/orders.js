@@ -2,36 +2,43 @@ let express = require('express')
 const { JwtAuth, verifyRole } = require('../../../middleware/jwtAuth')
 const { PrismaClient, Prisma } = require('@prisma/client');
 const { validateStrArray, validateStr } = require('../../validation/body');
-const { generateId, timeConverter, orderConverter } = require('../../model/class/utils/converterUtils');
-const { verify, Verify } = require('crypto');
+const { generateId, timeConverter, orderConverter, orderDetailConverter, paginationList } = require('../../model/class/utils/converterUtils');
 const { notFoundError, forbiddenError } = require('../../model/error/error');
 const { ROLE } = require('../../model/enum/role');
+const { ITEMEVENT } = require('../../model/enum/item');
 let prisma = new PrismaClient()
 
 let router = express.Router()
 
 // get all account order item
 router.get('/', JwtAuth, async (req, res) => {
+    let { sort } = req.query
+
     let addresses = await prisma.addresses.findMany({
         where: {
             username: req.user.username
         }
     })
 
+    // get all order list
     let orderList = []
     for (let address of addresses) {
+        // get all item orders by address Id sort by created at
         let orders = await prisma.orders.findMany({
             where: {
                 addressId: address.addressId
             },
             include: {
                 order_details: true
+            },
+            orderBy: {
+                createdAt: sort === "desc" ? "desc" : "asc"
             }
         })
 
         if (orders.length !== 0) {
             orders = orders.map(order => {
-                console.log(order)
+                // console.log(order)
                 order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
                 return orderConverter(order)
             })
@@ -42,11 +49,19 @@ router.get('/', JwtAuth, async (req, res) => {
     return res.json(orderList)
 })
 
-// get all supplier order item
+// get all supplier order item or order audit
 router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res) => {
+    let { sort, itemId, page, limit } = req.query
+
+    let pageN = Number(page)
+    let limitN = Number(limit)
+
     let items = await prisma.items.findMany({
         where: {
-            itemOwner: req.user.username
+            AND: [
+                { itemOwner: req.user.username },
+                { itemId: Number(itemId) }
+            ]
         },
         include: {
             item_details: true
@@ -68,6 +83,9 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
                 itemId: item.itemId,
                 itemStyle: item.style,
                 itemSize: item.size
+            },
+            orderBy: {
+                createdAt: sort === "desc" ? "desc" : "asc"
             }
         })
 
@@ -75,16 +93,38 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
             orders = orders.map(order => {
                 // console.log(order)
                 order.total = order.priceEach * order.qtyOrder
-                return timeConverter(order)
+                return orderDetailConverter(order)
             })
             orderList = orders
         }
     }
 
-    return res.json(orderList)
+    let page_order = paginationList(orderList, pageN, limitN, 20)
+
+    return res.json(page_order)
 })
 
-// get order item id
+// get order item by address id
+router.get('/addresses/:addressId', JwtAuth, async (req, res, next) => {
+    try {
+        let orders = await verifyOrderIdByAddress(req.params.addressId)
+        let orderResult = { totalPrice: 0, list: [] }
+
+        orders = orders.map(order => {
+            order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+            orderResult.totalPrice += order.total
+            return orderConverter(order)
+        })
+
+        orderResult.list = orders
+
+        return res.json(orderResult)
+    } catch (err) {
+        next(err)
+    }
+})
+
+// get order item by order id
 router.get('/:orderId', JwtAuth, async (req, res, next) => {
     try {
         let order = await verifyOrderId(req.params.orderId)
@@ -93,7 +133,6 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
     } catch (err) {
         next(err)
     }
-
 })
 
 // place order item
@@ -139,6 +178,15 @@ router.post('/', JwtAuth, async (req, res, next) => {
             // push orderInput
             order.order_details.push(orderInput)
 
+            // add to cart on item event behaviour
+            await prisma.item_events.create({
+                data: {
+                    itemId: cart.itemId,
+                    userId: req.user.id,
+                    itemEvent: ITEMEVENT.PAID
+                }
+            })
+
             // remove all selected cart item
             let mycart = await prisma.carts.findFirst({
                 where: {
@@ -158,7 +206,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
                 },
                 data: {
                     total: {
-                        decrement: itemDetail.price*cart.qty
+                        decrement: itemDetail.price * cart.qty
                     }
                 }
             })
@@ -235,6 +283,21 @@ const verifyOrderId = async (orderId) => {
         }
     })
     if (order == null) notFoundError("order id " + orderId + " does not exist")
+    return order
+}
+
+const verifyOrderIdByAddress = async (addressId) => {
+    let order = await prisma.orders.findMany({
+        where: {
+            AND: [
+                { addressId: addressId }
+            ]
+        },
+        include: {
+            order_details: true
+        }
+    })
+    if (order.length === 0) notFoundError("order id " + addressId + " does not exist")
     return order
 }
 
