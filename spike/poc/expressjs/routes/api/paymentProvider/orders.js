@@ -32,7 +32,7 @@ router.get('/', JwtAuth, async (req, res) => {
                 order_details: true
             },
             orderBy: {
-                createdAt: sort === "desc" ? "desc" : "asc"
+                createdAt: sort === "asc" ? "asc" : "desc"
             }
         })
 
@@ -85,7 +85,7 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
                 itemSize: item.size
             },
             orderBy: {
-                createdAt: sort === "desc" ? "desc" : "asc"
+                createdAt: sort === "asc" ? "asc" : "desc"
             }
         })
 
