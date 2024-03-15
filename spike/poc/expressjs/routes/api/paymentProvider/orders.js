@@ -156,9 +156,10 @@ router.post('/', JwtAuth, async (req, res, next) => {
             forbiddenError("user cannot place order by other people except yourself")
         }
 
+        // validate some cart in owner item
         mycart.forEach(cart => {
-            if (req.user.role !== ROLE.Admin && cart.sessionId.split("-")[0] !== req.user.username) {
-                forbiddenError("you cannot paid with other carts except yourself")
+            if (req.user.role !== ROLE.Admin && cart.sessionId.split("-")[0] === req.user.username) {
+                forbiddenError("you cannot paid with yourself owner cart")
             }
         })
 
