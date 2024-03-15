@@ -113,7 +113,7 @@ const orderConverter = (order) => {
   order = timeConverter(order)
 
   // shipped date
-  order.shippedDate = dateTimeZoneNow(order.phone)
+  if (order.shippedDate) order.shippedDate = dateTimeZoneNow(order.shippedDate)
 
   // order details
   order.order_details = order.order_details.map(order => {
@@ -177,6 +177,10 @@ const generateId = (halfNumber) => {
   return crypto.randomBytes(halfNumber).toString("hex");
 }
 
+const generateIdByMapping = (halfNumber, attribute) => {
+  return `${attribute}-${crypto.randomBytes(halfNumber).toString("hex")}`;
+}
+
 module.exports.productConverter = productConverter
 module.exports.timeConverter = timeConverter
 module.exports.userConverter = userConverter
@@ -185,3 +189,4 @@ module.exports.orderDetailConverter = orderDetailConverter
 module.exports.paginationList = paginationList
 module.exports.capitalizeFirstLetter = capitalizeFirstLetter
 module.exports.generateId = generateId
+module.exports.generateIdByMapping = generateIdByMapping

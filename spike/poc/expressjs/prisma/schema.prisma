@@ -8,8 +8,8 @@ datasource db {
 }
 
 model carts {
-  cartId       String       @id @db.Char(32)
-  sessionId    String       @db.Char(32)
+  cartId       String       @id @db.VarChar(53)
+  sessionId    String       @db.VarChar(53)
   itemId       Int
   itemStyle    String       @db.VarChar(50)
   itemSize     String       @db.VarChar(50)
@@ -22,8 +22,8 @@ model carts {
 }
 
 model session_cart {
-  sessionCartId String    @id @db.Char(32)
-  username      String    @db.VarChar(100)
+  sessionCartId String    @id @db.VarChar(53)
+  username      String    @db.VarChar(20)
   total         Decimal   @default(0.00) @db.Decimal(32, 2)
   createdAt     DateTime  @default(dbgenerated("NOW()"))
   updatedAt     DateTime? @default(dbgenerated("NOW()"))
@@ -51,7 +51,6 @@ model items {
   type         String         @db.VarChar(20)
   tag          String         @db.VarChar(500)
   totalRating  Decimal        @default(0.0) @db.Decimal(2, 1)
-  sold         Int            @default(0)
   minPrice     Decimal        @default(0.00) @db.Decimal(32, 2)
   maxPrice     Decimal?       @db.Decimal(32, 2)
   createdAt    DateTime       @default(dbgenerated("NOW()"))
@@ -88,9 +87,9 @@ model item_events {
 }
 
 model item_reviews {
-  itemReviewId      String              @id @db.Char(32)
+  itemReviewId      String              @id @db.VarChar(53)
   itemId            Int
-  username          String              @db.VarChar(100)
+  username          String              @db.VarChar(20)
   item_details      item_details        @relation(fields: [itemId, style, size], references: [itemId, style, size], map: "ItemReview_itemId_style_size_fkey")
   accounts          accounts            @relation(fields: [username], references: [username], map: "Itemreview_username_fkey")
   comment           String              @db.VarChar(500)
@@ -105,8 +104,8 @@ model item_reviews {
 }
 
 model item_review_likes {
-  username     String       @db.VarChar(100)
-  itemReviewId String       @db.Char(32)
+  username     String       @db.VarChar(20)
+  itemReviewId String       @db.VarChar(53)
   item_reviews item_reviews @relation(fields: [itemReviewId], references: [itemReviewId], map: "UserreviewLike_itemreviewId_fkey")
   accounts     accounts     @relation(fields: [username], references: [username], map: "UserreviewLike_username_fkey")
 
@@ -117,11 +116,11 @@ model item_review_likes {
 
 model accounts {
   userId        Int       @id @default(autoincrement())
-  username      String    @unique(map: "username_UNIQUE") @db.VarChar(50)
+  username      String    @unique(map: "username_UNIQUE") @db.VarChar(20)
   firstname     String?   @db.VarChar(50)
   lastname      String?   @db.VarChar(50)
   description   String?   @db.VarChar(500)
-  email         String    @unique(map: "Users_email_key") @db.VarChar(100)
+  email         String    @unique(map: "Users_email_key") @db.VarChar(50)
   password      String    @db.VarChar(100)
   role          String    @default("user") @db.VarChar(11)
   status        Boolean   @default(true)
@@ -141,8 +140,8 @@ model accounts {
 }
 
 model addresses {
-  addressId    String   @id @db.Char(32)
-  username     String   @db.VarChar(100)
+  addressId    String   @id @db.VarChar(53)
+  username     String   @db.VarChar(20)
   accounts     accounts @relation(fields: [username], references: [username], map: "Addresses_username_fkey")
   addressname  String   @db.VarChar(100)
   phone        String?  @db.Char(11)
@@ -155,8 +154,8 @@ model addresses {
 }
 
 model payments {
-  paymentId   String   @id @db.Char(32)
-  username    String   @db.VarChar(100)
+  paymentId   String   @id @db.VarChar(53)
+  username    String   @db.VarChar(20)
   accounts    accounts @relation(fields: [username], references: [username], map: "Payments_username_fkey")
   bankname    String   @db.VarChar(100)
   bankCode    String   @db.VarChar(10)
@@ -164,17 +163,17 @@ model payments {
 }
 
 model orders {
-  orderId       String          @id @db.Char(32)
-  addressId     String          @db.Char(32)
+  orderId       String          @id @db.VarChar(53)
+  addressId     String          @db.VarChar(53)
   addresses     addresses       @relation(fields: [addressId], references: [addressId], map: "Orders_addresses_fkey")
   status        String          @db.VarChar(20)
   createdAt     DateTime        @default(dbgenerated("NOW()"))
-  shippedDate   DateTime        @default(dbgenerated("NOW()"))
+  shippedDate   DateTime?
   order_details order_details[]
 }
 
 model order_details {
-  orderId      String       @db.Char(32)
+  orderId      String       @db.VarChar(53)
   orders       orders       @relation(fields: [orderId], references: [orderId], map: "Order_details_fkey")
   itemStyle    String       @db.VarChar(50)
   itemId       Int

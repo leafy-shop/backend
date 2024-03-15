@@ -10,7 +10,7 @@ const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('../../../middleware/jw
 const { PrismaClient, Prisma } = require('@prisma/client');
 // const { deleteNullValue } = require('../model/class/utils/modelMapping');
 // const { mode } = require('../../config/minio_config');
-const { productConverter, timeConverter, paginationList, generateId } = require('../../model/class/utils/converterUtils');
+const { productConverter, timeConverter, paginationList, generateIdByMapping } = require('../../model/class/utils/converterUtils');
 const { ROLE } = require('../../model/enum/role');
 const { findImagePath, listFirstImage, listAllImage } = require('../../model/class/utils/imageList');
 const prisma = new PrismaClient()
@@ -19,12 +19,8 @@ const prisma = new PrismaClient()
 const { deleteNullValue } = require('../../model/class/utils/modelMapping')
 const { getDifferentTime } = require('../../model/class/utils/datetimeUtils');
 const { ITEMTYPE, ITEMSIZE, ITEMEVENT } = require('../../model/enum/item');
-const axios = require("axios")
-const http = require('http');
 
 const dotenv = require('dotenv');
-const { error } = require('console');
-const { resolve } = require('path');
 const { getTopItems } = require('../../model/recommender/contentBasedFiltering');
 
 // get config vars
@@ -879,7 +875,7 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
         // if (!item.styles[0].size.includes(size)) notFoundError(`item id ${item.itemId} size not found `)
 
         // generate id
-        const id = generateId(16)
+        const id = generateIdByMapping(16, req.user.username)
 
         // console.log(id.length); // => f9b327e70bbcf42494ccb28b2d98e00e
 

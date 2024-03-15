@@ -260,7 +260,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
         // accounts data
         let account = {
             userId: isNaN(userId) ? undefined : validateInt("item id", userId, true),
-            username: validateStr("account username", username, 20, false, false, false),
+            username: validateStr("account username", username, 20, false, false, false, false),
             firstname: validateStr("account firstname", firstname, 50),
             lastname: validateStr("account lastname", lastname, 50),
             email: validateEmail("account email", email, 100),

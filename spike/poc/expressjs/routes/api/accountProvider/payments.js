@@ -1,8 +1,8 @@
 const { PrismaClient } = require('@prisma/client')
 const express = require('express')
-const { generateId } = require('../../model/class/utils/converterUtils')
+const { generateIdByMapping } = require('../../model/class/utils/converterUtils')
 const router = express.Router()
-const { validateStr, validatePhone, validateCode, validateRole } = require('../../validation/body')
+const { validateStr, validateCode, validateRole } = require('../../validation/body')
 const { deleteNullValue } = require('../../model/class/utils/modelMapping')
 const { userDetailView } = require('../../model/class/model')
 const { notFoundError, forbiddenError } = require('../../model/error/error')
@@ -65,7 +65,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
         let { paymentId, bankname, bankCode, bankAccount } = req.body
 
         // generate Id 32 digit
-        let id = paymentId != undefined ? paymentId : generateId(16)
+        let id = paymentId != undefined ? paymentId : generateIdByMapping(16, req.user.username)
         // console.log(validatePhone("validate payment phone", phone))
 
         // validate data model

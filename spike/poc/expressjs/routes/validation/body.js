@@ -2,7 +2,7 @@
 const { validatError } = require('./../model/error/error')
 const argon2 = require("argon2")
 
-const validateStr = (prop = '', value = '', length = 0, isEmpty = false, isNumber = false, RSC=true) => {
+const validateStr = (prop = '', value = '', length = 0, isEmpty = false, isNumber = false, isBlankSpace = true, RSC=true) => {
     console.log("validate string of " + prop)
     // validate is null or null value or negative value
     if (!isEmpty && (value == undefined || value.length == 0)) {
@@ -20,6 +20,11 @@ const validateStr = (prop = '', value = '', length = 0, isEmpty = false, isNumbe
     // validate string if they is number
     if (!isNaN(Number(value)) && !isNumber) {
         validatError(`${prop}:${value} is must not number`)
+    }
+
+    // validate string if they have space between characters
+    if (value.indexOf(' ') >= 0 && !isBlankSpace) {
+        validatError(`${prop}:${value} is must not have space between characters`)
     }
 
     let regex = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/;
