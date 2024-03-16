@@ -2,7 +2,7 @@
 const { validatError } = require('./../model/error/error')
 const argon2 = require("argon2")
 
-const validateStr = (prop = '', value = '', length = 0, isEmpty = false, isNumber = false, isBlankSpace = true, RSC=true) => {
+const validateStr = (prop = '', value = '', length = 0, isEmpty = false, isNumber = false, isBlankSpace = true, RSC = true) => {
     console.log("validate string of " + prop)
     // validate is null or null value or negative value
     if (!isEmpty && (value == undefined || value.length == 0)) {
@@ -186,7 +186,7 @@ const validateStrArray = (prop = '', values = [], ArrL, inArrL, upper = false) =
     return values.join()
 }
 
-const validateDatetimeFuture = (prop = '', value = undefined, isEmpty = false) => {
+const validateDatetimeFuture = (prop = '', value = undefined, isEmpty = false, isReverse = false) => {
     console.log("validate date of " + prop)
 
     // check time format
@@ -196,27 +196,35 @@ const validateDatetimeFuture = (prop = '', value = undefined, isEmpty = false) =
 
     // check value is undefined before add
     value = value !== undefined ? new Date(value) : undefined
+    // console.log(value)
     if (value == "Invalid Date") {
         validatError(`this ${prop} data is not date format`)
     }
 
     // check future time
-    if (value !== undefined && value.getTime() >= (new Date()).getTime()) {
+    if (value !== undefined && value.getTime() > (new Date()).getTime() && !isReverse) {
         validatError(`${prop}:${value} is not over than present`)
     }
+
+    // check past time
+    if (value !== undefined && value.getTime() < (new Date()).getTime() && isReverse) {
+        validatError(`${prop}:${value} is not under than present`)
+    }
+
+    value = new Date(value.valueOf() + 7*60*60*1000)
 
     console.log(`validate ${prop} is passed`)
     return value
 }
 
-const validatePhone = (prop = '', value = undefined) => {
+const validatePhone = (prop = '', value) => {
     let re = /^\(?(\d{3})\)?[- ]?(\d{3})[- ]?(\d{4})|\(?(\d{3})\)?[- ]?(\d{3})[- ]?(\d{4})[- ]?\d{1}$/;
-    // validate is null or null value
-    if (value !== undefined && !value.match(re)) {
+    // validate format
+    if (!value.match(re)) {
         validatError(`${prop} is not phone format`)
     }
     console.log(`validate ${prop} is passed`)
-    return value === undefined ? undefined : value.replace(/-/g, '');
+    return value.replace(/-/g, '');
 }
 
 const validateCode = (prop = '', value = '', length = 0, arrayCodeDigit = []) => {

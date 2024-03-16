@@ -3,8 +3,8 @@ let ORDERSTATUS = Object.freeze({
     PENDING: "pending",
     INPROGRESS: "in progress",
     // driver
-    INTRANSIT: "in transit",
-    DELIVERED: "delivered",
+    // INTRANSIT: "in transit",
+    // DELIVERED: "delivered",
     // customer
     COMPLETED: "complete",
     CANCELED: "canceled"

@@ -1,9 +1,9 @@
 let express = require('express')
 const { JwtAuth, verifyRole } = require('../../../middleware/jwtAuth')
 const { PrismaClient } = require('@prisma/client');
-const { validateStrArray, validateStr } = require('../../validation/body');
+const { validateStrArray, validateStr, validateRole, validateDatetimeFuture } = require('../../validation/body');
 const { orderConverter, orderDetailConverter, paginationList, generateIdByMapping } = require('../../model/class/utils/converterUtils');
-const { notFoundError, forbiddenError } = require('../../model/error/error');
+const { notFoundError, forbiddenError, validatError } = require('../../model/error/error');
 const { ROLE } = require('../../model/enum/role');
 const { ITEMEVENT } = require('../../model/enum/item');
 const { ORDERSTATUS } = require('../../model/enum/order');
@@ -36,7 +36,7 @@ router.get('/', JwtAuth, async (req, res) => {
     if (orders.length !== 0) {
         orders = orders.map(order => {
             // console.log(order)
-            // order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+            order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
             return orderConverter(order)
         })
         orderList = orders
@@ -85,15 +85,20 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
 // get order item by address id
 router.get('/addresses/:addressId', JwtAuth, async (req, res, next) => {
     try {
+        // list addresses
+        let addresses = await verifyAddressId(req.params.addressId)
+        
+        // validate authorization when see other address
+        addresses.forEach(address => {
+            if (address.addressId.split("-")[0] !== req.user.username) {
+                forbiddenError("you cannot see order in other addresses except owner addresses only")
+            }
+        })
+
+        // list orders
         let orders = await verifyOrderIdByAddress(req.params.addressId)
 
-        // if they are user or garden designer role
-        if ([ROLE.User, ROLE.GD_DESIGNER].includes(req.user.role) && orders.orderId.split("-")[1] !== req.user.username) {
-            forbiddenError("you cannot see order in other user except yourself")
-        }
-
-        // if they are supplier role
-        if (req.user.role === ROLE.Supplier && orders.orderId.split("-")[0] !== req.user.username) {
+        if (req.user.role === ROLE.Supplier && (orders.orderId.split("-")[0] === req.user.username || orders.orderId.split("-")[1] !== req.user.username)) {
             forbiddenError("you cannot see order in other user except yourself and your item order")
         }
 
@@ -111,20 +116,22 @@ router.get('/addresses/:addressId', JwtAuth, async (req, res, next) => {
 // get order item by order id
 router.get('/:orderId', JwtAuth, async (req, res, next) => {
     try {
-        let orders = await verifyOrderId(req.params.orderId)
+        let order = await verifyOrderId(req.params.orderId)
 
         // if they are user or garden designer role
-        if ([ROLE.User, ROLE.GD_DESIGNER].includes(req.user.role) && orders.orderId.split("-")[1] !== req.user.username) {
+        if (order.orderId.split("-")[1] !== req.user.username) {
             forbiddenError("you cannot see order in other user except yourself")
         }
 
         // if they are supplier role
-        if (req.user.role === ROLE.Supplier && orders.orderId.split("-")[0] !== req.user.username) {
-            forbiddenError("you cannot see order in other user except yourself and your item order")
+        // console.log(order.orderId.split("-")[0])
+        // console.log(order.orderId.split("-")[1])
+        if (req.user.role === ROLE.Supplier && (order.orderId.split("-")[0] === req.user.username || order.orderId.split("-")[1] !== req.user.username) ) {
+            forbiddenError("you cannot see order in other user except yourself or your item order")
         }
 
-        orders.total = orders.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
-        return res.json(orderConverter(orders))
+        order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+        return res.json(orderConverter(order))
     } catch (err) {
         next(err)
     }
@@ -262,16 +269,100 @@ router.post('/', JwtAuth, async (req, res, next) => {
     }
 })
 
-// get order item by order id
-router.get('/:orderId', JwtAuth, async (req, res, next) => {
+// changing order status
+router.put('/prepare_order/:orderId', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     try {
         let order = await verifyOrderId(req.params.orderId)
-        order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
-        return res.json(orderConverter(order))
+
+        // if they are supplier role
+        if (req.user.role === ROLE.Supplier && order.orderId.split("-")[0] !== req.user.username) {
+            forbiddenError("you cannot see order in other user except yourself and your item order")
+        }
+
+        let { orderStatus, shippedDate } = req.body
+
+        orderStatus = validateRole("validate order status", orderStatus, ORDERSTATUS, false)
+
+        // before transit
+        if (orderStatus === ORDERSTATUS.INPROGRESS) {
+            updatedOrder = await prisma.orders.update({
+                data: {
+                    status: ORDERSTATUS.INPROGRESS,
+                    shippedDate: validateDatetimeFuture("validate shipped date",shippedDate,false,true)
+                },
+                where: {
+                    orderId: order.orderId
+                },
+                include: {
+                    order_details: true
+                }
+            })
+            updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+            return res.json(orderConverter(updatedOrder))
+        } else {
+            validatError("supplier must prepared product for transit to user only")
+        }
     } catch (err) {
         next(err)
     }
 })
+
+// changing order status
+router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
+    try {
+        let order = await verifyOrderId(req.params.orderId)
+        let { orderStatus } = req.body
+
+        orderStatus = validateRole("validate order status", orderStatus, ORDERSTATUS, false)
+
+        let updatedOrder = {}
+
+        // checkout order when send to customer
+        if (order.orderId.split("-")[1] === req.user.username && orderStatus === ORDERSTATUS.COMPLETED) {
+            if (order.status === ORDERSTATUS.INPROGRESS) {
+                updatedOrder = await prisma.orders.update({
+                    data: {
+                        status: ORDERSTATUS.COMPLETED
+                    },
+                    where: {
+                        orderId: order.orderId
+                    },
+                    include: {
+                        order_details: true
+                    }
+                })
+                updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+                return res.json(orderConverter(updatedOrder))
+            } else {
+                validatError("supplier must be prepared receive item before send to customer")
+            }
+            // cancel order
+        } else if (order.orderId.split("-")[1] === req.user.username && orderStatus === ORDERSTATUS.CANCELED) {
+            if (order.status !== ORDERSTATUS.COMPLETED) {
+                updatedOrder = await prisma.orders.update({
+                    data: {
+                        status: ORDERSTATUS.CANCELED
+                    },
+                    where: {
+                        orderId: order.orderId
+                    },
+                    include: {
+                        order_details: true
+                    }
+                })
+                updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+                return res.json(orderConverter(updatedOrder))
+            } else {
+                validatError("customer cannot canceled after complete to recieve item")
+            }
+        } else {
+            forbiddenError("supplier cannot edit order item when consumer confirm purchase or cancel product")
+        }
+    } catch (err) {
+        next(err)
+    }
+})
+
 
 //----------------------------------------- method zone ----------------------------------------------------
 

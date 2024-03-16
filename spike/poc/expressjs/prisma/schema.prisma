@@ -125,7 +125,7 @@ model accounts {
   role          String    @default("user") @db.VarChar(11)
   status        Boolean   @default(true)
   verifyAccount Boolean   @default(false)
-  phone         String?   @db.Char(11)
+  phone         String   @db.Char(11)
   createdAt     DateTime  @default(dbgenerated("NOW()"))
   updatedAt     DateTime? @default(dbgenerated("NOW()"))
 
@@ -144,7 +144,7 @@ model addresses {
   username     String   @db.VarChar(20)
   accounts     accounts @relation(fields: [username], references: [username], map: "Addresses_username_fkey")
   addressname  String   @db.VarChar(100)
-  phone        String?  @db.Char(11)
+  phone        String  @db.Char(11)
   address      String   @db.VarChar(50)
   province     String   @db.VarChar(20)
   distrinct    String   @db.VarChar(20)
