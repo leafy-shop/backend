@@ -519,38 +519,39 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) =>
     }
 })
 
-const verifyId = async (email_id) => {
+const verifyId = async (username_id) => {
     let filter_u = await prisma.accounts.findFirst({
         // include: {
         //     userinfo: true
         // },
         where: {
             OR: [
-                { email: email_id },
-                { userId: isNaN(Number(email_id)) ? 0 : Number(email_id) }
+                { username: username_id },
+                { userId: isNaN(Number(username_id)) ? 0 : Number(username_id) }
             ]
         },
         select: userDetailView
     })
     // not found checking
-    if (filter_u == null) notFoundError("user id " + email_id + " does not exist")
+    if (filter_u == null) notFoundError("user name or user id " + username_id + " does not exist")
 
     return userConverter(filter_u)
 }
 
-const verifySupplier = async (email_id) => {
+const verifySupplier = async (username_id) => {
 
     let filter_u = await prisma.accounts.findFirst({
         where: {
             AND: [
                 {
                     OR: [
-                        { email: email_id },
-                        { userId: isNaN(Number(email_id)) ? 0 : Number(email_id) }
+                        { username: username_id },
+                        { userId: isNaN(Number(username_id)) ? 0 : Number(username_id) }
                     ]
                 },
                 {
                     OR: [
+                        { role: ROLE.User },
                         { role: ROLE.Supplier },
                         { role: ROLE.GD_DESIGNER }
                     ]
@@ -561,7 +562,7 @@ const verifySupplier = async (email_id) => {
     })
 
     // not found checking
-    if (filter_u == null) notFoundError("user email " + email_id + " does not exist")
+    if (filter_u == null) notFoundError("user name or user id " + username_id + " does not exist")
 
     // owner join time
     console.log(filter_u.createdAt)
