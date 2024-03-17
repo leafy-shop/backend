@@ -65,6 +65,33 @@ exports.UnstrictJwtAuth = (req, res, next) => {
   }
 };
 
+exports.refreshTokenAuth = (req, res, next) => {
+  // เรียก refresh token เพื่อใช้ในการ refresh ถ้าหากเป็น access token จะทำการลบข้อมูลของ user ทำให้ส่ง token ผิด
+  const jwtRefreshToken = "Bearer " + req.cookies.refreshToken;
+
+  try {
+    if (req.cookies.refreshToken !== undefined) {
+      // ตรวจสอบ user ใน access token 
+      // console.log(jwtToken.substring(7))
+      let user = jwt.verify(jwtRefreshToken.substring(7), process.env.TOKEN_SECRET);
+      // console.log(user)
+      // ตรวจสอบใน token มีการทำ format ของ user ถูกต้องไหม
+      if (user.email === undefined || user.role === undefined) {
+        return res.status(401).json(errorRes("invalid token", req.originalUrl))
+      }
+      // ถ้าเจอจะ request ไปยัง user
+      req.user = user;
+    }
+    next();
+  } catch (err) {
+    // ถ้า refresh token ไม่ถูกต้องหรือหมดอายุ
+    // clear session cookie
+    res.clearCookie("token")
+    res.clearCookie("refreshToken")
+    return res.status(403).json(errorRes("Refresh token: " + err.message, req.originalUrl))
+  }
+};
+
 exports.verifyRole = (...roles) => {
   return (req, res, next) => {
     // เรียก role จาก header หรือ cookie

@@ -13,10 +13,11 @@ const dotenv = require('dotenv');
 const cookieParser = require('cookie-parser')
 
 const { PrismaClient } = require('@prisma/client')
-const { UnstrictJwtAuth, JwtAuth } = require('../../../middleware/jwtAuth')
+const { UnstrictJwtAuth, JwtAuth, refreshTokenAuth } = require('../../../middleware/jwtAuth')
 const { ROLE } = require('../../model/enum/role')
 const { validatePassword } = require('../../validation/body')
 const { sendMail, signup_email } = require('../../../config/email_config')
+const { refreshToken } = require('firebase-admin/app')
 const prisma = new PrismaClient()
 
 // get config vars
@@ -97,7 +98,7 @@ router.post('/', async (req, res, next) => {
             "lastname": user.lastname,
             "email": user.email,
             "role": user.role,
-        }, "1h");
+        }, "1s");
 
         // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
         const cookieConfigToken = {
@@ -156,53 +157,29 @@ router.post('/', async (req, res, next) => {
     }
 })
 
-router.post('/refresh', UnstrictJwtAuth, async (req, res, next) => {
+router.post('/refresh', refreshTokenAuth, async (req, res, next) => {
     try {
-        if (isExpired(req.cookies.token)) {
-            // เรียก refresh token เพื่อใช้ในการ refresh ถ้าหากเป็น access token จะทำการลบข้อมูลของ user ทำให้ส่ง token ผิด
-            const jwtRefreshToken = "Bearer " + req.cookies.refreshToken;
-            // console.log(jwtRefreshToken)
-            // const userInfo = JSON.parse(cryptoJs.AES.decrypt(req.cookies.information, process.env.TOKEN_INFO_SECRET).toString(cryptoJs.enc.Utf8))
-            // console.log(userInfo)
-            // const jwttoken = "Bearer " + req.cookies.token
-            // let userInfo = cryptoreq.cookies.infomation;
-
-            // if refresh token expired that removed cookie and response
-            if (isExpired(jwtRefreshToken.substring(7)) || jwtRefreshToken.substring(7).length === 0) {
-                // clear session cookie
-                // const cookieConfig = {
-                //     httpOnly: true,
-                //     sameSite: 'Strict'
-                //     // secure: true
-                // }
-                res.clearCookie("token")
-                res.clearCookie("refreshToken")
-                unAuthorizedError("token is expired, need login again")
-            } else {
-                // assign refresh valiable
-                req.user = {}
-                req.user.email = getUser(jwtRefreshToken.substring(7)).email
-            }
-
-            // console.log(req.user)
-        }
-        // เรียกข้อมูล user โดยใช้ email
+        console.log(req.user)
+        // เรียกข้อมูล user โดยใช้ username
         let user = await prisma.accounts.findFirst({
-            where: { email: req.user.email }
+            where: { username: req.user.username }
         })
+
+        // console.log(user)
 
         // สร้าง refresh token ใหม่ทั้ง token และ refreshToken
         let userToken = {
-            "id": user.userId,
+            "id": user.id,
             "username": user.username,
             "firstname": user.firstname,
             "lastname": user.lastname,
             "email": user.email,
             "role": user.role,
         }
-
+        // console.log("T")
         let token = getToken(userToken, "1h")
         let refreshtoken = getToken(userToken, "24h")
+        // console.log("T")
 
         // ตรวจดูว่า token ถูกต้องไหมก่อนส่ง
         if (user === undefined) {
@@ -225,24 +202,8 @@ router.post('/refresh', UnstrictJwtAuth, async (req, res, next) => {
             // secure: true
         }
 
-        // // เก็บเป็น cookie ให้ผู้พัฒนา frontend สามารถใช้งานได้
-        // const cookieInfomation = {
-        //     maxAge: 24 * 60 * 60 * 1000,
-        //     // httpOnly: true,
-        //     sameSite: 'Strict'
-        //     // secure: true
-        // }
-
         res.cookie("token", token, cookieConfigToken);
         res.cookie("refreshToken", refreshtoken, cookieConfigRefreshToken);
-        // res.cookie("information", encryptInformation({
-        //     "id": getUser(token).id,
-        //     "username": getUser(token).username,
-        //     "firstname": getUser(token).firstname,
-        //     "lastname": getUser(token).lastname,
-        //     "email": getUser(token).email,
-        //     "role": getUser(token).role,
-        // }), cookieInfomation)
 
         res.status(200).json({
             "id": getUser(token).id,
@@ -252,6 +213,9 @@ router.post('/refresh', UnstrictJwtAuth, async (req, res, next) => {
             "email": getUser(token).email,
             "role": getUser(token).role,
         })
+
+
+        // console.log(req.user)
     } catch (err) {
         next(err)
     }
