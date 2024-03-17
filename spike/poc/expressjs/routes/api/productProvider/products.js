@@ -12,6 +12,7 @@ const { PrismaClient, Prisma } = require('@prisma/client');
 // const { mode } = require('../../config/minio_config');
 const { productConverter, timeConverter, paginationList, generateIdByMapping } = require('../../model/class/utils/converterUtils');
 const { ROLE } = require('../../model/enum/role');
+const { ORDERSTATUS } = require('../../model/enum/order');
 const { findImagePath, listFirstImage, listAllImage } = require('../../model/class/utils/imageList');
 const prisma = new PrismaClient()
 // const crypto = require("crypto");
@@ -327,6 +328,12 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         //     next(error)
         // });
 
+        // check item sold
+        filter_pd = await Promise.all(filter_pd.map(async (product) => {
+            return await haveItemSoles(product)
+        }))
+
+        // check out stock data
         const outStockData = await outOfStock(filter_pd);
 
         // Filter products that are in stock
@@ -426,6 +433,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         // image for product
         let path = findImagePath("products", item.itemId)
         item.image = await listFirstImage(path, "main.png")
+        item = await haveItemSoles(item)
         // console.log(item.image)
 
         // list product review to page
@@ -1209,6 +1217,23 @@ const findFavPdById = async (username, id) => {
         }
     })
     return fav_pd
+}
+
+const haveItemSoles = async (product) => {
+    let orders = await prisma.orders.findMany({
+        where: {
+            status: ORDERSTATUS.COMPLETED
+        },
+        select: {
+            order_details: {
+                where: {
+                    itemId: product.itemId
+                }
+            }
+        }
+    })
+    product.sold = orders.reduce((cur, pre) => cur + pre.order_details.reduce((cur1,pre1)=>cur1+pre1.qtyOrder,0),0)
+    return product
 }
 
 module.exports = router
