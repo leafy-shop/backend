@@ -159,7 +159,7 @@ router.post('/', async (req, res, next) => {
 
 router.post('/refresh', refreshTokenAuth, async (req, res, next) => {
     try {
-        console.log(req.user)
+        // console.log(req.user)
         // เรียกข้อมูล user โดยใช้ username
         let user = await prisma.accounts.findFirst({
             where: { username: req.user.username }
@@ -169,7 +169,7 @@ router.post('/refresh', refreshTokenAuth, async (req, res, next) => {
 
         // สร้าง refresh token ใหม่ทั้ง token และ refreshToken
         let userToken = {
-            "id": user.id,
+            "id": user.userId,
             "username": user.username,
             "firstname": user.firstname,
             "lastname": user.lastname,
