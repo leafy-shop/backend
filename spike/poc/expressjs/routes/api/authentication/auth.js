@@ -98,7 +98,7 @@ router.post('/', async (req, res, next) => {
             "lastname": user.lastname,
             "email": user.email,
             "role": user.role,
-        }, "1s");
+        }, "1้h");
 
         // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
         const cookieConfigToken = {
