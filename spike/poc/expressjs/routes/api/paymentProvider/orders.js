@@ -13,13 +13,16 @@ let router = express.Router()
 
 // get all account order item
 router.get('/', JwtAuth, async (req, res) => {
-    let { sort, page, limit } = req.query
+    let { status, sort, page, limit } = req.query
 
     let pageN = Number(page)
     let limitN = Number(limit)
 
     // get all item orders by address Id sort by created at
     let orders = await prisma.orders.findMany({
+        where: {
+            status: status
+        },
         include: {
             order_details: true
         },
@@ -54,7 +57,7 @@ router.get('/', JwtAuth, async (req, res) => {
 
 // get all supplier order item or order audit
 router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res) => {
-    let { sort, itemId, username, page, limit } = req.query
+    let { sort, itemId, username, status, page, limit } = req.query
 
     let pageN = Number(page)
     let limitN = Number(limit)
@@ -63,6 +66,9 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
     let orders = []
     if (Number(itemId) > 0) {
         orders = await prisma.orders.findMany({
+            where: {
+                status: status
+            },
             include: {
                 order_details: true
             },
@@ -102,7 +108,7 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
             order.postalCode = user.postalCode
             // console.log(order)
             order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
-            order.details = await Promise.all(order.order_details.map(async od => {
+            order.order_details = await Promise.all(order.order_details.map(async od => {
                 let item = await verifyItemId(od.itemId)
                 od.itemname = item.name
                 return od
@@ -119,14 +125,18 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
 // get order item by address id
 router.get('/addresses/:addressId', JwtAuth, async (req, res, next) => {
     try {
-        let { page, limit } = req.query
+        let { status, sort, page, limit } = req.query
 
         let pageN = Number(page)
         let limitN = Number(limit)
 
         // list addresses
-        let address = await verifyAddressId(req.params.addressId)
-        console.log(address)
+        let address = await prisma.addresses.findFirst({
+            where: {
+                addressId: req.params.addressId
+            }
+        })
+        // console.log(address)
 
         // validate authorization when see other address
         if (address.addressId.split("-")[0] !== req.user.username) {
@@ -134,16 +144,32 @@ router.get('/addresses/:addressId', JwtAuth, async (req, res, next) => {
         }
 
         // list orders
-        let orders = await verifyOrderIdByAddress(req.params.addressId)
+        let orders = []
+        if (address !== null) {
+            orders = await prisma.orders.findMany({
+                where: {
+                    AND: [
+                        { addressId: address.addressId },
+                        { status: status },
+                    ]
+                },
+                include: {
+                    order_details: true
+                },
+                orderBy: {
+                    createdAt: sort === "asc" ? "asc" : "desc"
+                }
+            })
 
-        if (req.user.role === ROLE.Supplier && (orders.orderId.split("-")[0] === req.user.username || orders.orderId.split("-")[1] !== req.user.username)) {
-            forbiddenError("you cannot see order in other user except yourself and your item order")
+            if (req.user.role === ROLE.Supplier && (orders.orderId.split("-")[0] === req.user.username || orders.orderId.split("-")[1] !== req.user.username)) {
+                forbiddenError("you cannot see order in other user except yourself and your item order")
+            }
+
+            orders = orders.map(order => {
+                order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+                return orderConverter(order)
+            })
         }
-
-        orders = orders.map(order => {
-            order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
-            return orderConverter(order)
-        })
 
         let page_order = paginationList(orders, pageN, limitN, 10)
 
