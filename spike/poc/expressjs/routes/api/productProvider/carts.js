@@ -46,6 +46,8 @@ router.get('/', JwtAuth, async (req, res, next) => {
                     cart.image = await listFirstImage(findImagePath("products", cart.itemId), "main.png")
                     cart.priceEach = parseFloat(product.price).toFixed(2);
                     cart.sessionId = undefined;
+                    let itemOwner = await verifyItemOwner(cart.itemId)
+                    cart.itemName = itemOwner.name
                     cart = timeConverter(cart)
                     ownerCart.push(cart)
                 }
@@ -381,9 +383,6 @@ const verifyItemOwner = async (id) => {
     let itemId = await prisma.items.findFirst({
         where: {
             itemId: id
-        },
-        select: {
-            itemOwner: true
         }
     })
     // if (mycart == null) notFoundError("cart id " + id + " does not exist")

@@ -18,7 +18,7 @@ const validateStr = (prop = '', value = '', length = 0, isEmpty = false, isNumbe
     }
 
     // validate string if they is number
-    if (!isNaN(Number(value)) && !isNumber) {
+    if (!isNaN(Number(value)) && isNumber) {
         validatError(`${prop}:${value} is must not number`)
     }
 
@@ -219,6 +219,10 @@ const validateDatetimeFuture = (prop = '', value = undefined, isEmpty = false, i
 
 const validatePhone = (prop = '', value) => {
     let re = /^\(?(\d{3})\)?[- ]?(\d{3})[- ]?(\d{4})|\(?(\d{3})\)?[- ]?(\d{3})[- ]?(\d{4})[- ]?\d{1}$/;
+    if (value === undefined) {
+        validatError(`${prop} is not null`)
+    }
+
     // validate format
     if (!value.match(re)) {
         validatError(`${prop} is not phone format`)

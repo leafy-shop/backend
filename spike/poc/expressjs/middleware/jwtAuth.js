@@ -130,7 +130,7 @@ exports.ProductFileAuthorization = async (req, res, next) => {
     // validate supplier
     if (req.user.role === ROLE.Supplier) {
       // find item owner by id
-      if (req.user.email !== item.itemOwner) {
+      if (req.user.username !== item.itemOwner) {
         validatError("you can't manage other item owner's images except yourself.")
       }
     }
@@ -157,7 +157,7 @@ exports.UserFileAuthorization = async (req, res, next) => {
         notFoundError("user id " + req.params.id + " not found")
       }
       // validate other user except admin
-      if (req.user.email !== user.email) {
+      if (req.user.username !== user.username) {
         validatError("you can't manage other user icons except yourself.")
       }
     }
