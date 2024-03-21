@@ -211,7 +211,7 @@ const validateDatetimeFuture = (prop = '', value = undefined, isEmpty = false, i
         validatError(`${prop}:${value} is not under than present`)
     }
 
-    value = new Date(value.valueOf() + 7*60*60*1000)
+    // value = new Date(value.valueOf() + 7*60*60*1000)
 
     console.log(`validate ${prop} is passed`)
     return value

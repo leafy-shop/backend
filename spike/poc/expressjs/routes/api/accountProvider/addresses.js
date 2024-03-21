@@ -2,10 +2,10 @@ const { PrismaClient } = require('@prisma/client')
 const express = require('express')
 const { generateIdByMapping } = require('../../model/class/utils/converterUtils')
 const router = express.Router()
-const { validateStr, validatePhone, validateCode } = require('../../validation/body')
+const { validateStr, validatePhone, validateCode, validateBoolean } = require('../../validation/body')
 const { deleteNullValue } = require('../../model/class/utils/modelMapping')
 const { userDetailView } = require('../../model/class/model')
-const { notFoundError, forbiddenError } = require('../../model/error/error')
+const { notFoundError, forbiddenError, validatError } = require('../../model/error/error')
 const { ROLE } = require('../../model/enum/role')
 const { JwtAuth } = require('../../../middleware/jwtAuth')
 
@@ -17,8 +17,8 @@ router.get('/:username', JwtAuth, async (req, res, next) => {
         // check user by name
         let user = await verifyName(req.params.username)
 
-        // check role and same user email
-        if (req.user.role !== ROLE.Admin && user.email !== req.user.email) forbiddenError('This user can see yourself only')
+        // check role and same user name
+        if (req.user.role !== ROLE.Admin && user.username !== req.user.username) forbiddenError('This user can see yourself only')
 
         // find all address of user
         let addresses = await prisma.addresses.findMany({
@@ -45,8 +45,8 @@ router.get('/:username/:addressId', JwtAuth, async (req, res, next) => {
         // check user by name
         let user = await verifyName(username)
 
-        // check role and same user email
-        if (req.user.role !== ROLE.Admin && user.email !== req.user.email) forbiddenError('This user can see yourself only')
+        // check role and same user name
+        if (req.user.role !== ROLE.Admin && user.username !== req.user.username) forbiddenError('This user can see yourself only')
 
         // get address detail by address name and user name
         let address = await verifyAddress(user.username, addressId)
@@ -58,26 +58,46 @@ router.get('/:username/:addressId', JwtAuth, async (req, res, next) => {
 })
 
 // POST - create user address
-router.post('/', JwtAuth, async (req, res, next) => {
+router.post('/:username', JwtAuth, async (req, res, next) => {
     try {
         // request data from request body
         let { addressId, addressname, address, province, distrinct, subDistrinct, postalCode, phone } = req.body
+        let { username } = req.params
+
+        if (req.user.role !== ROLE.Admin && req.user.username !== username) {
+            forbiddenError('This user can create yourself address only')
+        }
 
         // generate Id 32 digit
-        let id = addressId != undefined ? addressId : generateIdByMapping(16, req.user.username)
+        let id = addressId != undefined ? addressId : generateIdByMapping(16, username)
         // console.log(validatePhone("validate address phone", phone))
 
         // validate data model
         let addressModel = {
             addressId: id,
-            username: req.user.username,
+            username: username,
             addressname: validateStr("validate address name", addressname, 100),
             phone: validatePhone("validate address phone", phone),
             address: validateStr("valiadate address", address, 50),
             province: validateStr("validate province", province, 20),
             distrinct: validateStr("validate distrinct", distrinct, 20),
             subDistrinct: validateStr("validate sub distrinct", subDistrinct, 20, true),
-            postalCode: validateCode("validate postal code", postalCode, 5)
+            postalCode: validateCode("validate postal code", postalCode, 5),
+        }
+
+        // find all address of default user
+        let addressDefault = await prisma.addresses.findFirst({
+            where: {
+                AND: [
+                    { username: username },
+                    { isDefault: true }
+                ]
+            }
+        })
+
+        // set defualt value when they does not exist
+        if (addressDefault === null) {
+            addressModel.isDefault = true
         }
 
         // create address and return
@@ -116,10 +136,21 @@ router.patch('/:username/:addressId', JwtAuth, async (req, res, next) => {
                                 i == "province" ? validateStr("validate province", req.body[i], 20) :
                                     i == "distrinct" ? validateStr("validate distrinct", req.body[i], 20) :
                                         i == "subDistrinct" ? validateStr("validate sub distrinct", req.body[i], 20, true) :
-                                            i == "postalCode" ? validateCode("validate postal code", req.body[i], 5) : undefined
+                                            i == "postalCode" ? validateCode("validate postal code", req.body[i], 5) :
+                                                i == "isDefault" ? validateBoolean("validate is default for account address", req.body[i]) : undefined
             }
         }
         // console.log(mapAddress)
+        if (mapAddress.isDefault) {
+            await prisma.addresses.updateMany({
+                data: {
+                    isDefault: false
+                },
+                where: {
+                    username: username
+                }
+            })
+        }
 
         // update address and return
         let addressResponse = await prisma.addresses.update({
@@ -148,15 +179,21 @@ router.delete('/:username/:addressId', JwtAuth, async (req, res, next) => {
         if (req.user.role !== ROLE.Admin && user.email !== req.user.email) forbiddenError('This user can see yourself only')
 
         // find user name and address
-        await verifyAddress(username, addressId)
+        let address = await verifyAddress(username, addressId)
 
-        // dalete address and return
-        await prisma.addresses.delete({
-            where: {
-                addressId: addressId,
-                username: username
-            },
-        })
+        // mandatory cannot delete default selection
+        if (address.isDefault) {
+            validatError("cannot delete default selection of your address")
+        // dalete address and return    
+        } else {
+            await prisma.addresses.delete({
+                where: {
+                    addressId: addressId,
+                    username: username
+                },
+            })
+        }
+
         return res.json({ message: "user address " + addressId + " in " + username + " has been deleted" })
     } catch (err) {
         next(err)

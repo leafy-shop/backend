@@ -2,10 +2,10 @@ const { PrismaClient } = require('@prisma/client')
 const express = require('express')
 const { generateIdByMapping } = require('../../model/class/utils/converterUtils')
 const router = express.Router()
-const { validateStr, validateCode, validateRole } = require('../../validation/body')
+const { validateStr, validateCode, validateRole, validateBoolean } = require('../../validation/body')
 const { deleteNullValue } = require('../../model/class/utils/modelMapping')
 const { userDetailView } = require('../../model/class/model')
-const { notFoundError, forbiddenError } = require('../../model/error/error')
+const { notFoundError, forbiddenError, validatError } = require('../../model/error/error')
 const { ROLE } = require('../../model/enum/role')
 const { BANKCODE } = require('../../model/enum/account')
 const { JwtAuth } = require('../../../middleware/jwtAuth')
@@ -18,8 +18,8 @@ router.get('/:username', JwtAuth, async (req, res, next) => {
         // check user by name
         let user = await verifyName(req.params.username)
 
-        // check role and same user email
-        if (req.user.role !== ROLE.Admin && user.email !== req.user.email) forbiddenError('This user can see yourself only')
+        // check role and same user name
+        if (req.user.role !== ROLE.Admin && user.username !== req.user.username) forbiddenError('This user can see yourself only')
 
         // find all payment of user
         let payments = await prisma.payments.findMany({
@@ -59,10 +59,16 @@ router.get('/:username/:paymentId', JwtAuth, async (req, res, next) => {
 })
 
 // POST - create user payment
-router.post('/', JwtAuth, async (req, res, next) => {
+router.post('/:username', JwtAuth, async (req, res, next) => {
     try {
         // request data from request body
         let { paymentId, bankname, bankCode, bankAccount } = req.body
+        let { username } = req.params
+
+
+        if (req.user.role !== ROLE.Admin && req.user.username !== username) {
+            forbiddenError('This user can create yourself address only')
+        }
 
         // generate Id 32 digit
         let id = paymentId != undefined ? paymentId : generateIdByMapping(16, req.user.username)
@@ -75,6 +81,20 @@ router.post('/', JwtAuth, async (req, res, next) => {
             bankname: validateStr("validate bank name", bankname, 100),
             bankCode: validateRole("valiadate bank code", bankCode, BANKCODE),
             bankAccount: validateCode("validate bank account number", bankAccount, 16, [10, 12, 14, 15, 16])
+        }
+
+        // find all address of default user
+        let paymentDefault = await prisma.payments.findFirst({
+            where: {
+                AND: [
+                    { username: req.user.username },
+                    { isDefault: true }
+                ]
+            }
+        })
+        // set defualt value when they does not exist
+        if (paymentDefault === null) {
+            paymentModel.isDefault = true
         }
 
         // create payment and return
@@ -97,22 +117,34 @@ router.patch('/:username/:paymentId', JwtAuth, async (req, res, next) => {
         let user = await verifyName(username)
 
         // check role and same user email
-        if (req.user.role !== ROLE.Admin && user.email !== req.user.email) forbiddenError('This user can see yourself only')
+        if (req.user.role !== ROLE.Admin && user.username !== req.user.username) forbiddenError('This user can see yourself only')
 
         // find user name and payment
         await verifypayment(user.username, paymentId)
 
         // validate data model
-        let mappayment = {}
+        let mapPayment = {}
         for (let i in req.body) {
             if (req.body[i] != undefined) {
-                mappayment[i] =
+                mapPayment[i] =
                     i == "bankname" ? validateStr("validate bank name", req.body[i], 100) :
                         i == "bankCode" ? validateStr("validate bank code", req.body[i], 10) :
-                            i == "bankAccount" ? validateCode("validate bank account number", req.body[i], 16, [10, 12, 14, 15, 16]) : undefined
+                            i == "bankAccount" ? validateCode("validate bank account number", req.body[i], 16, [10, 12, 14, 15, 16]) :
+                                i == "isDefault" ? validateBoolean("validate is default for account payment", req.body[i]) : undefined
             }
         }
         // console.log(mappayment)
+
+        if (mapPayment.isDefault) {
+            await prisma.payments.updateMany({
+                data: {
+                    isDefault: false
+                },
+                where: {
+                    username: username
+                }
+            })
+        }
 
         // update payment and return
         let paymentResponse = await prisma.payments.update({
@@ -120,7 +152,7 @@ router.patch('/:username/:paymentId', JwtAuth, async (req, res, next) => {
                 paymentId: paymentId,
                 username: username
             },
-            data: mappayment
+            data: mapPayment
         })
         return res.json(deleteNullValue(paymentResponse))
     } catch (err) {
@@ -138,18 +170,23 @@ router.delete('/:username/:paymentId', JwtAuth, async (req, res, next) => {
         let user = await verifyName(username)
 
         // check role and same user email
-        if (req.user.role !== ROLE.Admin && user.email !== req.user.email) forbiddenError('This user can see yourself only')
+        if (req.user.role !== ROLE.Admin && user.username !== req.user.username) forbiddenError('This user can see yourself only')
 
         // find user name and payment
         await verifypayment(user.username, paymentId)
 
         // dalete payment and return
-        await prisma.payments.delete({
-            where: {
-                paymentId: paymentId,
-                username: username
-            },
-        })
+        if (address.isDefault) {
+            validatError("cannot delete default selection of your payment")
+        } else {
+            await prisma.payments.delete({
+                where: {
+                    addressId: addressId,
+                    username: username
+                },
+            })
+        }
+
         return res.json({ message: "user payment " + paymentId + " in " + username + " has been deleted" })
     } catch (err) {
         next(err)

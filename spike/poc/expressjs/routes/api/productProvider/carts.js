@@ -106,6 +106,9 @@ router.post('/products', JwtAuth, async (req, res, next) => {
         // let itemInCart = await verifyItemId()
         let itemOwner = await verifyItemOwner(choosePd.itemId)
 
+        console.log(sessionCart)
+        console.log(itemOwner.itemOwner)
+
         // check quantity
         cartItem = cartItem ? cartItem : { qty: 0 }
         if (choosePd.stock <= cartItem.qty) validatError(`product:${itemId} at style:${style} and size:${size} have out stocks`)
@@ -113,7 +116,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
         if (itemOwner.itemOwner === req.user.username) forbiddenError(`product:${itemId} at style:${style} and size:${size} cannot added from your product`)
 
         // if user already has cart item input and owner session cart
-        if (cartItem.cartId && sessionCart) {
+        if (cartItem && req.user.username === cartItem.cartId.split("-")[0] && sessionCart) {
             // update quantity item
             cart = await prisma.carts.update({
                 data: {

@@ -32,22 +32,18 @@ router.get('/', JwtAuth, async (req, res) => {
     })
 
     orders = orders.filter(order => {
-        return order.addressId.split("-")[0] === req.user.username
+        return order.customerName === req.user.username
     })
     console.log(orders)
 
     // get all order list
     orders = await Promise.all(orders.map(async order => {
-        // console.log(order)
-        let user = await verifyAddressId(order.addressId)
-        // console.log(user)
-        order.addressName = user.addressname
-        order.address = user.address
-        order.subDistrinct = user.subDistrinct
-        order.distrinct = user.distrinct
-        order.province = user.province
-        order.postalCode = user.postalCode
         order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+        order.order_details = await Promise.all(order.order_details.map(async od => {
+            let item = await verifyItemId(od.itemId)
+            od.itemname = item.name
+            return od
+        }))
         return orderConverter(order)
     }))
     let page_order = paginationList(orders, pageN, limitN, 10)
@@ -92,20 +88,12 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
 
     // filter supplier owner and customer name
     orders = orders.filter(order => {
-        return order.orderId.split("-")[0] === req.user.username && (!username || order.orderId.split("-")[1] === username)
+        return order.orderId.split("-")[0] === req.user.username && (!username || order.customerName === username)
     })
 
     // order format
     if (orders.length !== 0) {
         orders = await Promise.all(orders.map(async order => {
-            let user = await verifyAddressId(order.addressId)
-            // console.log(user)
-            order.addressName = user.addressname
-            order.address = user.address
-            order.subDistrinct = user.subDistrinct
-            order.distrinct = user.distrinct
-            order.province = user.province
-            order.postalCode = user.postalCode
             // console.log(order)
             order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
             order.order_details = await Promise.all(order.order_details.map(async od => {
@@ -123,61 +111,61 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
 })
 
 // get order item by address id
-router.get('/addresses/:addressId', JwtAuth, async (req, res, next) => {
-    try {
-        let { status, sort, page, limit } = req.query
+// router.get('/addresses/:addressId', JwtAuth, async (req, res, next) => {
+//     try {
+//         let { status, sort, page, limit } = req.query
 
-        let pageN = Number(page)
-        let limitN = Number(limit)
+//         let pageN = Number(page)
+//         let limitN = Number(limit)
 
-        // list addresses
-        let address = await prisma.addresses.findFirst({
-            where: {
-                addressId: req.params.addressId
-            }
-        })
-        // console.log(address)
+//         // list addresses
+//         let address = await prisma.addresses.findFirst({
+//             where: {
+//                 addressId: req.params.addressId
+//             }
+//         })
+//         // console.log(address)
 
-        // validate authorization when see other address
-        if (address.addressId.split("-")[0] !== req.user.username) {
-            forbiddenError("you cannot see order in other addresses except owner addresses only")
-        }
+//         // validate authorization when see other address
+//         if (address.addressId.split("-")[0] !== req.user.username) {
+//             forbiddenError("you cannot see order in other addresses except owner addresses only")
+//         }
 
-        // list orders
-        let orders = []
-        if (address !== null) {
-            orders = await prisma.orders.findMany({
-                where: {
-                    AND: [
-                        { addressId: address.addressId },
-                        { status: status },
-                    ]
-                },
-                include: {
-                    order_details: true
-                },
-                orderBy: {
-                    createdAt: sort === "asc" ? "asc" : "desc"
-                }
-            })
+//         // list orders
+//         let orders = []
+//         if (address !== null) {
+//             orders = await prisma.orders.findMany({
+//                 where: {
+//                     AND: [
+//                         { addressId: address.addressId },
+//                         { status: status },
+//                     ]
+//                 },
+//                 include: {
+//                     order_details: true
+//                 },
+//                 orderBy: {
+//                     createdAt: sort === "asc" ? "asc" : "desc"
+//                 }
+//             })
 
-            if (req.user.role === ROLE.Supplier && (orders.orderId.split("-")[0] === req.user.username || orders.orderId.split("-")[1] !== req.user.username)) {
-                forbiddenError("you cannot see order in other user except yourself and your item order")
-            }
+//             if (req.user.role === ROLE.Supplier && (orders.orderId.split("-")[0] === req.user.username || orders.orderId.split("-")[1] !== req.user.username)) {
+//                 forbiddenError("you cannot see order in other user except yourself and your item order")
+//             }
 
-            orders = orders.map(order => {
-                order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
-                return orderConverter(order)
-            })
-        }
+//             orders = orders.map(order => {
+//                 order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+//                 return orderConverter(order)
+//             })
+//         }
 
-        let page_order = paginationList(orders, pageN, limitN, 10)
+//         let page_order = paginationList(orders, pageN, limitN, 10)
 
-        return res.json(page_order)
-    } catch (err) {
-        next(err)
-    }
-})
+//         return res.json(page_order)
+//     } catch (err) {
+//         next(err)
+//     }
+// })
 
 // get order item by order id
 router.get('/:orderId', JwtAuth, async (req, res, next) => {
@@ -185,7 +173,7 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
         let order = await verifyOrderId(req.params.orderId)
 
         // if they are user or garden designer role
-        if (order.orderId.split("-")[1] !== req.user.username) {
+        if (ROLE.Admin !== req.user.role && order.customerName !== req.user.username) {
             forbiddenError("you cannot see order in other user except yourself")
         }
 
@@ -236,14 +224,19 @@ router.post('/', JwtAuth, async (req, res, next) => {
             }
         })
 
+        // edited address
+        let addressFormat = (accountAddress.subDistrinct !== undefined ? `${accountAddress.address} ${accountAddress.subDistrinct} ${accountAddress.distrinct} ${accountAddress.province} ${accountAddress.postalCode}` :
+        `${accountAddress.address} ${accountAddress.distrinct} ${accountAddress.province} ${accountAddress.postalCode}`)
+
         let orders = {}
         for (let selectOwner in selectedSession) {
             // add order by address and status etc.
-            let orderId = `${selectedSession[selectOwner].sessionId.split("-")[0]}-${generateIdByMapping(16, req.user.username)}`
+            let orderId = generateIdByMapping(16, selectedSession[selectOwner].sessionId.split("-")[0])
             await prisma.orders.create({
                 data: {
                     orderId: orderId,
-                    addressId: validateStr("validate account address", addressId, 53),
+                    customerName: accountAddress.username,
+                    address: addressFormat,
                     status: ORDERSTATUS.PENDING
                 }
             })
@@ -384,7 +377,7 @@ router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
         let updatedOrder = {}
 
         // checkout order when send to customer
-        if (order.orderId.split("-")[1] === req.user.username && orderStatus === ORDERSTATUS.COMPLETED) {
+        if (order.customerName === req.user.username && orderStatus === ORDERSTATUS.COMPLETED) {
             if (order.status === ORDERSTATUS.INPROGRESS) {
                 updatedOrder = await prisma.orders.update({
                     data: {
@@ -403,7 +396,7 @@ router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
                 validatError("supplier must be prepared receive item before send to customer")
             }
             // cancel order
-        } else if (order.orderId.split("-")[1] === req.user.username && orderStatus === ORDERSTATUS.CANCELED) {
+        } else if (order.customerName === req.user.username && orderStatus === ORDERSTATUS.CANCELED) {
             if (order.status !== ORDERSTATUS.COMPLETED) {
                 updatedOrder = await prisma.orders.update({
                     data: {

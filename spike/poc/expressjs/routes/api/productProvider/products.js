@@ -116,8 +116,6 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     let sortModel = {}
     if (sort_name == "price") {
         sortModel.minPrice = (sort === "desc") ? "desc" : "asc"
-    } else if (sort_name == "sales") {
-        sortModel.sold = (sort === "desc") ? "desc" : "asc"
     } else if (sort_name == "new_arrival") {
         sortModel.createdAt = (sort === "desc") ? "desc" : "asc"
     }
@@ -329,9 +327,23 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         // });
 
         // check item sold
-        filter_pd = await Promise.all(filter_pd.map(async (product) => {
-            return await haveItemSoles(product)
-        }))
+
+
+        if (sort_name == "sales") {
+            sortModel.sold = (sort === "desc") ? "desc" : "asc"
+            filter_pd = await Promise.all(filter_pd.map(async (product) => {
+                return await haveItemSolesIn2Month(product)
+            }))
+            if (sort == "desc") {
+                filter_pd = filter_pd.sort((a,b) => b.sold - a.sold)
+            } else {
+                filter_pd = filter_pd.sort((a,b) => a.sold - b.sold)
+            }
+        } else {
+            filter_pd = await Promise.all(filter_pd.map(async (product) => {
+                return await haveItemSoles(product)
+            }))
+        }
 
         // check out stock data
         const outStockData = await outOfStock(filter_pd);
@@ -340,27 +352,27 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         filter_pd = filter_pd.filter(product => {
             return !outStockData.some(out => out.itemId === product.itemId);
         });
-    
+
         // Limit out-of-stock products to 5 items
         const itemOutStock = outStockData.slice(0, 5);
-    
+
         // Paginate the filtered product list
         const page_pd = paginationList(filter_pd, pageN, limitN, 18);
-    
+
         // Fetch images for in-stock products
         const productList = await Promise.all(page_pd.list.map(async (product) => {
             return await getProductImage(productConverter(product, prodList));
         }));
-    
+
         page_pd.list = productList;
-    
+
         // Fetch images for out-of-stock products
         const outStockImages = await Promise.all(itemOutStock.map(async (product) => {
             return await getProductImage(productConverter(product, prodList));
         }));
-    
+
         page_pd.outStock = outStockImages;
-    
+
         return res.send(page_pd);
 
     } catch (err) {
@@ -471,11 +483,12 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         // })
         const stylesWithImages = await Promise.all(
             item.styles.map(async (product) => {
+                product.itemId = undefined
                 // Fetch image for each product style
-                return await getProductStyleImage(productConverter(product));
+                return await getProductStyleImage(productConverter(product), item.itemId);
             })
         );
-    
+
         item.styles = stylesWithImages;
         // Respond with the updated product object
         return res.json(productConverter(item));
@@ -500,21 +513,30 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
     // })
 
     // {
+    //     "itemId": 20,
     //     "name": "small zee cactus",
     //     "description": "this is cactus create by zee",
-    //     "itemOwner": "piraphat123@gmail.com",
+    //     "itemOwner": "piraphat123",
     //     "type": "cactus",
     //     "tag": ["cactus is amazing","flower cactus","cactus","","cactus","Cactus"],
     //     "styles": [
     //         {
-    //             "style": "light green cactus",
-    //             "size": ["XS","S"]
-    //         },{
-    //             "style": "green cactus",
-    //             "size": ["S"]
+    //             "style": "sku-1",
+    //             "sizes": [
+    //                 { "size": "XS", "price": 12.00, "stock": 666 },
+    //                 { "size": "S", "price": 24.00, "stock": 444 }
+    //             ]
+    //         },
+    //         {
+    //             "style": "sku-2",
+    //             "sizes": [
+    //                 { "size": "XS", "price": 32.00, "stock": 222 },
+    //                 { "size": "S", "price": 64.00, "stock": 111 },
+    //                 { "size": "M", "price": 96.00, "stock": 121 },
+    //                 { "size": "L", "price": 128.00, "stock": 211 }
+    //             ]
     //         }
-    //     ],
-    //     "price": 32
+    //     ]
     // }
 
     // created product from request body and validation
@@ -525,33 +547,25 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
 
         let priceRange = {}
         let priceList = []
-        let styleList = []
-        let sizeList = []
         if (styles.length === 0 || !Array.isArray(styles)) {
-            validatError("created item must be have 1 style item")
+            validatError("created item must have at least 1 style item")
         }
-        styles.forEach(sty => {
-            if (sty.price === undefined) {
-                validatError("item detail must be have price")
-            }
+        styles = styles.map(sty => {
             // console.log(sty)
-            sty.style = sty.style === undefined || sty.style.length === 0 ? "No" : sty.style
-            styleList.push(validateStr("item style:" + sty.style, sty.style, 50))
-            sty.size = sty.size === undefined || sty.style.length === 0 ? ITEMSIZE.No : sty.size
-            sizeList.push(validateStr("item size:" + sty.style, sty.size, 50))
-            validateInt("item stock:" + sty.style, sty.stock, false, 0)
-            priceList.push(validateDouble("item price:" + sty.price, sty.price, false, 0))
-        })
-        styles.forEach(sty => {
-            if (styleList.includes("No") && sty.style !== "No") {
-                validatError("item detail style if no style must cannot add another style")
-            }
-            if (sizeList.includes("No") && sty.size !== "No") {
-                validatError("item detail size if no size must cannot add another style")
-            }
+            sty.style = sty.style === undefined || sty.style.length === 0 ? validatError("item detail must have sku style code") : sty.style
+            sty.sizes = sty.sizes === undefined || sty.sizes.length === 0 ? validatError("item detail in sku must be have size") : sty.sizes
+            sty.sizes = sty.sizes.map(size => {
+                // console.log(size)
+                size.size = validateStr("item size from " + sty.style, size.size, 50)
+                size.price = validateDouble("item price from " + sty.style, size.price, false, 0)
+                size.stock = validateInt("item stock from " + sty.style, size.stock, false, 1)
+                priceList.push(size.price)
+                return size
+            })
+            return sty
         })
         priceRange.minPrice = Math.min(...priceList)
-        priceRange.maxPrice = Math.max(...priceList) !== priceRange.minPrice ? Math.max(...priceList) : 0
+        priceRange.maxPrice = Math.max(...priceList)
 
         let itemModel = {
             itemId: isNaN(itemId) ? undefined : validateInt("item id", itemId, true),
@@ -564,7 +578,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
         }
 
         if (req.user.role == ROLE.Admin) {
-            itemModel.itemOwner = validateEmail("item owner", itemOwner, 100)
+            itemModel.itemOwner = validateStr("item owner", itemOwner, 20)
         } else {
             itemModel.itemOwner = req.user.username
         }
@@ -574,20 +588,31 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
             data: itemModel
         })
 
-        const item_detail = await Promise.all(styles.map(async (sty) => {
-            // Create item detail for each style
-            return await prisma.item_details.create({
+        // create item sku mapping and item details
+        await Promise.all(styles.map(async (sty) => {
+            let sku = await prisma.item_sku.create({
                 data: {
                     itemId: input.itemId,
-                    style: sty.style,
-                    size: sty.size,
-                    stock: sty.stock,
-                    price: sty.price
+                    SKUstyle: sty.style,
                 }
+            });
+
+            // using sku mapping to create
+            sty.sizes = sty.sizes.map(size => {
+                size.itemId = sku.itemId
+                size.style = sku.SKUstyle
+                return size
+            })
+
+            // console.log(sty.sizes)
+
+            // Create item detail for each style
+            return await prisma.item_details.createMany({
+                data: sty.sizes
             });
         }));
 
-        input.styles = item_detail;
+        input.styles = styles;
         return res.status(201).json(productConverter(input));
 
     } catch (err) {
@@ -686,44 +711,102 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req,
 })
 
 // PUT - update product detail by id and style
-router.put('/:id/:style/:size', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
+router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     // update product
-
-    let { price, stock, style, size } = req.body
+    let { id, style } = req.params
+    let { sizes } = req.body
 
     try {
+        if (sizes.length === 0 || !Array.isArray(sizes)) {
+            validatError("updated item" + id + "sku style " + style + " must have at least 1 size item")
+        }
+        sizes = sizes.map(size => {
+            // console.log(size)
+            size.size = validateStr("item size", size.size, 50)
+            size.price = validateDouble("item price", size.price, false, 0)
+            size.stock = validateInt("item stock", size.stock, false, 1)
+            return size
+        })
+
         // find item id
-        let item = await verifyDetailId(req.params.id, req.params.style, req.params.size)
+        let item = await verifyDetailId(id, style)
+
+        // console.log(item)
 
         // check if supplier role update other username
         if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.username)
             forbiddenError("This supplier can update owner's item only")
 
-        // check that product is found
-        if (item == null) notFoundError("item id " + id + " does not exist")
+        // delete all item sku
+        await prisma.item_details.deleteMany({
+            where: {
+                AND: [
+                    { itemId: Number(id) },
+                    { style: style }
+                ]
+            }
+        })
 
-        // switch out of stock or not
-        let itemModel = {
-            itemId: Number(req.params.id),
-            style: style !== undefined ? validateStr("validate item price", style, 50) : req.params.style,
-            size: size !== undefined ? validateStr('validate item size', size, 50) : req.params.size,
-            price: validateDouble("validate item price", price, false, 0),
-            stock: validateInt('validate item stock', stock, false, 0)
+        // update item id and style
+        sizes = sizes.map(size => {
+            size.itemId = Number(id)
+            size.style = style
+            return size
+        })
+
+        // create item size converter
+        await prisma.item_details.createMany({
+            data: sizes
+        })
+
+        // console.log("T")
+
+        // update item max price range
+        let overallPrice = await prisma.item_details.findMany({
+            where: {
+                itemId: Number(id)
+            },
+            select: {
+                price: true
+            }
+        })
+
+        let priceArray = overallPrice.map(item => Number(item.price))
+
+        if (item.maxPrice !== Math.max(...priceArray)) {
+            await prisma.items.update({
+                where: {
+                    itemId: Number(id)
+                },
+                data: {
+                    maxPrice: Math.max(...priceArray)
+                }
+            })
         }
 
-        // update stock
-        let input = await prisma.item_details.update({
-            where: {
-                itemId_style_size: {
-                    itemId: Number(req.params.id),
-                    style: req.params.style,
-                    size: req.params.size
+        // update item min price range
+        if (item.minPrice !== Math.min(...priceArray)) {
+            await prisma.items.update({
+                where: {
+                    itemId: Number(id)
+                },
+                data: {
+                    minPrice: Math.min(...priceArray)
                 }
-            },
-            data: itemModel
+            })
+        }
+
+        item = await verifyDetailId(id, style)
+
+        item.styles = await prisma.item_details.findMany({
+            where: {
+                itemId: Number(id),
+                style: style
+            }
         })
-        // return update product converter
-        return res.json(productConverter(input))
+
+        // return converter of product
+        return res.json(productConverter(item))
     } catch (err) {
         // if product is not found
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -1034,8 +1117,9 @@ const getProductImage = async (product) => {
     return product
 }
 
-const getProductStyleImage = async (style) => {
-    style.images = await listAllImage(findImagePath("products", style.itemId + '/' + style.style))
+const getProductStyleImage = async (style, id) => {
+    style.images = await listAllImage(findImagePath("products", id + '/' + style.style))
+    console.log(style.images)
     return style
 }
 
@@ -1074,30 +1158,57 @@ const verifyId = async (id) => {
 }
 
 // use model for add to cart and check stock
-const verifyDetailId = async (id, sty, size = "No") => {
-    // find product by id
-    let item_detail = await prisma.item_details.findFirst({
-        where: {
-            AND: [
-                { itemId: Number(id) },
-                { style: sty },
-                { size: size }
-            ]
-        }
-    })
+const verifyDetailId = async (id, sty, size) => {
 
-    // check that product is found
-    if (item_detail == null) notFoundError("item id " + id + " in style " + sty + " have size " + size + " does not exist")
+    let item_detail = []
+    if (size !== undefined) {
+        // find product by id
+        item_detail = await prisma.item_details.findFirst({
+            where: {
+                AND: [
+                    { itemId: Number(id) },
+                    { style: sty },
+                    { size: size }
+                ]
+            }
+        })
+        // check that product is found
+        if (item_detail == null) notFoundError("item id " + id + " in style " + sty + " have size " + size + " does not exist")
 
-    // check that item owner
-    let item = await prisma.items.findFirst({
-        where: { itemId: item_detail.itemId }
-    })
+        // check that item owner
+        let item = await prisma.items.findFirst({
+            where: { itemId: item_detail.itemId }
+        })
 
-    item.styles = [item_detail]
+        item.styles = [item_detail]
 
-    // return converter of product
-    return productConverter(item)
+        // return converter of product
+        return item
+    } else {
+        // find product by id
+        item_detail = await prisma.item_sku.findFirst({
+            where: {
+                AND: [
+                    { itemId: Number(id) },
+                    { SKUstyle: sty }
+                ]
+            },
+            include: {
+                item_details: true
+            }
+        })
+
+        // check that product is found
+        if (item_detail === null) notFoundError("item id " + id + " in style " + sty + " does not exist")
+
+        // check that item owner
+        let item = await prisma.items.findFirst({
+            where: { itemId: Number(id) }
+        })
+
+        // return converter of product
+        return item
+    }
 }
 
 const verifyUsername = async (username) => {
@@ -1232,7 +1343,35 @@ const haveItemSoles = async (product) => {
             }
         }
     })
-    product.sold = orders.reduce((cur, pre) => cur + pre.order_details.reduce((cur1,pre1)=>cur1+pre1.qtyOrder,0),0)
+    product.sold = orders.reduce((cur, pre) => {
+        return cur + pre.order_details.reduce((cur1, pre1) => cur1 + pre1.qtyOrder, 0)
+    }, 0)
+    return product
+}
+
+const haveItemSolesIn2Month = async (product) => {
+    let orders = await prisma.orders.findMany({
+        where: {
+            AND: [
+                { status: ORDERSTATUS.COMPLETED },
+                {
+                    createdAt: {
+                        gte: new Date(Date.now().valueOf() - 60 * 24 * 60 * 60 * 1000)
+                    }
+                }
+            ]
+        },
+        select: {
+            order_details: {
+                where: {
+                    itemId: product.itemId
+                }
+            }
+        }
+    })
+    product.sold = orders.reduce((cur, pre) => {
+        return cur + pre.order_details.reduce((cur1, pre1) => cur1 + pre1.qtyOrder, 0)
+    }, 0)
     return product
 }
 

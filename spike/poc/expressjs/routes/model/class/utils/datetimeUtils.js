@@ -23,7 +23,7 @@ const dateTimeZoneNow = (date) => {
 
 const getDifferentTime = (jsdate) => {
     // create compare values
-    const dateTime = new Date(jsdate.getTime() - 1000 * 60 * 60 * 7);;
+    const dateTime = new Date(jsdate.getTime() - 1000 * 60 * 60 * 7);
     const now = DateTime.local();
     // console.log(dateTime)
     // console.log(now)

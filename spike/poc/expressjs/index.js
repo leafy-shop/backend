@@ -3,6 +3,7 @@ const express =require("express")
 const logger =require('./middleware/logger')
 const cors =require('cors')
 const cookieParser = require('cookie-parser')
+const bodyParser = require('body-parser')
 const compression = require("compression"); // reduce loading of all site
 const {errorRes} = require("./routes/model/error/error")
 require('dotenv').config().parsed
@@ -32,8 +33,8 @@ app.use(compression())
 app.use(cookieParser())
 
 // Body parse middleware สำหรับแปลงค่าเพื่อสำหรับแสดงผล request ที่ส่งเข้ามา
-app.use(express.json())
-app.use(express.urlencoded({ extended: false}))
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: false}))
 
 // route ไปยังไฟล์ที่สามารถ req,res ได้
 app.use('/api/authentication',require('./routes/api/authentication/auth.js'))

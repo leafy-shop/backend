@@ -116,9 +116,11 @@ const orderConverter = (order) => {
   if (order.shippedDate) order.shippedDate = dateTimeZoneNow(order.shippedDate)
 
   // order details
-  order.order_details = order.order_details.map(order => {
-    return orderDetailConverter(order)
-  })
+  if (order.order_details) {
+    order.order_details = order.order_details.map(order => {
+      return orderDetailConverter(order)
+    })
+  }
 
   return order
 }

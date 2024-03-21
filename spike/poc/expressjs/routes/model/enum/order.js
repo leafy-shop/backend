@@ -6,7 +6,7 @@ let ORDERSTATUS = Object.freeze({
     // INTRANSIT: "in transit",
     // DELIVERED: "delivered",
     // customer
-    COMPLETED: "complete",
+    COMPLETED: "completed",
     CANCELED: "canceled"
 })
 
