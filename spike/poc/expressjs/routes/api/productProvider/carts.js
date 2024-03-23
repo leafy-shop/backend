@@ -62,7 +62,38 @@ router.get('/', JwtAuth, async (req, res, next) => {
         resultSession.total = parseFloat(mySession.reduce((pre, cur) => pre + Number(cur.total), 0)).toFixed(2)
         resultSession.shipping = parseFloat(0).toFixed(2);
         resultSession.tax = parseFloat(0).toFixed(2);
-        res.json(timeConverter(resultSession));
+        return res.json(timeConverter(resultSession));
+    } catch (err) {
+        next(err)
+    }
+})
+
+router.get('/count', JwtAuth, async (req, res, next) => {
+    try {
+        // find my session
+        let mySession = await verifySessionMany(req.user.username, true)
+
+        let result = { count: 0 }
+        for (let session in mySession) {
+
+            // list all group item id
+            let myQty = await prisma.carts.aggregate({
+                _sum: {
+                    qty: true
+                },
+                where: {
+                    sessionId: mySession[session].sessionCartId
+                }
+            })
+            result.count += myQty._sum.qty
+            
+        }
+
+        // declare value for return on my cart session
+        // resultSession.total = parseFloat(mySession.reduce((pre, cur) => pre + Number(cur.total), 0)).toFixed(2)
+        // resultSession.shipping = parseFloat(0).toFixed(2);
+        // resultSession.tax = parseFloat(0).toFixed(2);
+        return res.json(result);
     } catch (err) {
         next(err)
     }
@@ -116,7 +147,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
         if (itemOwner.itemOwner === req.user.username) forbiddenError(`product:${itemId} at style:${style} and size:${size} cannot added from your product`)
 
         // if user already has cart item input and owner session cart
-        if (cartItem && req.user.username === cartItem.cartId.split("-")[0] && sessionCart) {
+        if (cartItem && cartItem.cartId && req.user.username === cartItem.cartId.split("-")[0] && sessionCart) {
             // update quantity item
             cart = await prisma.carts.update({
                 data: {
