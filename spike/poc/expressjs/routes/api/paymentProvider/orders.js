@@ -7,13 +7,14 @@ const { notFoundError, forbiddenError, validatError } = require('../../model/err
 const { ROLE } = require('../../model/enum/role');
 const { ITEMEVENT } = require('../../model/enum/item');
 const { ORDERSTATUS } = require('../../model/enum/order');
+const { orderView } = require('../../model/class/model');
 let prisma = new PrismaClient()
 
 let router = express.Router()
 
 // get all account order item
 router.get('/', JwtAuth, async (req, res) => {
-    let { status, sort, page, limit } = req.query
+    let { ownerItemOrProduct, status, sort, page, limit } = req.query
 
     let pageN = Number(page)
     let limitN = Number(limit)
@@ -23,9 +24,7 @@ router.get('/', JwtAuth, async (req, res) => {
         where: {
             status: status
         },
-        include: {
-            order_details: true
-        },
+        select: orderView,
         orderBy: {
             createdAt: sort === "asc" ? "asc" : "desc"
         }
@@ -34,11 +33,10 @@ router.get('/', JwtAuth, async (req, res) => {
     orders = orders.filter(order => {
         return order.customerName === req.user.username
     })
-    console.log(orders)
 
     // get all order list
     orders = await Promise.all(orders.map(async order => {
-        order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+        order.total = parseFloat(order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)).toFixed(2)
         order.order_details = await Promise.all(order.order_details.map(async od => {
             let item = await verifyItemId(od.itemId)
             od.itemname = item.name
@@ -46,6 +44,12 @@ router.get('/', JwtAuth, async (req, res) => {
         }))
         return orderConverter(order)
     }))
+
+    // filter owner name or order details as itemname 
+    orders = orders.filter(order => {
+        return (ownerItemOrProduct !== undefined ? order.orderId.split("-")[0].includes(ownerItemOrProduct) || order.order_details.some(od => od.itemname.includes(ownerItemOrProduct)) : true) 
+    })
+
     let page_order = paginationList(orders, pageN, limitN, 10)
 
     return res.json(page_order)
@@ -95,7 +99,7 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
     if (orders.length !== 0) {
         orders = await Promise.all(orders.map(async order => {
             // console.log(order)
-            order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+            order.total = parseFloat(order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)).toFixed(2)
             order.order_details = await Promise.all(order.order_details.map(async od => {
                 let item = await verifyItemId(od.itemId)
                 od.itemname = item.name
@@ -184,7 +188,7 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
             forbiddenError("you cannot see order in other user except yourself or your item order")
         }
 
-        order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+        order.total = parseFloat(order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)).toFixed(2)
         return res.json(orderConverter(order))
     } catch (err) {
         next(err)
@@ -478,9 +482,7 @@ const verifyOrderId = async (orderId) => {
                 { orderId: orderId }
             ]
         },
-        include: {
-            order_details: true
-        }
+        select: orderView
     })
     if (order == null) notFoundError("order id " + orderId + " does not exist")
     return order

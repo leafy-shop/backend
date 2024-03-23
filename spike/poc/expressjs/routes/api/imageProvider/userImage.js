@@ -13,7 +13,7 @@ const { bucket, s3, mode, userIconStorage, userCoverStorage } = require("../../.
 const uploadIcon = multer({
     storage: userIconStorage,
     limits: {
-        fileSize: 1024 * 1024 * 10,
+        fileSize: 1024 * 1024 * 1,
     },
     limits: { files: 1 },
     async fileFilter(req, file, cb) {
@@ -27,7 +27,7 @@ const uploadIcon = multer({
 const uploadCover = multer({
     storage: userCoverStorage,
     limits: {
-        fileSize: 1024 * 1024 * 10,
+        fileSize: 1024 * 1024 * 2,
     },
     limits: { files: 1 },
     async fileFilter(req, file, cb) {

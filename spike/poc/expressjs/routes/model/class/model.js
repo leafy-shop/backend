@@ -101,6 +101,22 @@ const userViewFav = () => {
     return userView
 }
 
+
+let orderView = {
+    orderId: true,
+    customerName: true,
+    status: true,
+    createdAt: true,
+    order_details: {
+        select: {
+            itemStyle: true,
+            itemId: true,
+            qtyOrder: true,
+            priceEach: true
+        }
+    }
+}
+
 module.exports.userView = userView
 module.exports.userDetailView = userDetailView
 module.exports.gardenDesignerView = gardenDesignerView
@@ -109,3 +125,4 @@ module.exports.userViewFav = userViewFav
 module.exports.prodList = prodList
 module.exports.supplierView = supplierView
 module.exports.reviewViewOwner = reviewViewOwner
+module.exports.orderView = orderView

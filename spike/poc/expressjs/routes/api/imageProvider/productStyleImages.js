@@ -12,7 +12,7 @@ const { deleteAllImage, findImagePath } = require("../../model/class/utils/image
 const upload = multer({
     storage: productStyleStorage,
     limits: {
-        fileSize: 1024 * 1024 * 10,
+        fileSize: 1024 * 1024 * 1,
     },
     limits: { files: 10 },
     fileFilter(req, file, cb) {

@@ -34,9 +34,13 @@ router.get('/', JwtAuth, async (req, res, next) => {
                 // find all cart in item group
                 let carts = await prisma.carts.findMany({
                     where: {
-                        itemId: cartGroup.itemId
+                        AND: [
+                            {itemId: cartGroup.itemId}
+                        ]
                     }
                 })
+                // remove other user name
+                carts = carts.filter(cart => cart.cartId.split("-")[0] === req.user.username)
 
                 // store all cart in item group like their image, price
                 let ownerCart = []

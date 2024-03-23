@@ -13,7 +13,7 @@ const { bucket, s3, mode, productStorage } = require("../../../config/minio_conf
 const upload = multer({
   storage: productStorage,
   limits: {
-    fileSize: 1024 * 1024 * 10,
+    fileSize: 1024 * 1024 * 2,
   },
   limits: { files: 1 },
   async fileFilter(req, file, cb) {
