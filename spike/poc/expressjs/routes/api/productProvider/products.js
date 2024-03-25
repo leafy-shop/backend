@@ -327,22 +327,15 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
         // });
 
         // check item sold
-
-
+        filter_pd = await Promise.all(filter_pd.map(async (product) => {
+            return await haveItemSolesIn2Month(product)
+        }))
         if (sort_name == "sales") {
-            sortModel.sold = (sort === "desc") ? "desc" : "asc"
-            filter_pd = await Promise.all(filter_pd.map(async (product) => {
-                return await haveItemSolesIn2Month(product)
-            }))
             if (sort == "desc") {
-                filter_pd = filter_pd.sort((a,b) => b.sold - a.sold)
+                filter_pd = filter_pd.sort((a, b) => b.sold - a.sold)
             } else {
-                filter_pd = filter_pd.sort((a,b) => a.sold - b.sold)
+                filter_pd = filter_pd.sort((a, b) => a.sold - b.sold)
             }
-        } else {
-            filter_pd = await Promise.all(filter_pd.map(async (product) => {
-                return await haveItemSoles(product)
-            }))
         }
 
         // check out stock data
@@ -388,48 +381,105 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     }
 })
 
-let outOfStock = async (filter_pd) => {
-    let filteredProducts = await Promise.all(
-        filter_pd.map(async (product) => {
-            let productStock = await prisma.item_details.findMany({
-                select: {
+router.get('/supplier/:owner', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
+    // query params
+    let { page, limit, sort_name, sort, type } = req.query
+    let { owner } = req.params
+
+    // page number and page size
+    let pageN = Number(page)
+    let limitN = Number(limit)
+
+    // customize sorting model
+    let sortModel = {}
+    if (sort_name == "latest") {
+        sortModel.updatedAt = (sort === "desc") ? "desc" : "asc"
+    } else if (sort_name == "price") {
+        sortModel.minPrice = (sort === "desc") ? "desc" : "asc"
+    } else {
+        sortModel.updatedAt = "desc"
+    }
+
+    try {
+        // validate supplier role 
+        if (ROLE.Supplier === req.user.role && req.user.username !== owner) {
+            forbiddenError("supplier can see yourself product only")
+        }
+
+        let filter_pd = await prisma.items.findMany({
+            where: {
+                AND: [
+                    { type: type },
+                    { itemOwner: owner }
+                ]
+            },
+            include: {
+                favprd: false,
+            },
+            orderBy: sortModel
+        })
+
+        // console.log(filter_pd)
+
+        filter_pd = await Promise.all(filter_pd.map(async (product) => {
+            let count = await prisma.item_details.aggregate({
+                _sum: {
                     stock: true
                 },
                 where: {
                     itemId: product.itemId
                 }
-            });
-            // console.log(productStock, productStock.every(stock => stock.stock < 1));
-            return {
-                product: product,
-                isOutOfStock: productStock.every(stock => stock.stock < 1)
-            };
-        })
-    );
+            })
+            product.allStock = count._sum.stock
+            return await haveItemSolesIn2Month(product)
+        }))
 
-    return filteredProducts.filter(item => item.isOutOfStock).map(item => item.product);
-}
+        // check item sold
+        if (sort_name == "sales") {
+            if (sort == "desc") {
+                filter_pd = filter_pd.sort((a, b) => b.sold - a.sold)
+            } else {
+                filter_pd = filter_pd.sort((a, b) => a.sold - b.sold)
+            }
+        } else if (sort_name == "soldout") {
+            if (sort == "desc") {
+                filter_pd = filter_pd.sort((a, b) => b.allStock - a.allStock)
+            } else {
+                filter_pd = filter_pd.sort((a, b) => a.allStock - b.allStock)
+            }
+        }
+        // Paginate the filtered product list
+        const page_pd = paginationList(filter_pd, pageN, limitN, 10);
 
-// // get recommender by fetch api on FastAPI
-// let getRecommender = async (pds, id) => {
-//     let filter_pd = []
-//     try {
-//         let { data, status } = await axios.get(url + '/ml/recommend?user_id=' + id)
-//         data.forEach(prodId => {
-//             filter_pd.push(pds.filter(prod => prod.itemId == prodId)[0])
-//         })
-//         console.log(filter_pd)
-//         return filter_pd
-//     } catch (err) {
-//         return pds
-//     }
-// }
+        // Fetch images for in-stock products
+        const productList = await Promise.all(page_pd.list.map(async (product) => {
+            prodList.description = true
+            prodList.allStock = true
+            return await getProductImage(productConverter(product, prodList));
+        }));
+
+        page_pd.list = productList;
+
+        return res.send(page_pd);
+
+    } catch (err) {
+        // if favorite product is not found in this user
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.code === 'P2022') {
+                err.message = "this user has not favorite product"
+                err.status = 404
+            }
+        }
+        next(err)
+    }
+})
 
 // GET - products by id
 router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
     try {
         // find id of product
-        let item = await verifyId(req.params.id)
+        let item = await verifyId(validateInt("validate itemId", req.params.id))
 
         // find item_details and map to item
         item.styles = await prisma.item_details.findMany({
@@ -629,7 +679,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
 // PUT - change favorite product by id
 router.put('/isFav/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.User), async (req, res, next) => {
     try {
-        let item = await verifyId(Number(req.params.id))
+        let item = await verifyId(validateInt("validate itemId", req.params.id))
         let userMatching = await findFavPdById(req.user.username,
             // find product by id
             item.itemId)
@@ -684,7 +734,7 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req,
     // update product
     try {
         // find item id
-        let item = await verifyId(req.params.id)
+        let item = await verifyId(validateInt("validate itemId", req.params.id))
 
         // check if supplier role update other username
         if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.username)
@@ -823,7 +873,7 @@ router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async 
 router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     try {
         // find item id
-        let item = await verifyId(req.params.id)
+        let item = await verifyId(validateInt("validate itemId", req.params.id))
 
         // check if supplier role update other username
         if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.username)
@@ -912,7 +962,7 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
         let limitN = Number(limit)
 
         // find item id
-        let item_reviews = await findAllReviewByItemId(req.params.prodId, sort, style)
+        let item_reviews = await findAllReviewByItemId(validateInt("validate itemId", req.params.prodId), sort, style)
 
         // review item with pagination
         item_reviews = paginationList(item_reviews, pageN, limitN, 5)
@@ -960,7 +1010,7 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
         let { itemReviewId, comment, rating, style, size } = req.body
 
         // find item id
-        let item = await verifyDetailId(req.params.prodId, style, size)
+        let item = await verifyDetailId(validateInt("validate itemId", req.params.prodId), style, size)
 
         // // check size
         // if (!item.styles[0].size.includes(size)) notFoundError(`item id ${item.itemId} size not found `)
@@ -1010,7 +1060,7 @@ router.delete('/:prodId/reviews/:commentId', JwtAuth, async (req, res, next) => 
         let { prodId, commentId } = req.params
 
         // find item id
-        let item = await findReviewById(prodId, commentId)
+        let item = await findReviewById(validateInt("validate itemId", prodId), commentId)
 
         // check if supplier role delete other username that not same finding commend that throw to exception
         if ([ROLE.Supplier, ROLE.User].includes(req.user.role) && review.username !== req.user.username) forbiddenError("user can delete your comment only")
@@ -1044,7 +1094,7 @@ router.put('/:prodId/reviews/:commentId/like', JwtAuth, async (req, res, next) =
         let { prodId, commentId } = req.params
 
         // get average value of rating in item id
-        let review = await findReviewById(prodId, commentId)
+        let review = await findReviewById(validateInt("validate itemId", prodId), commentId)
         let like = await findReviewLike(req.user.username, commentId)
 
         let comment
@@ -1110,7 +1160,30 @@ router.put('/:prodId/reviews/:commentId/like', JwtAuth, async (req, res, next) =
     }
 })
 
-// -- method zone --
+// ---------------------------------------------- method zone ----------------------------------------------------------------
+
+let outOfStock = async (filter_pd) => {
+    let filteredProducts = await Promise.all(
+        filter_pd.map(async (product) => {
+            let productStock = await prisma.item_details.findMany({
+                select: {
+                    stock: true
+                },
+                where: {
+                    itemId: product.itemId
+                }
+            });
+            // console.log(productStock, productStock.every(stock => stock.stock < 1));
+            return {
+                product: product,
+                isOutOfStock: productStock.every(stock => stock.stock < 1)
+            };
+        })
+    );
+
+    return filteredProducts.filter(item => item.isOutOfStock).map(item => item.product);
+}
+
 const getProductImage = async (product) => {
     product.image = await listFirstImage(findImagePath("products", product.itemId), "main.png")
     // console.log(product.image)

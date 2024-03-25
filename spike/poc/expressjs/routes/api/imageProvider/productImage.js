@@ -8,7 +8,8 @@ const { ROLE } = require("../../model/enum/role");
 const imageList = require('../../model/class/utils/imageList')
 
 // reference: https://dev.to/franciscomendes10866/upload-files-to-minio-object-storage-s3-with-expressjs-3561
-const { bucket, s3, mode, productStorage } = require("../../../config/minio_config")
+const { bucket, s3, mode, productStorage } = require("../../../config/minio_config");
+const { notFoundError } = require("../../model/error/error");
 
 const upload = multer({
   storage: productStorage,
@@ -58,8 +59,16 @@ router.get("/:id/:style/:filename", async (req, res) => {
 
 // upload single image
 // condition (file size < 8 MB, file multipart, file upload per solution, file type image only, path storage property)
-router.post("/:id", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), ProductFileAuthorization, upload.single("file"), async (req, res) => {
-  return res.status(201).json({ message: req.file.location });
+router.post("/:id", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), ProductFileAuthorization, upload.single("file"), async (req, res, next) => {
+  try {
+    if (req.file) {
+      return res.status(201).json({ message: req.file.location });
+    } else {
+      notFoundError("File upload not found")
+    }
+  } catch (err) {
+    next(err)
+  }
 });
 
 // delete single image

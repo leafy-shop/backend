@@ -190,7 +190,7 @@ const getUserIcon = async (user) => {
 router.get('/:id', JwtAuth, async (req, res, next) => {
     try {
         // sendMail("test massage","test",req.user.email)
-        let user = await verifyId(req.params.id)
+        let user = await verifyId(validateInt("validate itemId",req.params.id))
 
         // console.log(user)
 
@@ -375,7 +375,7 @@ router.post('/register', async (req, res, next) => {
 router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     try {
         // check user exist
-        let user = await verifyId(req.params.id)
+        let user = await verifyId(validateInt("validate itemId",req.params.id))
 
         // user accounts
         let mapUser = {}
@@ -496,7 +496,7 @@ router.patch('/views/edit', JwtAuth, async (req, res, next) => {
 // delete user by id
 router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
     try {
-        let user = await verifyId(req.params.id)
+        let user = await verifyId(validateInt("validate itemId",req.params.id))
         if (user.email === req.user.email) {
             forbiddenError("you cannot delete myself")
         }
