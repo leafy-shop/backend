@@ -322,6 +322,17 @@ router.put('/:id', JwtAuth, async (req, res, next) => {
                 where: { cartId: mycart.cartId }
             })
 
+            let carts = await prisma.carts.findMany({
+                where: {
+                    sessionId: mycart.sessionId
+                }
+            })
+            if (carts.length == 0) {
+                await prisma.session_cart.delete({
+                    where: { sessionCartId: mycart.sessionId }
+                })
+            }
+
             // update new price
             await prisma.session_cart.update({
                 data: {
