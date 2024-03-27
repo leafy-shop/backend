@@ -402,7 +402,6 @@ router.delete('/:id/session', JwtAuth, async (req, res, next) => {
 })
 
 //----------------------------------------- method zone ----------------------------------------------------
-
 const verifyProductId = async (id, style, size) => {
     let mycart = await prisma.item_details.findFirst({
         where: {

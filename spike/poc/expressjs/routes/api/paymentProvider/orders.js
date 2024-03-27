@@ -8,6 +8,7 @@ const { ROLE } = require('../../model/enum/role');
 const { ITEMEVENT } = require('../../model/enum/item');
 const { ORDERSTATUS } = require('../../model/enum/order');
 const { orderView } = require('../../model/class/model');
+const { listFirstImage, findImagePath } = require('../../model/class/utils/imageList');
 let prisma = new PrismaClient()
 
 let router = express.Router()
@@ -40,6 +41,7 @@ router.get('/', JwtAuth, async (req, res) => {
         order.order_details = await Promise.all(order.order_details.map(async od => {
             let item = await verifyItemId(od.itemId)
             od.itemname = item.name
+            od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
             return od
         }))
         return orderConverter(order)
@@ -189,6 +191,11 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
         }
 
         order.total = parseFloat(order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)).toFixed(2)
+        order.order_details = await Promise.all(order.order_details.map(async od => {
+            od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
+            return od
+        }))
+            
         return res.json(orderConverter(order))
     } catch (err) {
         next(err)
