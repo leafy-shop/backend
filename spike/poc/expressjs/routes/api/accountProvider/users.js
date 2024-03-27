@@ -400,7 +400,7 @@ router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => 
                     // i == "username" ? validateStr("account username", req.body[i], 50) : cannot edit username
                     i == "firstname" ? validateStr("account firstname", req.body[i], 50) :
                         i == "lastname" ? validateStr("account lastname", req.body[i], 50) :
-                            i == "description" ? validateStr("account desciption", req.body[i], 500) :
+                            i == "description" ? validateStr("account desciption", req.body[i], 500, true) :
                                 i == "email" ? validateEmail("account email", req.body[i], 100) :
                                     i == "role" ? validateRole("account role", req.body[i], ROLE) :
                                         i == "password" ? await validatePassword("account password", req.body[i], 8, 20) :
@@ -456,7 +456,7 @@ router.patch('/views/edit', JwtAuth, async (req, res, next) => {
                     i == "email" ? validateEmail("account email", req.body[i], 100) :
                         i == "firstname" ? validateStr("account firstname", req.body[i], 50) :
                             i == "lastname" ? validateStr("account lastname", req.body[i], 50) :
-                                i == "description" ? validateStr("account desciption", req.body[i], 500) :
+                                i == "description" ? validateStr("account desciption", req.body[i], 500, true) :
                                     i == "password" ? await validatePassword("account password", req.body[i], 8, 20) :
                                         i == "phone" ? validatePhone("account information phone", req.body[i]) : undefined
             }
