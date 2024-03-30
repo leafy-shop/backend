@@ -55,7 +55,8 @@ router.get('/', JwtAuth, async (req, res, next) => {
                     cart = timeConverter(cart)
                     ownerCart.push(cart)
                 }
-                cartGroup[mySession[session].sessionCartId.split("-")[0]] = ownerCart
+                cartGroup.itemOwner = mySession[session].sessionCartId.split("-")[0]
+                cartGroup.carts = ownerCart
                 cartGroup.itemId = undefined
                 resultCart = cartGroup
             }
@@ -322,17 +323,6 @@ router.put('/:id', JwtAuth, async (req, res, next) => {
                 where: { cartId: mycart.cartId }
             })
 
-            let carts = await prisma.carts.findMany({
-                where: {
-                    sessionId: mycart.sessionId
-                }
-            })
-            if (carts.length == 0) {
-                await prisma.session_cart.delete({
-                    where: { sessionCartId: mycart.sessionId }
-                })
-            }
-
             // update new price
             await prisma.session_cart.update({
                 data: {
@@ -344,6 +334,17 @@ router.put('/:id', JwtAuth, async (req, res, next) => {
                     sessionCartId: mycart.sessionId
                 }
             })
+
+            let carts = await prisma.carts.findMany({
+                where: {
+                    sessionId: mycart.sessionId
+                }
+            })
+            if (carts.length == 0) {
+                await prisma.session_cart.delete({
+                    where: { sessionCartId: mycart.sessionId }
+                })
+            }
             return res.json({ message: `cart id ${req.params.id} has been canceled` })
         }
     } catch (err) {
@@ -384,6 +385,17 @@ router.delete('/:id', JwtAuth, async (req, res, next) => {
                 sessionCartId: mycart.sessionId
             }
         })
+
+        let carts = await prisma.carts.findMany({
+            where: {
+                sessionId: mycart.sessionId
+            }
+        })
+        if (carts.length == 0) {
+            await prisma.session_cart.delete({
+                where: { sessionCartId: mycart.sessionId }
+            })
+        }
 
         return res.json({ message: `cart id ${req.params.id} has been canceled` })
     } catch (err) {
