@@ -3,7 +3,7 @@ const router = express.Router();
 
 const { validateInt, validateStr } = require('../../validation/body')
 const { notFoundError, forbiddenError, validatError } = require('../../model/error/error')
-const { JwtAuth } = require('../../../middleware/jwtAuth')
+const { JwtAuth, UnstrictJwtAuth } = require('../../../middleware/jwtAuth')
 
 const { PrismaClient } = require('@prisma/client');
 const { ITEMSIZE, ITEMEVENT } = require('../../model/enum/item');
@@ -15,7 +15,7 @@ const prisma = new PrismaClient()
 router.get('/', JwtAuth, async (req, res, next) => {
     try {
         // find my session
-        let mySession = await verifySessionMany(req.user.username, true)
+        let mySession = await verifySessionMany(req.user.username)
 
         // list all group item id
         let myOwnerSession = new Set(mySession.map(session => session.sessionCartId.split("-")[0]))
@@ -78,26 +78,27 @@ router.get('/', JwtAuth, async (req, res, next) => {
     }
 })
 
-router.get('/count', JwtAuth, async (req, res, next) => {
+router.get('/count', UnstrictJwtAuth, async (req, res, next) => {
     try {
-        // find my session
-        let mySession = await verifySessionMany(req.user.username, true)
-
         let result = { count: 0 }
-        for (let session in mySession) {
-
-            // list all group item id
-            let myQty = await prisma.carts.aggregate({
-                _sum: {
-                    qty: true
-                },
-                where: {
-                    sessionId: mySession[session].sessionCartId
-                }
-            })
-            result.count += myQty._sum.qty
-
+        if (req.user !== undefined) {
+            // find my session
+            let mySession = await verifySessionMany(req.user.username)
+            
+            for (let session in mySession) {
+                // list all group item id
+                let myQty = await prisma.carts.aggregate({
+                    _sum: {
+                        qty: true
+                    },
+                    where: {
+                        sessionId: mySession[session].sessionCartId
+                    }
+                })
+                result.count += myQty._sum.qty
+            }
         }
+
 
         // declare value for return on my cart session
         // resultSession.total = parseFloat(mySession.reduce((pre, cur) => pre + Number(cur.total), 0)).toFixed(2)
@@ -486,7 +487,7 @@ const verifySessionMany = async (name) => {
             username: name
         }
     })
-    if (mysession.length === 0) notFoundError("session cart with name " + name + " does not exist")
+    // if (mysession.length === 0) notFoundError("session cart with name " + name + " does not exist")
     return mysession
 }
 
