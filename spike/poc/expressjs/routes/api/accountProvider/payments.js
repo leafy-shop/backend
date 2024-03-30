@@ -173,15 +173,15 @@ router.delete('/:username/:paymentId', JwtAuth, async (req, res, next) => {
         if (req.user.role !== ROLE.Admin && user.username !== req.user.username) forbiddenError('This user can see yourself only')
 
         // find user name and payment
-        await verifypayment(user.username, paymentId)
+        let payment = await verifypayment(user.username, paymentId)
 
         // dalete payment and return
-        if (address.isDefault) {
+        if (payment.isDefault) {
             validatError("cannot delete default selection of your payment")
         } else {
             await prisma.payments.delete({
                 where: {
-                    addressId: addressId,
+                    paymentId: paymentId,
                     username: username
                 },
             })
