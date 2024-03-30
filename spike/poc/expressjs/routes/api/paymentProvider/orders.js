@@ -229,11 +229,28 @@ router.post('/', JwtAuth, async (req, res, next) => {
         }
 
         // validate some cart in owner item
-        mycart.forEach(cart => {
+        for (const cart of mycart) {
             if (req.user.role !== ROLE.Admin && cart.sessionId.split("-")[0] === req.user.username) {
-                forbiddenError("you cannot paid with yourself owner cart")
+                forbiddenError("you cannot pay with your own cart");
             }
-        })
+    
+            const stock = await prisma.item_details.findFirst({
+                select: {
+                    stock: true
+                },
+                where: {
+                    AND: [
+                        { itemId: cart.itemId },
+                        { style: cart.itemStyle },
+                        { size: cart.itemSize }
+                    ]
+                }
+            });
+    
+            if (cart.qty > stock.stock) {
+                validatError("you cannot pay order when your quantity in cart is more than quantity in item stock");
+            }
+        }
 
         // edited address
         let addressFormat = (accountAddress.subDistrinct !== undefined ? `${accountAddress.address} ${accountAddress.subDistrinct} ${accountAddress.distrinct} ${accountAddress.province} ${accountAddress.postalCode}` :
