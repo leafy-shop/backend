@@ -37,7 +37,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
             })
         }
 
-        console.log(myOwnerCart)
+        // console.log(myOwnerCart)
 
         // create cart and loop by their image, price
         for (let sessionGroup of myOwnerSession) {
@@ -67,7 +67,6 @@ router.get('/', JwtAuth, async (req, res, next) => {
             cartGroup.itemOwner = sessionGroup
             resultSession.carts.push(cartGroup);
         }
-
 
         // declare value for return on my cart session
         resultSession.total = parseFloat(mySession.reduce((pre, cur) => pre + Number(cur.total), 0)).toFixed(2)
@@ -126,7 +125,7 @@ router.get('/count', JwtAuth, async (req, res, next) => {
 
 // create carts from item details
 router.post('/products', JwtAuth, async (req, res, next) => {
-    let { itemId, style, size } = req.body
+    let { itemId, style, size, qty } = req.body
     itemId = Number(itemId)
     style = style ? style : ITEMSIZE.No
     size = size ? size : ITEMSIZE.No
@@ -138,6 +137,8 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             validateStr("product style", style, 50),
             validateStr("product size", size, 50)
         )
+
+        qty = validateInt("product qty", qty, false,0)
 
         // create cart item
         let cart = {}
@@ -162,7 +163,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             // update quantity item
             cart = await prisma.carts.update({
                 data: {
-                    qty: { increment: 1 }
+                    qty: { increment: qty }
                 },
                 where: {
                     cartId: cartItem.cartId,
@@ -199,7 +200,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                     itemId: choosePd.itemId,
                     itemStyle: choosePd.style,
                     itemSize: choosePd.size,
-                    qty: 1
+                    qty: qty
                 }
             })
 
@@ -241,7 +242,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                     itemId: choosePd.itemId,
                     itemStyle: choosePd.style,
                     itemSize: choosePd.size,
-                    qty: 1
+                    qty: qty
                 }
             })
 
