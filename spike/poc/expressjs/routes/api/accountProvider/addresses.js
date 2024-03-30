@@ -15,7 +15,12 @@ const prisma = new PrismaClient()
 router.get('/:username', JwtAuth, async (req, res, next) => {
     try {
         // check user by name
-        let user = await verifyName(req.params.username)
+        let user = await prisma.accounts.findFirst({
+            where: {
+                username: validateStr("valiadte user name", req.user.username, 20)
+            },
+            select: userDetailView
+        })
 
         // check role and same user name
         if (req.user.role !== ROLE.Admin && user.username !== req.user.username) forbiddenError('This user can see yourself only')
@@ -204,7 +209,7 @@ router.delete('/:username/:addressId', JwtAuth, async (req, res, next) => {
 const verifyName = async (name) => {
     let filter_u = await prisma.accounts.findFirst({
         where: {
-            username: validateStr("valiadte user name", name, 100)
+            username: validateStr("valiadte user name", name, 20)
         },
         select: userDetailView
     })
