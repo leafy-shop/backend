@@ -17,51 +17,57 @@ router.get('/', JwtAuth, async (req, res, next) => {
         // find my session
         let mySession = await verifySessionMany(req.user.username, true)
 
-        let resultSession = { cart: [] }
-        for (let session in mySession) {
+        // list all group item id
+        let myOwnerSession = new Set(mySession.map(session => session.sessionCartId.split("-")[0]))
+        console.log(myOwnerSession)
 
-            // list all group item id
-            let mycart = await prisma.carts.groupBy({
-                by: ["itemId"],
+        let resultSession = { carts: [] }
+        let myOwnerCart = []
+        for (let session in mySession) {
+            // list all cart by onwer session
+            let carts = await prisma.carts.findMany({
                 where: {
                     sessionId: mySession[session].sessionCartId
                 }
             })
 
-            // create cart and loop by their image, price
-            let resultCart = []
-            for (let cartGroup of mycart) {
-                // find all cart in item group
-                let carts = await prisma.carts.findMany({
-                    where: {
-                        AND: [
-                            {itemId: cartGroup.itemId}
-                        ]
-                    }
-                })
-                // remove other user name
-                carts = carts.filter(cart => cart.cartId.split("-")[0] === req.user.username)
-
-                // store all cart in item group like their image, price
-                let ownerCart = []
-                for (let cart of carts) {
-                    let product = await verifyProductId(cart.itemId, cart.itemStyle, cart.itemSize);
-                    // console.log(filterGroupCart)
-                    cart.image = await listFirstImage(findImagePath("products", cart.itemId), "main.png")
-                    cart.priceEach = parseFloat(product.price).toFixed(2);
-                    cart.sessionId = undefined;
-                    let itemOwner = await verifyItemOwner(cart.itemId)
-                    cart.itemName = itemOwner.name
-                    cart = timeConverter(cart)
-                    ownerCart.push(cart)
-                }
-                cartGroup.itemOwner = mySession[session].sessionCartId.split("-")[0]
-                cartGroup.carts = ownerCart
-                cartGroup.itemId = undefined
-                resultCart = cartGroup
-            }
-            resultSession.cart.push(resultCart);
+            carts.forEach(cart => {
+                cart.itemOwner = cart.sessionId.split("-")[0]
+                myOwnerCart.push(cart)
+            })
         }
+
+        console.log(myOwnerCart)
+
+        // create cart and loop by their image, price
+        for (let sessionGroup of myOwnerSession) {
+            let cartGroup = {}
+            // find all cart in item group
+            let cartFilterOwner = myOwnerCart.filter(ownerCart => {
+                // console.log(ownerCart.itemOwner)
+                // console.log(sessionGroup)
+                return ownerCart.itemOwner === sessionGroup
+            })
+            console.log(cartFilterOwner.length)
+
+            // store all cart in item group like their image, price
+            cartFilterOwner = await Promise.all(cartFilterOwner.map(async cart => {
+                let product = await verifyProductId(cart.itemId, cart.itemStyle, cart.itemSize);
+                // console.log(filterGroupCart)
+                cart.image = await listFirstImage(findImagePath("products", cart.itemId), "main.png")
+                cart.priceEach = parseFloat(product.price).toFixed(2);
+                cart.sessionId = undefined;
+                let itemname = await verifyItemOwner(cart.itemId)
+                cart.itemName = itemname.name
+                return timeConverter(cart)
+            }))
+
+            // console.log(resultCart)
+            cartGroup.cartOwner = cartFilterOwner 
+            cartGroup.itemOwner = sessionGroup
+            resultSession.carts.push(cartGroup);
+        }
+
 
         // declare value for return on my cart session
         resultSession.total = parseFloat(mySession.reduce((pre, cur) => pre + Number(cur.total), 0)).toFixed(2)
@@ -91,7 +97,7 @@ router.get('/count', JwtAuth, async (req, res, next) => {
                 }
             })
             result.count += myQty._sum.qty
-            
+
         }
 
         // declare value for return on my cart session
