@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { validateInt, validateStr } = require('../../validation/body')
+const { validateInt, validateStr, validateIdForTesting } = require('../../validation/body')
 const { notFoundError, forbiddenError, validatError } = require('../../model/error/error')
 const { JwtAuth, UnstrictJwtAuth } = require('../../../middleware/jwtAuth')
 
@@ -126,7 +126,7 @@ router.get('/count', UnstrictJwtAuth, async (req, res, next) => {
 
 // create carts from item details
 router.post('/products', JwtAuth, async (req, res, next) => {
-    let { itemId, style, size, qty } = req.body
+    let { sessionBodyId, cartBodyId, itemId, style, size, qty } = req.body
     itemId = Number(itemId)
     style = style ? style : ITEMSIZE.No
     size = size ? size : ITEMSIZE.No
@@ -150,8 +150,8 @@ router.post('/products', JwtAuth, async (req, res, next) => {
         // let itemInCart = await verifyItemId()
         let itemOwner = await verifyItemOwner(choosePd.itemId)
 
-        console.log(sessionCart)
-        console.log(itemOwner.itemOwner)
+        // console.log(sessionCart)
+        // console.log(itemOwner.itemOwner)
 
         // check quantity
         cartItem = cartItem ? cartItem : { qty: 0 }
@@ -192,7 +192,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             // if user already has owner session cart but in owner cart item input is empty
         } else if (sessionCart && itemOwner.itemOwner === sessionCart.sessionCartId.split("-")[0] && !cartItem.cartId) {
             // create cart item
-            let cartId = generateIdByMapping(16, req.user.username)
+            let cartId = cartBodyId !== undefined ? validateIdForTesting(cartBodyId.split("-")[0],cartBodyId.split("-")[1]) : generateIdByMapping(16, req.user.username)
             // console.log(cartId, cartId.length)
             cart = await prisma.carts.create({
                 data: {
@@ -226,7 +226,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             // if user has not owner session cart
         } else {
             // create session cart
-            let sessionId = generateIdByMapping(16, itemOwner.itemOwner);
+            let sessionId = sessionBodyId !== undefined ? validateIdForTesting(sessionBodyId.split("-")[0],sessionBodyId.split("-")[1]) : generateIdByMapping(16, itemOwner.itemOwner);
             sessionCart = await prisma.session_cart.create({
                 data: {
                     sessionCartId: sessionId,
@@ -235,7 +235,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                 }
             })
             // create cart item
-            let cartId = generateIdByMapping(16, req.user.username)
+            let cartId = cartBodyId !== undefined ? validateIdForTesting(cartBodyId.split("-")[0],cartBodyId.split("-")[1]) : generateIdByMapping(16, req.user.username)
             cart = await prisma.carts.create({
                 data: {
                     cartId: cartId,
@@ -443,7 +443,7 @@ const verifyProductId = async (id, style, size) => {
             ]
         }
     })
-    if (mycart == null) notFoundError("cart id " + id + " does not exist")
+    if (mycart == null) notFoundError("item detail id " + id + " with sku style " + style + " and have size " + size + " does not exist")
     return mycart
 }
 

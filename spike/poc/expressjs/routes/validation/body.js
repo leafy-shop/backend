@@ -232,8 +232,6 @@ const validatePhone = (prop = '', value) => {
 }
 
 const validateCode = (prop = '', value = '', length = 0, arrayCodeDigit = []) => {
-
-
     // validate is null or null value or negative value
     if (value == undefined || value.length == 0) {
         validatError(`${prop} is null`)
@@ -275,6 +273,12 @@ const validateCode = (prop = '', value = '', length = 0, arrayCodeDigit = []) =>
     }
 }
 
+const validateIdForTesting = (username, digitCode) => {
+    username = validateStr("validate username", username, 20, false, false, false, false)
+    digitCode = validateStr("validate digitCode", digitCode, 32)
+    return username + "-" + digitCode
+}
+
 module.exports.validateStr = validateStr
 module.exports.validateInt = validateInt
 module.exports.validateBoolean = validateBoolean
@@ -286,3 +290,4 @@ module.exports.validateStrArray = validateStrArray
 module.exports.validateDatetimeFuture = validateDatetimeFuture
 module.exports.validatePhone = validatePhone
 module.exports.validateCode = validateCode
+module.exports.validateIdForTesting = validateIdForTesting
