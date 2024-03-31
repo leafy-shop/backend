@@ -76,7 +76,7 @@ router.post('/:username', JwtAuth, async (req, res, next) => {
         }
 
         // generate Id 32 digit
-        let id = paymentId != undefined ? paymentId : generateIdByMapping(16, req.user.username)
+        let id = paymentId != undefined ? validateIdForTesting(paymentId.split("-")[0],paymentId.split("-")[1]) : generateIdByMapping(16, req.user.username)
         // console.log(validatePhone("validate payment phone", phone))
 
         // validate data model

@@ -2,7 +2,7 @@ const { PrismaClient } = require('@prisma/client')
 const express = require('express')
 const { generateIdByMapping } = require('../../model/class/utils/converterUtils')
 const router = express.Router()
-const { validateStr, validatePhone, validateCode, validateBoolean } = require('../../validation/body')
+const { validateStr, validatePhone, validateCode, validateBoolean, validateIdForTesting } = require('../../validation/body')
 const { deleteNullValue } = require('../../model/class/utils/modelMapping')
 const { userDetailView } = require('../../model/class/model')
 const { notFoundError, forbiddenError, validatError } = require('../../model/error/error')
@@ -74,7 +74,7 @@ router.post('/:username', JwtAuth, async (req, res, next) => {
         }
 
         // generate Id 32 digit
-        let id = addressId != undefined ? addressId : generateIdByMapping(16, username)
+        let id = addressId != undefined ? validateIdForTesting(addressId.split("-")[0],addressId.split("-")[1]) : generateIdByMapping(16, username)
         // console.log(validatePhone("validate address phone", phone))
 
         // validate data model
