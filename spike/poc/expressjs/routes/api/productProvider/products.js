@@ -602,7 +602,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
         }
         styles = styles.map(sty => {
             // console.log(sty)
-            sty.style = sty.style === undefined || sty.style.length === 0 ? validatError("item detail must have sku style code") : sty.style
+            sty.style = sty.style === undefined || sty.style.length === 0 ? validatError("item detail must have sku style code") : validateStr("item sku style",sty.style, 20)
             sty.sizes = sty.sizes === undefined || sty.sizes.length === 0 ? validatError("item detail in sku must be have size") : sty.sizes
             sty.sizes = sty.sizes.map(size => {
                 // console.log(size)
@@ -1009,6 +1009,9 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
     try {
         let { itemReviewId, comment, rating, style, size } = req.body
 
+        size = size !== undefined ? size : "No"
+        style = style !== undefined ? style : "No"
+
         // find item id
         let item = await verifyDetailId(validateInt("validate itemId", req.params.prodId), style, size)
 
@@ -1030,8 +1033,8 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
                 username: req.user.username,
                 comment: validateStr("item comment", comment, 200),
                 rating: validateInt("item rating", rating, 500, 1, 5),
-                size: size,
-                style: style
+                size: size ,
+                style: style 
             }
         })
 

@@ -70,7 +70,6 @@ router.post('/:username', JwtAuth, async (req, res, next) => {
         let { paymentId, bankname, bankCode, bankAccount } = req.body
         let { username } = req.params
 
-
         if (req.user.role !== ROLE.Admin && req.user.username !== username) {
             forbiddenError('This user can create yourself address only')
         }
