@@ -1,7 +1,7 @@
 let express = require('express')
 const { JwtAuth, verifyRole } = require('../../../middleware/jwtAuth')
 const { PrismaClient, Prisma } = require('@prisma/client');
-const { validateStrArray, validateStr, validateRole, validateDatetimeFuture } = require('../../validation/body');
+const { validateStrArray, validateStr, validateRole, validateDatetimeFuture, validateIdForTesting } = require('../../validation/body');
 const { orderConverter, orderDetailConverter, paginationList, generateIdByMapping } = require('../../model/class/utils/converterUtils');
 const { notFoundError, forbiddenError, validatError } = require('../../model/error/error');
 const { ROLE } = require('../../model/enum/role');
