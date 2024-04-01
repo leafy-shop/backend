@@ -162,7 +162,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
         if (itemOwner.itemOwner === req.user.username) forbiddenError(`product:${itemId} at style:${style} and size:${size} cannot added from your product`)
 
         // if user already has cart item input and owner session cart
-        if (cartItem && cartItem.cartId === cartBodyId && req.user.username === cartItem.cartId.split("-")[0] && sessionCart) {
+        if (cartItem && cartItem.cartId && cartItem.cartId === cartBodyId && req.user.username === cartItem.cartId.split("-")[0] && sessionCart) {
             // update quantity item
             cart = await prisma.carts.update({
                 data: {
@@ -185,7 +185,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             // update total price
             sessionCart = await prisma.session_cart.update({
                 data: {
-                    total: { increment: choosePd.price }
+                    total: { increment: choosePd.price * qty }
                 },
                 where: {
                     sessionCartId: cart.sessionId
@@ -219,7 +219,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             // update create session cart
             sessionCart = await prisma.session_cart.update({
                 data: {
-                    total: { increment: choosePd.price }
+                    total: { increment: choosePd.price * qty }
                 },
                 where: {
                     sessionCartId: sessionCart.sessionCartId
@@ -233,7 +233,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                 data: {
                     sessionCartId: sessionId,
                     username: req.user.username,
-                    total: choosePd.price
+                    total: choosePd.price * qty
                 }
             })
             // create cart item
@@ -257,10 +257,9 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                     itemEvent: ITEMEVENT.ATC
                 }
             })
-
         }
 
-        return res.status(201).json({ msg: `your product ${choosePd.itemId} price ${sessionCart.total} baht that add in your cart with quantity ${cart.qty}` })
+        return res.status(201).json({ msg: `your product ${choosePd.itemId} price ${choosePd.price} baht that add in your cart with quantity ${cart.qty}` })
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner

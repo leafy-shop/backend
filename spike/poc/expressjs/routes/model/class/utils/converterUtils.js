@@ -62,7 +62,7 @@ const productConverter = (product, model) => {
       let newMergeStyle = {}
       // console.log(mergeStyle)
       newMergeStyle = mergeStyle[0]
-      // console.log(newMergeStyle)
+      console.log(newMergeStyle)
       if (mergeStyle.length > 1) {
         newMergeStyle.sizes = []
         mergeStyle.forEach(inStyle => {

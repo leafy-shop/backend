@@ -330,11 +330,12 @@ router.post('/', JwtAuth, async (req, res, next) => {
                 orders[selectedSession[selectOwner].sessionId.split("-")[0]] = orderDetails
                 totalPrice += itemDetail.price * cart.qty
             }
+            // console.log(totalPrice)
 
             // delete session cart
             await prisma.session_cart.update({
                 where: {
-                    sessionCartId: mycart.sessionId
+                    sessionCartId: selectedSession[selectOwner].sessionId
                 },
                 data: {
                     total: {
@@ -356,12 +357,12 @@ router.post('/', JwtAuth, async (req, res, next) => {
                 })
             }
 
-            // // mandatory delete item when item have not price in cart
-            // await prisma.session_cart.deleteMany({
-            //     where: {
-            //         total: 0
-            //     }
-            // })
+            // mandatory delete item when item have not price in cart
+            await prisma.session_cart.deleteMany({
+                where: {
+                    total: 0
+                }
+            })
         }
 
         return res.status(201).json(orders)
