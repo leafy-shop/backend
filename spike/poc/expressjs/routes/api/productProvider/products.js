@@ -955,6 +955,47 @@ router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async 
     }
 })
 
+// DELETE - delete sku product
+router.delete('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
+    try {
+        // find item id
+        let item = await verifyDetailId(validateInt("itemId", Number(req.params.id)), req.params.style)
+        let all_item_sku = await prisma.item_sku.count({
+            where: {
+                itemId: Number(req.params.id)
+            }
+        })
+
+        // check if supplier role update other username
+        if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.username)
+            forbiddenError("This supplier can delete owner's item only")
+
+        if (all_item_sku <= 1) {
+            forbiddenError("The product must have at least 1 sku")
+        }
+
+        // find id to delete product
+        let input = await prisma.item_sku.delete({
+            where: {
+                itemId_SKUstyle: {
+                    itemId: Number(req.params.id),
+                    SKUstyle: req.params.style
+                }
+            }
+        })
+        return res.json({ message: "item id " + req.params.id + " with sku style " + req.params.style + " has been deleted" })
+    } catch (err) {
+        // if product is not found
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.code === 'P2025') {
+                err.message = "item id " + req.params.id + " does not exist"
+            }
+        }
+        next(err)
+    }
+})
+
 // DELETE - delete product
 router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     try {
@@ -963,7 +1004,7 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req
 
         // check if supplier role update other username
         if (req.user.role == ROLE.Supplier && item.itemOwner !== req.user.username)
-            forbiddenError("This supplier can update owner's item only")
+            forbiddenError("This supplier can delete owner's item only")
 
         // find id to delete product
         let input = await prisma.items.delete({
