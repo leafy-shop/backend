@@ -49,7 +49,7 @@ router.get('/', JwtAuth, async (req, res) => {
 
     // filter owner name or order details as itemname 
     orders = orders.filter(order => {
-        return (ownerItemOrProduct !== undefined ? order.orderId.split("-")[0].includes(ownerItemOrProduct) || order.order_details.some(od => od.itemname.includes(ownerItemOrProduct)) : true) 
+        return (ownerItemOrProduct !== undefined ? order.orderId.split("-")[0].includes(ownerItemOrProduct) || order.order_details.some(od => od.itemname.includes(ownerItemOrProduct)) : true)
     })
 
     let page_order = paginationList(orders, pageN, limitN, 10)
@@ -195,7 +195,7 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
             od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
             return od
         }))
-            
+
         return res.json(orderConverter(order))
     } catch (err) {
         next(err)
@@ -233,7 +233,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
             if (req.user.role !== ROLE.Admin && cart.sessionId.split("-")[0] === req.user.username) {
                 forbiddenError("you cannot pay with your own cart");
             }
-    
+
             const stock = await prisma.item_details.findFirst({
                 select: {
                     stock: true
@@ -246,7 +246,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
                     ]
                 }
             });
-    
+
             if (cart.qty > stock.stock) {
                 validatError("you cannot pay order when your quantity in cart is more than quantity in item stock");
             }
@@ -254,20 +254,20 @@ router.post('/', JwtAuth, async (req, res, next) => {
 
         // edited address
         let addressFormat = (accountAddress.subDistrinct !== undefined ? `${accountAddress.address} ${accountAddress.subDistrinct} ${accountAddress.distrinct} ${accountAddress.province} ${accountAddress.postalCode}` :
-        `${accountAddress.address} ${accountAddress.distrinct} ${accountAddress.province} ${accountAddress.postalCode}`)
+            `${accountAddress.address} ${accountAddress.distrinct} ${accountAddress.province} ${accountAddress.postalCode}`)
 
         let orders = {}
         for (let selectOwner in selectedSession) {
-            // add order by address and status etc.
-            let orderId = orderBodyId !== undefined ? validateIdForTesting(selectedSession[selectOwner].sessionId.split("-")[0],orderBodyId) : generateIdByMapping(16, selectedSession[selectOwner].sessionId.split("-")[0])
-            await prisma.orders.create({
-                data: {
-                    orderId: orderId,
-                    customerName: accountAddress.username,
-                    address: addressFormat,
-                    status: ORDERSTATUS.PENDING
-                }
-            })
+            // // add order by address and status etc.
+            // let orderId = orderBodyId !== undefined ? validateIdForTesting(selectedSession[selectOwner].sessionId.split("-")[0], orderBodyId) : generateIdByMapping(16, selectedSession[selectOwner].sessionId.split("-")[0])
+            // await prisma.orders.create({
+            //     data: {
+            //         orderId: orderId,
+            //         customerName: accountAddress.username,
+            //         address: addressFormat,
+            //         status: ORDERSTATUS.PENDING
+            //     }
+            // })
 
             // find selected cart
             let selectedCart = mycart.filter(cart => cart.sessionId === selectedSession[selectOwner].sessionId)
@@ -275,27 +275,27 @@ router.post('/', JwtAuth, async (req, res, next) => {
             for (let cart of selectedCart) {
                 let itemDetail = await verifyId(cart.itemId, cart.itemSize, cart.itemStyle)
                 // add order details
-                let orderInput = await prisma.order_details.create({
-                    data: {
-                        orderId: orderId,
-                        itemStyle: cart.itemStyle,
-                        itemId: cart.itemId,
-                        itemSize: cart.itemSize,
-                        qtyOrder: cart.qty,
-                        priceEach: itemDetail.price
-                    }
-                })
-                // push orderInput
-                orderDetails.push(orderDetailConverter(orderInput))
+                // let orderInput = await prisma.order_details.create({
+                //     data: {
+                //         orderId: orderId,
+                //         itemStyle: cart.itemStyle,
+                //         itemId: cart.itemId,
+                //         itemSize: cart.itemSize,
+                //         qtyOrder: cart.qty,
+                //         priceEach: itemDetail.price
+                //     }
+                // })
+                // // push orderInput
+                // orderDetails.push(orderDetailConverter(orderInput))
 
-                // add to cart on item event behaviour
-                await prisma.item_events.create({
-                    data: {
-                        itemId: cart.itemId,
-                        userId: req.user.id,
-                        itemEvent: ITEMEVENT.PAID
-                    }
-                })
+                // // add to cart on item event behaviour
+                // await prisma.item_events.create({
+                //     data: {
+                //         itemId: cart.itemId,
+                //         userId: req.user.id,
+                //         itemEvent: ITEMEVENT.PAID
+                //     }
+                // })
 
                 // remove all selected cart item
                 let mycart = await prisma.carts.findFirst({
@@ -323,18 +323,6 @@ router.post('/', JwtAuth, async (req, res, next) => {
                     }
                 })
 
-                // delete session cart
-                let carts = await prisma.carts.findMany({
-                    where: {
-                        sessionId: mycart.sessionId
-                    }
-                })
-                if (carts.length == 0) {
-                    await prisma.session_cart.delete({
-                        where: { sessionCartId: mycart.sessionId }
-                    })
-                }
-
                 // remove item stock per quantity
                 await prisma.item_details.update({
                     where: {
@@ -353,12 +341,28 @@ router.post('/', JwtAuth, async (req, res, next) => {
                 orders[selectedSession[selectOwner].sessionId.split("-")[0]] = orderDetails
             }
 
-            // mandatory delete item when item have not price in cart
-            await prisma.session_cart.deleteMany({
+            // delete session cart
+            let carts = await prisma.carts.findMany({
                 where: {
-                    total: 0
+                    sessionId: selectedSession[selectOwner].sessionId
                 }
             })
+
+            console.log(selectedSession[selectOwner].sessionId)
+            console.log(carts)
+
+            if (carts.length === 0) {
+                await prisma.session_cart.delete({
+                    where: { sessionCartId: selectedSession[selectOwner].sessionId }
+                })
+            }
+
+            // // mandatory delete item when item have not price in cart
+            // await prisma.session_cart.deleteMany({
+            //     where: {
+            //         total: 0
+            //     }
+            // })
         }
 
         return res.status(201).json(orders)
