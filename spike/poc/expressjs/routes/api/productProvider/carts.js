@@ -5,7 +5,7 @@ const { validateInt, validateStr, validateIdForTesting } = require('../../valida
 const { notFoundError, forbiddenError, validatError } = require('../../model/error/error')
 const { JwtAuth, UnstrictJwtAuth } = require('../../../middleware/jwtAuth')
 
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient, Prisma } = require('@prisma/client');
 const { ITEMSIZE, ITEMEVENT } = require('../../model/enum/item');
 const { generateIdByMapping, timeConverter } = require('../../model/class/utils/converterUtils');
 const { ROLE } = require('../../model/enum/role');
@@ -64,7 +64,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
             }))
 
             // console.log(resultCart)
-            cartGroup.cartOwner = cartFilterOwner 
+            cartGroup.cartOwner = cartFilterOwner
             cartGroup.itemOwner = sessionGroup
             resultSession.carts.push(cartGroup);
         }
@@ -85,7 +85,7 @@ router.get('/count', UnstrictJwtAuth, async (req, res, next) => {
         if (req.user !== undefined) {
             // find my session
             let mySession = await verifySessionMany(req.user.username)
-            
+
             for (let session in mySession) {
                 // list all group item id
                 let myQty = await prisma.carts.aggregate({
@@ -140,7 +140,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             validateStr("product size", size, 50)
         )
 
-        qty = validateInt("product qty", qty, false,0)
+        qty = validateInt("product qty", qty, false, 0)
 
         // create cart item
         let cart = {}
@@ -193,7 +193,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             // if user already has owner session cart but in owner cart item input is empty
         } else if (sessionCart && itemOwner.itemOwner === sessionCart.sessionCartId.split("-")[0] && !cartItem.cartId) {
             // create cart item
-            let cartId = cartBodyId !== undefined ? validateIdForTesting(cartBodyId.split("-")[0],cartBodyId.split("-")[1]) : generateIdByMapping(16, req.user.username)
+            let cartId = cartBodyId !== undefined ? validateIdForTesting(cartBodyId.split("-")[0], cartBodyId.split("-")[1]) : generateIdByMapping(16, req.user.username)
             // console.log(cartId, cartId.length)
             cart = await prisma.carts.create({
                 data: {
@@ -227,7 +227,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             // if user has not owner session cart
         } else {
             // create session cart
-            let sessionId = sessionBodyId !== undefined ? validateIdForTesting(sessionBodyId.split("-")[0],sessionBodyId.split("-")[1]) : generateIdByMapping(16, itemOwner.itemOwner);
+            let sessionId = sessionBodyId !== undefined ? validateIdForTesting(sessionBodyId.split("-")[0], sessionBodyId.split("-")[1]) : generateIdByMapping(16, itemOwner.itemOwner);
             sessionCart = await prisma.session_cart.create({
                 data: {
                     sessionCartId: sessionId,
@@ -236,7 +236,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                 }
             })
             // create cart item
-            let cartId = cartBodyId !== undefined ? validateIdForTesting(cartBodyId.split("-")[0],cartBodyId.split("-")[1]) : generateIdByMapping(16, req.user.username)
+            let cartId = cartBodyId !== undefined ? validateIdForTesting(cartBodyId.split("-")[0], cartBodyId.split("-")[1]) : generateIdByMapping(16, req.user.username)
             cart = await prisma.carts.create({
                 data: {
                     cartId: cartId,
@@ -261,6 +261,12 @@ router.post('/products', JwtAuth, async (req, res, next) => {
 
         return res.status(201).json({ msg: `your product ${choosePd.itemId} price ${sessionCart.total} baht that add in your cart with quantity ${cart.qty}` })
     } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.meta.target === 'PRIMARY') {
+                err.message = "cart of user is duplicated"
+            }
+        }
         next(err)
     }
 })

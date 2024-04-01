@@ -1,4 +1,4 @@
-const { PrismaClient } = require('@prisma/client')
+const { PrismaClient, Prisma } = require('@prisma/client')
 const express = require('express')
 const { generateIdByMapping } = require('../../model/class/utils/converterUtils')
 const router = express.Router()
@@ -107,6 +107,12 @@ router.post('/:username', JwtAuth, async (req, res, next) => {
         })
         return res.status(201).json(deleteNullValue(paymentResponse))
     } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.meta.target === 'PRIMARY') {
+                err.message = "product of user is duplicated"
+            }
+        }
         next(err)
     }
 })

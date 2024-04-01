@@ -1,6 +1,6 @@
 let express = require('express')
 const { JwtAuth, verifyRole } = require('../../../middleware/jwtAuth')
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient, Prisma } = require('@prisma/client');
 const { validateStrArray, validateStr, validateRole, validateDatetimeFuture } = require('../../validation/body');
 const { orderConverter, orderDetailConverter, paginationList, generateIdByMapping } = require('../../model/class/utils/converterUtils');
 const { notFoundError, forbiddenError, validatError } = require('../../model/error/error');
@@ -352,6 +352,12 @@ router.post('/', JwtAuth, async (req, res, next) => {
 
         return res.status(201).json(orders)
     } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.meta.target === 'PRIMARY') {
+                err.message = "order of user is duplicated"
+            }
+        }
         next(err)
     }
 })
