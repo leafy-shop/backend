@@ -151,6 +151,8 @@ router.post('/products', JwtAuth, async (req, res, next) => {
         // let itemInCart = await verifyItemId()
         let itemOwner = await verifyItemOwner(choosePd.itemId)
 
+        console.log(itemOwner)
+
         // console.log(sessionCart)
         // console.log(itemOwner.itemOwner)
 
@@ -191,7 +193,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                 }
             })
             // if user already has owner session cart but in owner cart item input is empty
-        } else if (sessionCart && sessionCart.sessionCartId == sessionBodyId && itemOwner.itemOwner === sessionCart.sessionCartId.split("-")[0] && !cartItem.cartId) {
+        } else if (sessionCart && itemOwner.itemOwner === sessionCart.sessionCartId.split("-")[0] && !cartItem.cartId) {
             // create cart item
             let cartId = cartBodyId !== undefined ? validateIdForTesting(cartBodyId.split("-")[0], cartBodyId.split("-")[1]) : generateIdByMapping(16, req.user.username)
             // console.log(cartId, cartId.length)
@@ -227,7 +229,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             // if user has not owner session cart
         } else {
             // create session cart
-            let sessionId = sessionBodyId !== undefined ? validateIdForTesting(sessionBodyId.split("-")[0], sessionBodyId.split("-")[1]) : generateIdByMapping(16, itemOwner.itemOwner);
+            let sessionId = generateIdByMapping(16, itemOwner.itemOwner);
             sessionCart = await prisma.session_cart.create({
                 data: {
                     sessionCartId: sessionId,
