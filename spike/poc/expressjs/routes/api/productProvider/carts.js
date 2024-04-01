@@ -140,7 +140,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
             validateStr("product size", size, 50)
         )
 
-        qty = validateInt("product qty", qty, false, 0)
+        qty = qty ? validateInt("product qty", qty, false, 0) : 1
 
         // create cart item
         let cart = {}
@@ -156,12 +156,12 @@ router.post('/products', JwtAuth, async (req, res, next) => {
 
         // check quantity
         cartItem = cartItem ? cartItem : { qty: 0 }
-        if (choosePd.stock <= cartItem.qty) validatError(`product:${itemId} at style:${style} and size:${size} have out stocks`)
+        if (choosePd.stock < cartItem.qty + qty) validatError(`product:${itemId} at style:${style} and size:${size} have out stocks`)
 
         if (itemOwner.itemOwner === req.user.username) forbiddenError(`product:${itemId} at style:${style} and size:${size} cannot added from your product`)
 
         // if user already has cart item input and owner session cart
-        if (cartItem && cartItem.cartId && req.user.username === cartItem.cartId.split("-")[0] && sessionCart) {
+        if (cartItem && cartItem.cartId === cartBodyId && req.user.username === cartItem.cartId.split("-")[0] && sessionCart) {
             // update quantity item
             cart = await prisma.carts.update({
                 data: {
@@ -191,7 +191,7 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                 }
             })
             // if user already has owner session cart but in owner cart item input is empty
-        } else if (sessionCart && itemOwner.itemOwner === sessionCart.sessionCartId.split("-")[0] && !cartItem.cartId) {
+        } else if (sessionCart && sessionCart.sessionCartId == sessionBodyId && itemOwner.itemOwner === sessionCart.sessionCartId.split("-")[0] && !cartItem.cartId) {
             // create cart item
             let cartId = cartBodyId !== undefined ? validateIdForTesting(cartBodyId.split("-")[0], cartBodyId.split("-")[1]) : generateIdByMapping(16, req.user.username)
             // console.log(cartId, cartId.length)
