@@ -259,7 +259,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
         let orders = {}
         for (let selectOwner in selectedSession) {
             // add order by address and status etc.
-            let orderId = orderBodyId !== undefined ? validateIdForTesting(orderBodyId.split('-')[0],orderBodyId.split('-')[1]) : generateIdByMapping(16, selectedSession[selectOwner].sessionId.split("-")[0])
+            let orderId = orderBodyId !== undefined ? validateIdForTesting(selectedSession[selectOwner].sessionId.split("-")[0],orderBodyId) : generateIdByMapping(16, selectedSession[selectOwner].sessionId.split("-")[0])
             await prisma.orders.create({
                 data: {
                     orderId: orderId,
