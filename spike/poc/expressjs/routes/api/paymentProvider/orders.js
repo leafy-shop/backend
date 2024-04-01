@@ -304,13 +304,6 @@ router.post('/', JwtAuth, async (req, res, next) => {
                     }
                 })
 
-                // delete cart
-                await prisma.carts.delete({
-                    where: {
-                        cartId: mycart.cartId
-                    }
-                })
-
                 // delete session cart
                 await prisma.session_cart.update({
                     where: {
@@ -322,6 +315,25 @@ router.post('/', JwtAuth, async (req, res, next) => {
                         }
                     }
                 })
+
+                // delete cart
+                await prisma.carts.delete({
+                    where: {
+                        cartId: mycart.cartId
+                    }
+                })
+
+                // delete session cart
+                let carts = await prisma.carts.findMany({
+                    where: {
+                        sessionId: mycart.sessionId
+                    }
+                })
+                if (carts.length == 0) {
+                    await prisma.session_cart.delete({
+                        where: { sessionCartId: mycart.sessionId }
+                    })
+                }
 
                 // remove item stock per quantity
                 await prisma.item_details.update({
@@ -339,7 +351,6 @@ router.post('/', JwtAuth, async (req, res, next) => {
                     }
                 })
                 orders[selectedSession[selectOwner].sessionId.split("-")[0]] = orderDetails
-                console.log(orders)
             }
 
             // mandatory delete item when item have not price in cart
