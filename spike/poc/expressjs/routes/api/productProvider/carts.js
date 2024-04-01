@@ -19,7 +19,6 @@ router.get('/', JwtAuth, async (req, res, next) => {
 
         // list all group item id
         let myOwnerSession = new Set(mySession.map(session => session.sessionCartId.split("-")[0]))
-        console.log(myOwnerSession)
 
         let resultSession = { carts: [] }
         let myOwnerCart = []
