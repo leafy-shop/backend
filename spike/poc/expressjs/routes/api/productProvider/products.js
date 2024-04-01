@@ -600,10 +600,16 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
         if (styles.length === 0 || !Array.isArray(styles)) {
             validatError("created item must have at least 1 style item")
         }
+        if (styles.length > 10) {
+            validatError("This product already have maximum 10 sku per item so they cannot have sku anymore.")
+        }
         styles = styles.map(sty => {
             // console.log(sty)
-            sty.style = sty.style === undefined || sty.style.length === 0 ? validatError("item detail must have sku style code") : validateStr("item sku style",sty.style, 20)
+            sty.style = sty.style === undefined || sty.style.length === 0 ? validatError("item detail must have sku style code") : validateStr("item sku style", sty.style, 20)
             sty.sizes = sty.sizes === undefined || sty.sizes.length === 0 ? validatError("item detail in sku must be have size") : sty.sizes
+            if (sty.sizes.length > 10) {
+                validatError("Product already have maximum 10 sizes per item sku so they cannot have sku anymore.")
+            }
             sty.sizes = sty.sizes.map(size => {
                 // console.log(size)
                 size.size = validateStr("item size from " + sty.style, size.size, 50)
@@ -670,6 +676,86 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
             // The .code property can be accessed in a type-safe manner
             if (err.meta.target === 'PRIMARY') {
                 err.message = "product of user is duplicated"
+            }
+        }
+        next(err)
+    }
+})
+
+// POST - create sku product
+router.post('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
+    let { style, sizes } = req.body
+
+    //         {
+    //             "style": "sku-2",
+    //             "sizes": [
+    //                 { "size": "XS", "price": 32.00, "stock": 222 },
+    //                 { "size": "S", "price": 64.00, "stock": 111 },
+    //                 { "size": "M", "price": 96.00, "stock": 121 },
+    //                 { "size": "L", "price": 128.00, "stock": 211 }
+    //             ]
+    //         }
+
+    // created product from request body and validation
+    try {
+        // console.log(sty)
+        style = style === undefined || style.length === 0 ? validatError("item detail must have sku style code") : validateStr("item sku style", style, 20)
+        sizes = sizes === undefined || !Array.isArray(sizes) || sizes.length === 0 ? validatError("item detail in sku must be have size") : sizes
+        if (sizes.length > 10) {
+            validatError("Product already have maximum 10 sizes per item sku so they cannot have sku anymore.")
+        }
+        sizes = sizes.map(size => {
+            // console.log(size)
+            size.size = validateStr("item size from " + style, size.size, 50)
+            size.price = validateDouble("item price from " + style, size.price, false, 0)
+            size.stock = validateInt("item stock from " + style, size.stock, false, 1)
+            return size
+        })
+
+        // product Id 
+        let product = await verifyId(validateInt("validate itemId", req.params.id))
+
+        // check item owner
+        if (req.user.role === ROLE.Supplier && req.user.username !== product.itemOwner) {
+            forbiddenError("This supplier can create sku in owner's item only")
+        }
+
+        let skuProduct = await prisma.item_sku.count({
+            where: {
+                itemId: Number(req.params.id)
+            }
+        })
+
+        if (skuProduct > 10) {
+            validatError("This product already have maximum 10 sku per item so they cannot have sku anymore.")
+        }
+
+        // create item sku mapping and item details
+        let sku = await prisma.item_sku.create({
+            data: {
+                itemId: product.itemId,
+                SKUstyle: style,
+            }
+        });
+
+        // using sku mapping to create
+        sizes = sizes.map(size => {
+            size.itemId = sku.itemId
+            size.style = sku.SKUstyle
+            return size
+        })
+
+        // Create item detail for each style
+        await prisma.item_details.createMany({
+            data: sizes
+        });
+
+        return res.status(201).json({"message": "item sku:" + style + " has been added"});
+    } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.meta.target === 'PRIMARY') {
+                err.message = "sku product of user is duplicated"
             }
         }
         next(err)
@@ -1033,8 +1119,8 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
                 username: req.user.username,
                 comment: validateStr("item comment", comment, 200),
                 rating: validateInt("item rating", rating, 500, 1, 5),
-                size: size ,
-                style: style 
+                size: size,
+                style: style
             }
         })
 

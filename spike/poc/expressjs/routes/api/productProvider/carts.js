@@ -59,6 +59,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
                 cart.sessionId = undefined;
                 let itemname = await verifyItemOwner(cart.itemId)
                 cart.itemName = itemname.name
+                cart.stock = product.stock
                 return timeConverter(cart)
             }))
 
