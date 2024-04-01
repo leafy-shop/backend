@@ -272,6 +272,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
             // find selected cart
             let selectedCart = mycart.filter(cart => cart.sessionId === selectedSession[selectOwner].sessionId)
             let orderDetails = []
+            let totalPrice = 0
             for (let cart of selectedCart) {
                 let itemDetail = await verifyId(cart.itemId, cart.itemSize, cart.itemStyle)
                 // add order details
@@ -304,18 +305,6 @@ router.post('/', JwtAuth, async (req, res, next) => {
                     }
                 })
 
-                // delete session cart
-                await prisma.session_cart.update({
-                    where: {
-                        sessionCartId: mycart.sessionId
-                    },
-                    data: {
-                        total: {
-                            decrement: itemDetail.price * cart.qty
-                        }
-                    }
-                })
-
                 // delete cart
                 await prisma.carts.delete({
                     where: {
@@ -339,7 +328,20 @@ router.post('/', JwtAuth, async (req, res, next) => {
                     }
                 })
                 orders[selectedSession[selectOwner].sessionId.split("-")[0]] = orderDetails
+                totalPrice += itemDetail.price * cart.qty
             }
+
+            // delete session cart
+            await prisma.session_cart.update({
+                where: {
+                    sessionCartId: mycart.sessionId
+                },
+                data: {
+                    total: {
+                        decrement: totalPrice
+                    }
+                }
+            })
 
             // delete session cart
             let carts = await prisma.carts.findMany({
