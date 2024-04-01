@@ -110,7 +110,7 @@ router.post('/:username', JwtAuth, async (req, res, next) => {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
             if (err.meta.target === 'PRIMARY') {
-                err.message = "product of user is duplicated"
+                err.message = "payment of user is duplicated"
             }
         }
         next(err)
