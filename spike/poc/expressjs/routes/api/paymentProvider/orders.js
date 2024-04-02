@@ -1,7 +1,7 @@
 let express = require('express')
 const { JwtAuth, verifyRole } = require('../../../middleware/jwtAuth')
 const { PrismaClient, Prisma } = require('@prisma/client');
-const { validateStrArray, validateStr, validateRole, validateDatetimeFuture, validateIdForTesting } = require('../../validation/body');
+const { validateStrArray, validateStr, validateRole, validateDatetimeFuture, validateIdForTesting, validateInt } = require('../../validation/body');
 const { orderConverter, orderDetailConverter, paginationList, generateIdByMapping } = require('../../model/class/utils/converterUtils');
 const { notFoundError, forbiddenError, validatError } = require('../../model/error/error');
 const { ROLE } = require('../../model/enum/role');
@@ -366,6 +366,101 @@ router.post('/', JwtAuth, async (req, res, next) => {
         }
 
         return res.status(201).json(orders)
+    } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.meta.target === 'PRIMARY') {
+                err.message = "order of user is duplicated"
+            }
+        }
+        next(err)
+    }
+})
+
+// pay item without cart on order item
+router.post('/no_cart', JwtAuth, async (req, res, next) => {
+    try {
+        let { orderBodyId, itemId, style, size, qty, addressId } = req.body
+
+        // find address account
+        let accountAddress = await verifyAddressId(validateStr("validate account address", addressId, 53))
+
+        // find cart items
+        let item = await verifyItemId(itemId)
+        qty = qty ? validateInt("item quantity",qty, false, 1) : 1
+        let selectedItem = await verifyId(itemId, size, style)
+        if (selectedItem == null) notFoundError("size and style of item id " + itemId + " does not exist")
+
+        // validate other address place order 
+        if (req.user.role !== ROLE.Admin && req.user.username !== accountAddress.username) {
+            forbiddenError("user cannot place order by other people except yourself")
+        }
+
+        // validate some order in owner item
+        if (req.user.role === ROLE.Supplier && req.user.username !== item.itemOwner) {
+            forbiddenError("user cannot place order by other people except yourself")
+        }
+
+        // validate quantity cart in item stock
+        if (qty > selectedItem.stock) {
+            validatError("you cannot pay order when your quantity in cart is more than quantity in item stock");
+        }
+
+        // edited address
+        let addressFormat = (accountAddress.subDistrinct !== undefined ? `${accountAddress.address} ${accountAddress.subDistrinct} ${accountAddress.distrinct} ${accountAddress.province} ${accountAddress.postalCode}` :
+            `${accountAddress.address} ${accountAddress.distrinct} ${accountAddress.province} ${accountAddress.postalCode}`)
+
+        // add order by address and status etc.
+        let orderId = orderBodyId !== undefined ? validateIdForTesting(item.itemOwner, orderBodyId) : generateIdByMapping(16, item.itemOwner)
+        let orderInput = await prisma.orders.create({
+            data: {
+                orderId: orderId,
+                customerName: accountAddress.username,
+                address: addressFormat,
+                status: ORDERSTATUS.PENDING
+            }
+        })
+
+        // find selected cart
+        let order_detail = await prisma.order_details.create({
+            data: {
+                orderId: orderId,
+                itemStyle: style,
+                itemId: itemId,
+                itemSize: size,
+                qtyOrder: qty,
+                priceEach: selectedItem.price
+            }
+        })
+
+        orderInput.order_details = []
+        orderInput.order_details.push(order_detail)
+
+        // add to cart on item event behaviour
+        await prisma.item_events.create({
+            data: {
+                itemId: itemId,
+                userId: req.user.id,
+                itemEvent: ITEMEVENT.PAID
+            }
+        })
+
+        // remove item stock per quantity
+        await prisma.item_details.update({
+            where: {
+                itemId_style_size: {
+                    style: style,
+                    itemId: itemId,
+                    size: size
+                }
+            },
+            data: {
+                stock: {
+                    decrement: qty
+                }
+            }
+        })
+        return res.status(201).json(orderConverter(orderInput))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
