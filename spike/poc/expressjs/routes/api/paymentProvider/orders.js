@@ -388,17 +388,17 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
         // find cart items
         let item = await verifyItemId(Number(itemId))
         qty = qty ? validateInt("item quantity",qty, false, 1) : 1
-        let selectedItem = await verifyId(Number(itemId), size, style)
+        let selectedItem = await verifyId(item.itemId, size, style)
         if (selectedItem == null) notFoundError("size and style of item id " + itemId + " does not exist")
 
-        // validate other address place order 
+        // validate other address place order
         if (req.user.role !== ROLE.Admin && req.user.username !== accountAddress.username) {
             forbiddenError("user cannot place order by other people except yourself")
         }
 
         // validate some order in owner item
-        if (req.user.role === ROLE.Supplier && req.user.username !== item.itemOwner) {
-            forbiddenError("user cannot place order by other people except yourself")
+        if (req.user.role === ROLE.Supplier && req.user.username === item.itemOwner) {
+            forbiddenError("supplier user cannot place order by other people except yourself")
         }
 
         // validate quantity cart in item stock
@@ -426,20 +426,21 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
             data: {
                 orderId: orderId,
                 itemStyle: style,
-                itemId: itemId,
+                itemId: item.itemId,
                 itemSize: size,
                 qtyOrder: qty,
                 priceEach: selectedItem.price
             }
         })
 
+        // map model
         orderInput.order_details = []
         orderInput.order_details.push(order_detail)
 
         // add to cart on item event behaviour
         await prisma.item_events.create({
             data: {
-                itemId: itemId,
+                itemId: item.itemId,
                 userId: req.user.id,
                 itemEvent: ITEMEVENT.PAID
             }
@@ -450,7 +451,7 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
             where: {
                 itemId_style_size: {
                     style: style,
-                    itemId: itemId,
+                    itemId: item.itemId,
                     size: size
                 }
             },
