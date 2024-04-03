@@ -388,7 +388,7 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
         // find cart items
         let item = await verifyItemId(validateInt("item id",Number(itemId)))
         qty = qty ? validateInt("item quantity",qty, false, 1) : 1
-        let selectedItem = await verifyId(item.itemId, validateStr("item style",size, 50), validateStr("item size",style, 20))
+        let selectedItem = await verifyId(item.itemId, validateStr("item size",size, 50), validateStr("item style",style, 20))
         if (selectedItem == null) notFoundError("size and style of item id " + itemId + " does not exist")
 
         // validate other address place order
