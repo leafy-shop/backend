@@ -2,7 +2,7 @@ let express = require('express')
 const { JwtAuth, verifyRole } = require('../../../middleware/jwtAuth')
 const { PrismaClient, Prisma } = require('@prisma/client');
 const { validateStrArray, validateStr, validateRole, validateDatetimeFuture, validateIdForTesting, validateInt } = require('../../validation/body');
-const { orderConverter, orderDetailConverter, paginationList, generateIdByMapping } = require('../../model/class/utils/converterUtils');
+const { orderConverter, orderDetailConverter, paginationList, generateOrderId } = require('../../model/class/utils/converterUtils');
 const { notFoundError, forbiddenError, validatError } = require('../../model/error/error');
 const { ROLE } = require('../../model/enum/role');
 const { ITEMEVENT } = require('../../model/enum/item');
@@ -259,7 +259,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
         let orders = {}
         for (let selectOwner in selectedSession) {
             // add order by address and status etc.
-            let orderId = orderBodyId !== undefined ? validateIdForTesting(selectedSession[selectOwner].sessionId.split("-")[0], orderBodyId) : generateIdByMapping(16, selectedSession[selectOwner].sessionId.split("-")[0])
+            let orderId = orderBodyId !== undefined ? validateIdForTesting(selectedSession[selectOwner].sessionId.split("-")[0], orderBodyId) : generateOrderId(selectedSession[selectOwner].sessionId.split("-")[0])
             await prisma.orders.create({
                 data: {
                     orderId: orderId,
@@ -332,17 +332,17 @@ router.post('/', JwtAuth, async (req, res, next) => {
             }
             // console.log(totalPrice)
 
-            // delete session cart
-            await prisma.session_cart.update({
-                where: {
-                    sessionCartId: selectedSession[selectOwner].sessionId
-                },
-                data: {
-                    total: {
-                        decrement: totalPrice
-                    }
-                }
-            })
+            // // delete session cart
+            // await prisma.session_cart.update({
+            //     where: {
+            //         sessionCartId: selectedSession[selectOwner].sessionId
+            //     },
+            //     data: {
+            //         total: {
+            //             decrement: totalPrice
+            //         }
+            //     }
+            // })
 
             // delete session cart
             let carts = await prisma.carts.findMany({
@@ -358,11 +358,11 @@ router.post('/', JwtAuth, async (req, res, next) => {
             }
 
             // mandatory delete item when item have not price in cart
-            await prisma.session_cart.deleteMany({
-                where: {
-                    total: 0
-                }
-            })
+            // await prisma.session_cart.deleteMany({
+            //     where: {
+            //         total: 0
+            //     }
+            // })
         }
 
         return res.status(201).json(orders)
@@ -411,7 +411,8 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
             `${accountAddress.address} ${accountAddress.distrinct} ${accountAddress.province} ${accountAddress.postalCode}`)
 
         // add order by address and status etc.
-        let orderId = orderBodyId !== undefined ? validateIdForTesting(item.itemOwner, orderBodyId) : generateIdByMapping(16, item.itemOwner)
+        let orderId = orderBodyId !== undefined ? validateIdForTesting(item.itemOwner, orderBodyId) : generateOrderId(item.itemOwner)
+        // console.log(orderId)
         let orderInput = await prisma.orders.create({
             data: {
                 orderId: orderId,
@@ -462,6 +463,7 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
             }
         })
         return res.status(201).json(orderConverter(orderInput))
+        // return res.json({orderId: orderId})
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -480,7 +482,7 @@ router.put('/prepare_order/:orderId', JwtAuth, verifyRole(ROLE.Admin, ROLE.Suppl
 
         // if they are supplier role
         if (req.user.role === ROLE.Supplier && order.orderId.split("-")[0] !== req.user.username) {
-            forbiddenError("you cannot see order in other user except yourself and your item order")
+            forbiddenError("you cannot edit order in other supplier orders except yourself orders")
         }
 
         let { orderStatus, shippedDate } = req.body
@@ -537,12 +539,14 @@ router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
                 })
                 updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
                 return res.json(orderConverter(updatedOrder))
+            } else if (order.status === ORDERSTATUS.PENDING) {
+                validatError("customer must be wait from supplier confirm to prepared transit items")
             } else {
-                validatError("supplier must be prepared receive item before send to customer")
+                validatError("customer cannot edit item when order status is completed or canceled")
             }
             // cancel order
         } else if (order.customerName === req.user.username && orderStatus === ORDERSTATUS.CANCELED) {
-            if (order.status !== ORDERSTATUS.COMPLETED) {
+            if (![ORDERSTATUS.COMPLETED,ORDERSTATUS.CANCELED].includes(order.status)) {
                 updatedOrder = await prisma.orders.update({
                     data: {
                         status: ORDERSTATUS.CANCELED
@@ -557,10 +561,10 @@ router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
                 updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
                 return res.json(orderConverter(updatedOrder))
             } else {
-                validatError("customer cannot canceled after complete to recieve item")
+                validatError("customer cannot cancel after complete to recieve item or has already canceled item")
             }
         } else {
-            forbiddenError("supplier cannot edit order item when consumer confirm purchase or cancel product")
+            forbiddenError("you cannot edit other customer order except yourself")
         }
     } catch (err) {
         next(err)

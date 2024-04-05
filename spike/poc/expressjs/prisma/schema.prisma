@@ -8,15 +8,15 @@ datasource db {
 }
 
 model carts {
-  cartId       String       @id @db.VarChar(53)
-  sessionId    String       @db.VarChar(53)
-  itemId       Int
-  itemStyle    String       @db.VarChar(50)
-  itemSize     String       @db.VarChar(50)
-  qty          Int          @default(0)
-  item_details item_details @relation(fields: [itemId, itemStyle, itemSize], references: [itemId, style, size], map: "Carts_item_details_fkey")
-  createdAt    DateTime     @default(dbgenerated("NOW()"))
-  updatedAt    DateTime?    @default(dbgenerated("NOW()"))
+  cartId    String    @id @db.VarChar(53)
+  sessionId String    @db.VarChar(53)
+  itemId    Int
+  itemStyle String    @db.VarChar(50)
+  itemSize  String    @db.VarChar(50)
+  qty       Int       @default(0)
+  item_sku  item_sku  @relation(fields: [itemId, itemStyle], references: [itemId, SKUstyle], map: "Carts_item_sku_fkey")
+  createdAt DateTime  @default(dbgenerated("NOW()"))
+  updatedAt DateTime? @default(dbgenerated("NOW()"))
 
   sessions session_cart @relation(fields: [sessionId], references: [sessionCartId], map: "Carts_session_fkey")
 }
@@ -24,7 +24,6 @@ model carts {
 model session_cart {
   sessionCartId String    @id @db.VarChar(53)
   username      String    @db.VarChar(20)
-  total         Decimal   @default(0.00) @db.Decimal(32, 2)
   createdAt     DateTime  @default(dbgenerated("NOW()"))
   updatedAt     DateTime? @default(dbgenerated("NOW()"))
   accounts      accounts  @relation(fields: [username], references: [username], map: "Session_cart_username_fkey")
@@ -44,21 +43,23 @@ model favprd {
 }
 
 model items {
-  itemId      Int           @id @default(autoincrement())
-  name        String        @db.VarChar(100)
-  description String        @db.VarChar(5000)
-  itemOwner   String
-  items       accounts      @relation(fields: [itemOwner], references: [username], map: "Items_itemOwner_fkey")
-  type        String        @db.VarChar(20)
-  tag         String        @db.VarChar(500)
-  totalRating Decimal       @default(0.0) @db.Decimal(2, 1)
-  minPrice    Decimal       @default(0.00) @db.Decimal(32, 2)
-  maxPrice    Decimal?      @db.Decimal(32, 2)
-  createdAt   DateTime      @default(dbgenerated("NOW()"))
-  updatedAt   DateTime?     @default(dbgenerated("NOW()"))
-  favprd      favprd[]
-  item_sku    item_sku[]
-  item_events item_events[]
+  itemId        Int             @id @default(autoincrement())
+  name          String          @db.VarChar(100)
+  description   String          @db.VarChar(5000)
+  itemOwner     String
+  items         accounts        @relation(fields: [itemOwner], references: [username], map: "Items_itemOwner_fkey")
+  type          String          @db.VarChar(20)
+  tag           String          @db.VarChar(500)
+  totalRating   Decimal         @default(0.0) @db.Decimal(2, 1)
+  minPrice      Decimal         @default(0.00) @db.Decimal(32, 2)
+  maxPrice      Decimal?        @db.Decimal(32, 2)
+  createdAt     DateTime        @default(dbgenerated("NOW()"))
+  updatedAt     DateTime?       @default(dbgenerated("NOW()"))
+  favprd        favprd[]
+  item_sku      item_sku[]
+  item_events   item_events[]
+  item_reviews  item_reviews[]
+  order_details order_details[]
 
   @@index([itemId], map: "fk_items_users1_idx")
 }
@@ -68,21 +69,19 @@ model item_sku {
   items        items          @relation(fields: [itemId], references: [itemId], map: "Item_sku_itemId_fkey")
   SKUstyle     String         @default("No") @db.VarChar(20)
   item_details item_details[]
+  carts        carts[]
 
   @@id([itemId, SKUstyle])
   @@index([itemId, SKUstyle], map: "fk_ItemSKU_items_idx")
 }
 
 model item_details {
-  itemId        Int
-  style         String          @default("No") @db.VarChar(50)
-  item_sku      item_sku        @relation(fields: [itemId, style], references: [itemId, SKUstyle], map: "Item_details_sku_fkey")
-  stock         Int             @default(0)
-  size          String          @default("No") @db.VarChar(50)
-  price         Decimal         @default(0.00) @db.Decimal(32, 2)
-  carts         carts[]
-  item_reviews  item_reviews[]
-  order_details order_details[]
+  itemId   Int
+  style    String   @default("No") @db.VarChar(50)
+  item_sku item_sku @relation(fields: [itemId, style], references: [itemId, SKUstyle], map: "Item_details_sku_fkey")
+  stock    Int      @default(0)
+  size     String   @default("No") @db.VarChar(50)
+  price    Decimal  @default(0.00) @db.Decimal(32, 2)
 
   @@id([itemId, style, size])
   @@index([itemId, style, size], map: "fk_ItemDetail_items_idx")
@@ -101,7 +100,7 @@ model item_reviews {
   itemReviewId      String              @id @db.VarChar(53)
   itemId            Int
   username          String              @db.VarChar(20)
-  item_details      item_details        @relation(fields: [itemId, style, size], references: [itemId, style, size], map: "ItemReview_itemId_style_size_fkey")
+  items             items               @relation(fields: [itemId], references: [itemId], map: "ItemReview_itemId_fkey")
   accounts          accounts            @relation(fields: [username], references: [username], map: "Itemreview_username_fkey")
   comment           String              @db.VarChar(500)
   rating            Int                 @default(0)
@@ -187,17 +186,17 @@ model orders {
 }
 
 model order_details {
-  orderId      String       @db.VarChar(53)
-  orders       orders       @relation(fields: [orderId], references: [orderId], map: "Order_details_fkey")
-  itemStyle    String       @db.VarChar(50)
-  itemId       Int
-  itemSize     String       @db.VarChar(50)
-  item_details item_details @relation(fields: [itemStyle, itemId, itemSize], references: [style, itemId, size], map: "Order_details_items_fkey")
-  qtyOrder     Int          @default(1)
-  priceEach    Decimal      @default(0.00) @db.Decimal(32, 2)
-  createdAt    DateTime     @default(dbgenerated("NOW()"))
+  orderId   String   @db.VarChar(53)
+  orders    orders   @relation(fields: [orderId], references: [orderId], map: "Order_details_fkey")
+  itemStyle String   @db.VarChar(50)
+  itemId    Int
+  itemSize  String   @db.VarChar(50)
+  items     items    @relation(fields: [itemId], references: [itemId], map: "Order_details_itemId_fkey")
+  qtyOrder  Int      @default(1)
+  priceEach Decimal  @default(0.00) @db.Decimal(32, 2)
+  createdAt DateTime @default(dbgenerated("NOW()"))
 
-  @@id([orderId, itemStyle, itemId, itemSize])
+  @@id([orderId, itemId])
   @@index([orderId], map: "fk_Order_details_idx")
-  @@index([itemStyle, itemId, itemSize], map: "fk_Order_details_items_idx")
+  @@index([itemId], map: "fk_Order_details_items_idx")
 }

@@ -179,8 +179,30 @@ const generateId = (halfNumber) => {
   return crypto.randomBytes(halfNumber).toString("hex");
 }
 
-const generateIdByMapping = (halfNumber, attribute) => {
-  return `${attribute}-${crypto.randomBytes(halfNumber).toString("hex")}`;
+const generateIdByMapping = (length, attribute) => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const charactersLength = characters.length;
+  let customId = '';
+  
+  for (let i = 0; i < length; i++) {
+      const randomIndex = crypto.randomInt(0, charactersLength);
+      customId += characters.charAt(randomIndex);
+  }
+  
+  return `${attribute}-${customId}`;
+}
+
+const generateOrderId = (attribute) => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789';
+  const charactersLength = characters.length;
+  let customId = '';
+  
+  for (let i = 0; i < 12; i++) {
+      const randomIndex = crypto.randomInt(0, charactersLength);
+      customId += characters.charAt(randomIndex);
+  }
+  
+  return `${attribute}-${customId}`;
 }
 
 module.exports.productConverter = productConverter
@@ -192,3 +214,4 @@ module.exports.paginationList = paginationList
 module.exports.capitalizeFirstLetter = capitalizeFirstLetter
 module.exports.generateId = generateId
 module.exports.generateIdByMapping = generateIdByMapping
+module.exports.generateOrderId = generateOrderId

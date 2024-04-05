@@ -51,14 +51,15 @@ router.get('/', JwtAuth, async (req, res, next) => {
 
             // store all cart in item group like their image, price
             cartFilterOwner = await Promise.all(cartFilterOwner.map(async cart => {
-                let product = await verifyProductId(cart.itemId, cart.itemStyle, cart.itemSize);
+                let product = await verifyProductId(cart.itemId, cart.itemStyle, cart.itemSize)
                 // console.log(filterGroupCart)
                 cart.image = await listFirstImage(findImagePath("products", cart.itemId), "main.png")
-                cart.priceEach = parseFloat(product.price).toFixed(2);
-                cart.sessionId = undefined;
+                cart.priceEach = parseFloat(product.price).toFixed(2)
+                cart.sessionId = undefined
                 let itemname = await verifyItemOwner(cart.itemId)
                 cart.itemName = itemname.name
                 cart.stock = product.stock
+                cart.totalItemQty = parseFloat(product.price * cart.qty).toFixed(2)
                 return timeConverter(cart)
             }))
 
@@ -69,7 +70,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
         }
 
         // declare value for return on my cart session
-        resultSession.total = parseFloat(mySession.reduce((pre, cur) => pre + Number(cur.total), 0)).toFixed(2)
+        resultSession.total = parseFloat(resultSession.carts.reduce((pre, cur) => pre + cur.cartOwner.reduce((pre2, cur2) => pre2 + Number(cur2.totalItemQty), 0), 0)).toFixed(2)
         resultSession.shipping = parseFloat(0).toFixed(2);
         resultSession.tax = parseFloat(0).toFixed(2);
         return res.json(timeConverter(resultSession));
@@ -98,38 +99,16 @@ router.get('/count', UnstrictJwtAuth, async (req, res, next) => {
                 result.count += myQty._sum.qty
             }
         }
-
-
-        // declare value for return on my cart session
-        // resultSession.total = parseFloat(mySession.reduce((pre, cur) => pre + Number(cur.total), 0)).toFixed(2)
-        // resultSession.shipping = parseFloat(0).toFixed(2);
-        // resultSession.tax = parseFloat(0).toFixed(2);
         return res.json(result);
     } catch (err) {
         next(err)
     }
 })
 
-// router.get('/:id', JwtAuth, async (req, res, next) => {
-//     try {
-//         let mycart = await verifyId(req.params.id)
-//         if (mycart.username !== req.user.name) forbiddenError("your cannot see other user carts except yourself")
-
-//         // console.log(mycart)
-//         mycart.totalPrice = mycart.qty * mycart.product.price
-
-//         return res.json(mycart)
-//     } catch (err) {
-//         next(err)
-//     }
-// })
-
 // create carts from item details
 router.post('/products', JwtAuth, async (req, res, next) => {
-    let { sessionBodyId, cartBodyId, itemId, style, size, qty } = req.body
+    let { cartBodyId, itemId, style, size, qty } = req.body
     itemId = Number(itemId)
-    style = style ? style : ITEMSIZE.No
-    size = size ? size : ITEMSIZE.No
 
     try {
         // select item detail by item id, style and size
@@ -157,12 +136,12 @@ router.post('/products', JwtAuth, async (req, res, next) => {
 
         // check quantity
         cartItem = cartItem ? cartItem : { qty: 0 }
-        if (choosePd.stock < cartItem.qty + qty) validatError(`product:${itemId} at style:${style} and size:${size} have out stocks`)
+        if (choosePd.stock < cartItem.qty + qty) validatError(`product:${itemId} at style:${style} and size:${size} have quantity in cart more than number in stocks`)
 
         if (itemOwner.itemOwner === req.user.username) forbiddenError(`product:${itemId} at style:${style} and size:${size} cannot added from your product`)
 
         // if user already has cart item input and owner session cart
-        if (cartItem && cartItem.cartId && cartItem.cartId === cartBodyId && req.user.username === cartItem.cartId.split("-")[0] && sessionCart) {
+        if (cartItem && cartItem.cartId && (cartBodyId == undefined || cartItem.cartId === cartBodyId) && req.user.username === cartItem.cartId.split("-")[0] && sessionCart) {
             // update quantity item
             cart = await prisma.carts.update({
                 data: {
@@ -182,15 +161,15 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                 }
             })
 
-            // update total price
-            sessionCart = await prisma.session_cart.update({
-                data: {
-                    total: { increment: choosePd.price * qty }
-                },
-                where: {
-                    sessionCartId: cart.sessionId
-                }
-            })
+            // // update total price
+            // sessionCart = await prisma.session_cart.update({
+            //     data: {
+            //         total: { increment: choosePd.price * qty }
+            //     },
+            //     where: {
+            //         sessionCartId: cart.sessionId
+            //     }
+            // })
             // if user already has owner session cart but in owner cart item input is empty
         } else if (sessionCart && itemOwner.itemOwner === sessionCart.sessionCartId.split("-")[0] && !cartItem.cartId) {
             // create cart item
@@ -216,15 +195,16 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                 }
             })
 
-            // update create session cart
-            sessionCart = await prisma.session_cart.update({
-                data: {
-                    total: { increment: choosePd.price * qty }
-                },
-                where: {
-                    sessionCartId: sessionCart.sessionCartId
-                }
-            })
+            // // update create session cart
+            // sessionCart = await prisma.session_cart.update({
+            //     data: {
+            //         total: { increment: choosePd.price * qty }
+            //     },
+            //     where: {
+            //         sessionCartId: sessionCart.sessionCartId
+            //     }
+            // })
+
             // if user has not owner session cart
         } else {
             // create session cart
@@ -233,7 +213,6 @@ router.post('/products', JwtAuth, async (req, res, next) => {
                 data: {
                     sessionCartId: sessionId,
                     username: req.user.username,
-                    total: choosePd.price * qty
                 }
             })
             // create cart item
@@ -303,51 +282,39 @@ router.put('/:id', JwtAuth, async (req, res, next) => {
             })
 
             // find session by session id
-            let myallcart = await prisma.carts.findMany({
-                where: {
-                    sessionId: mySession.sessionCartId
-                }
-            })
+            // let myallcart = await prisma.carts.findMany({
+            //     where: {
+            //         sessionId: mySession.sessionCartId
+            //     }
+            // })
 
-            // map product all price in each cart on promise
-            let promises = myallcart.map(async (cur) => {
-                let product = await verifyProductId(cur.itemId, cur.itemStyle, cur.itemSize);
-                return cur.qty * product.price;
-            });
+            // // map product all price in each cart on promise
+            // let promises = myallcart.map(async (cur) => {
+            //     let product = await verifyProductId(cur.itemId, cur.itemStyle, cur.itemSize);
+            //     return cur.qty * product.price;
+            // });
 
-            let totalPrices = await Promise.all(promises);
+            // let totalPrices = await Promise.all(promises);
 
-            // return sum total of product price
-            let sumTotal = totalPrices.reduce((acc, curr) => acc + curr, 0);
+            // // return sum total of product price
+            // let sumTotal = totalPrices.reduce((acc, curr) => acc + curr, 0);
 
-            // update new price
-            await prisma.session_cart.update({
-                data: {
-                    total: sumTotal
-                },
-                where: {
-                    sessionCartId: mySession.sessionCartId
-                }
-            });
-            return res.json({ message: `cart id ${mycart.cartId} of ${req.user.username} has updated` })
+            // // update new price
+            // await prisma.session_cart.update({
+            //     data: {
+            //         total: sumTotal
+            //     },
+            //     where: {
+            //         sessionCartId: mySession.sessionCartId
+            //     }
+            // });
+            return res.json({ message: `cart of ${req.user.username} has item id ${ itemDetail.itemId } - sku ${ itemDetail.style } have size ${ itemDetail.size } been changed to ${qty}`})
 
             // delete cart by quantity check
         } else {
             // delete cart
             await prisma.carts.delete({
                 where: { cartId: mycart.cartId }
-            })
-
-            // update new price
-            await prisma.session_cart.update({
-                data: {
-                    total: {
-                        decrement: mycart.qty * itemDetail.price
-                    }
-                },
-                where: {
-                    sessionCartId: mycart.sessionId
-                }
             })
 
             let carts = await prisma.carts.findMany({
@@ -387,18 +354,6 @@ router.delete('/:id', JwtAuth, async (req, res, next) => {
         // delete cart
         await prisma.carts.delete({
             where: { cartId: mycart.cartId }
-        })
-
-        // update new price
-        await prisma.session_cart.update({
-            data: {
-                total: {
-                    decrement: mycart.qty * item_detail.price
-                }
-            },
-            where: {
-                sessionCartId: mycart.sessionId
-            }
         })
 
         let carts = await prisma.carts.findMany({

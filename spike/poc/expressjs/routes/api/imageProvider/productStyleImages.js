@@ -7,7 +7,7 @@ const { JwtAuth, verifyRole, ProductFileAuthorization } = require('../../../midd
 
 const { bucket, s3, storage, mode, productStyleStorage } = require("../../../config/minio_config");
 const { ROLE } = require("../../model/enum/role");
-const { deleteAllImage, findImagePath } = require("../../model/class/utils/imageList");
+const { deleteAllImage, findImagePath, listAllImage } = require("../../model/class/utils/imageList");
 
 const upload = multer({
     storage: productStyleStorage,
@@ -20,14 +20,37 @@ const upload = multer({
         if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
             return cb(new Error("Please upload a image file type jpg, jpeg or png"));
         }
-        console.log(file)
+        // console.log(file)
         cb(undefined, true);
     }
 });
 
 // upload multiple image
 // condition (file size < 8 MB, file multipart, file upload per solution, file type image only, path storage property)
-router.post("/:id/:style", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), ProductFileAuthorization, upload.array("file", 10), async (req, res) => {
+router.post("/:id/:style", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), ProductFileAuthorization, async (req, res, next) => {
+    // list all object when exist
+    try {
+        // remove image before reupload
+        const folder = findImagePath("products", req.params.id, req.params.style)
+        const listedObjects = await listAllImage(folder)
+
+        if (listedObjects.length != 0) {
+            // console.log(folder)
+
+            // create mapping all images object params
+            const deleteParams = {
+                Bucket: bucket,
+                Delete: { Objects: listedObjects.map(obj => ({ Key: folder + "/" + obj })) },
+            };
+
+            // delete all files when exist
+            await s3.deleteObjects(deleteParams).promise();
+        }
+        next()
+    } catch (err) {
+        next(err)
+    }
+}, upload.array("file", 10), async (req, res) => {
     let locations = []
     req.files.forEach(file => {
         locations.push(file.location)
