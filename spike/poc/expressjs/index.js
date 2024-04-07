@@ -6,6 +6,9 @@ const cookieParser = require('cookie-parser')
 const bodyParser = require('body-parser')
 const compression = require("compression"); // reduce loading of all site
 const {errorRes} = require("./routes/model/error/error")
+const http = require('http');
+const {initializeSocket} = require("./routes/socket/chat.js")
+
 require('dotenv').config().parsed
 let corsOptions = {
     origin: process.env.CLIENT_HOST||'http://localhost:5173',
@@ -14,6 +17,7 @@ let corsOptions = {
 }
 
 const app = express()
+const server = http.createServer(app);
 
 // Set up rate limiter: maximum of twenty requests per minute
 const RateLimit = require("express-rate-limit");
@@ -48,7 +52,11 @@ app.use('/api/image/users',require('./routes/api/imageProvider/userImage.js'))
 app.use('/api/addresses',require('./routes/api/accountProvider/addresses.js'))
 app.use('/api/payments',require('./routes/api/accountProvider/payments.js'))
 app.use('/api/orders',require('./routes/api/paymentProvider/orders.js'))
-// app.use('/api/send-mail',require('./routes/api/mailer.js'))
+app.use('/chat',require('./routes/socket/chat.js').router)
+
+// use ejs for rendering
+app.set('view engine', 'ejs');
+
 
 const errorHandler = (error, req, res, next) => {
     if (res.headersSent) {
@@ -81,6 +89,9 @@ const PORT =process.env.PORT || 5001
 //     }
 // }
 
+// socket connection
+initializeSocket(server)
+
 // Fallback Middleware function for returning 
 // 404 error for undefined paths
 const invalidPathHandler = (request, response, next) => {
@@ -92,4 +103,4 @@ const invalidPathHandler = (request, response, next) => {
 // function which sends back the response for invalid paths)
 app.use(invalidPathHandler)
 
-app.listen(PORT,()=>console.log(`server is run on port ${PORT}`))
+server.listen(PORT,()=>console.log(`server is run on port ${PORT}`))

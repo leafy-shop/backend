@@ -1,7 +1,7 @@
 let express = require('express')
 const { JwtAuth, verifyRole } = require('../../../middleware/jwtAuth')
 const { PrismaClient, Prisma } = require('@prisma/client');
-const { validateStrArray, validateStr, validateRole, validateDatetimeFuture, validateIdForTesting, validateInt } = require('../../validation/body');
+const { validateStrArray, validateStr, validateRole, validateDatetimeFuture, validateIdForTesting, validateInt, validateDatetime } = require('../../validation/body');
 const { orderConverter, orderDetailConverter, paginationList, generateOrderId } = require('../../model/class/utils/converterUtils');
 const { notFoundError, forbiddenError, validatError } = require('../../model/error/error');
 const { ROLE } = require('../../model/enum/role');
@@ -58,18 +58,28 @@ router.get('/', JwtAuth, async (req, res) => {
 })
 
 // get all supplier order item or order audit
-router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res) => {
-    let { sort, itemId, username, status, page, limit } = req.query
+router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
+    let { sort, status, dateStart, dateEnd, page, limit } = req.query
 
     let pageN = Number(page)
     let limitN = Number(limit)
 
-    // filter item by customize itemId
-    let orders = []
-    if (Number(itemId) > 0) {
+    try {
+        // console.log(validateDatetimeFuture("validate date end", new Date(dateEnd), true))
+
+        // filter item by customize itemId
+        let orders = []
         orders = await prisma.orders.findMany({
             where: {
-                status: status
+                AND: [
+                    { status: status },
+                    {
+                        createdAt: {
+                            gte: validateDatetime("validate date start", dateStart, true),
+                            lte: validateDatetime("validate date end", dateEnd, true)
+                        }
+                    }
+                ]
             },
             include: {
                 order_details: true
@@ -78,42 +88,33 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
                 createdAt: sort === "asc" ? "asc" : "desc"
             }
         })
-    } else {
-        orders = await prisma.orders.findMany({
-            where: {
-                itemId: itemId
-            },
-            include: {
-                order_details: true
-            },
-            orderBy: {
-                createdAt: sort === "asc" ? "asc" : "desc"
-            }
+
+        // filter supplier owner
+        orders = orders.filter(order => {
+            return order.orderId.split("-")[0] === req.user.username
         })
-    }
 
-    // filter supplier owner and customer name
-    orders = orders.filter(order => {
-        return order.orderId.split("-")[0] === req.user.username && (!username || order.customerName === username)
-    })
-
-    // order format
-    if (orders.length !== 0) {
-        orders = await Promise.all(orders.map(async order => {
-            // console.log(order)
-            order.total = parseFloat(order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)).toFixed(2)
-            order.order_details = await Promise.all(order.order_details.map(async od => {
-                let item = await verifyItemId(od.itemId)
-                od.itemname = item.name
-                return od
+        // order format
+        if (orders.length !== 0) {
+            orders = await Promise.all(orders.map(async order => {
+                // console.log(order)
+                order.total = parseFloat(order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)).toFixed(2)
+                order.order_details = await Promise.all(order.order_details.map(async od => {
+                    let item = await verifyItemId(od.itemId)
+                    od.itemname = item.name
+                    return od
+                }))
+                return orderConverter(order)
             }))
-            return orderConverter(order)
-        }))
+        }
+
+        let page_order = paginationList(orders, pageN, limitN, 10)
+
+        return res.json(page_order)
+    } catch (err) {
+        next(err)
     }
 
-    let page_order = paginationList(orders, pageN, limitN, 10)
-
-    return res.json(page_order)
 })
 
 // get order item by address id
@@ -190,11 +191,14 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
             forbiddenError("you cannot see order in other user except yourself or your item order")
         }
 
-        order.total = parseFloat(order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)).toFixed(2)
         order.order_details = await Promise.all(order.order_details.map(async od => {
+            let item = await verifyItemId(od.itemId)
+            od.totalRating = item.totalRating
+            od.totalPrice = parseFloat(od.priceEach * od.qtyOrder).toFixed(2)
             od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
             return od
         }))
+        order.total = parseFloat(order.order_details.reduce((pre, order) => pre + Number(order.totalPrice), 0)).toFixed(2)
 
         return res.json(orderConverter(order))
     } catch (err) {
@@ -386,9 +390,9 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
         let accountAddress = await verifyAddressId(validateStr("validate account address", addressId, 53))
 
         // find cart items
-        let item = await verifyItemId(validateInt("item id",Number(itemId)))
-        qty = qty ? validateInt("item quantity",qty, false, 1) : 1
-        let selectedItem = await verifyId(item.itemId, validateStr("item size",size, 50), validateStr("item style",style, 20))
+        let item = await verifyItemId(validateInt("item id", Number(itemId)))
+        qty = qty ? validateInt("item quantity", qty, false, 1) : 1
+        let selectedItem = await verifyId(item.itemId, validateStr("item size", size, 50), validateStr("item style", style, 20))
         if (selectedItem == null) notFoundError("size and style of item id " + itemId + " does not exist")
 
         // validate other address place order
@@ -546,7 +550,7 @@ router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
             }
             // cancel order
         } else if (order.customerName === req.user.username && orderStatus === ORDERSTATUS.CANCELED) {
-            if (![ORDERSTATUS.COMPLETED,ORDERSTATUS.CANCELED].includes(order.status)) {
+            if (![ORDERSTATUS.COMPLETED, ORDERSTATUS.CANCELED].includes(order.status)) {
                 updatedOrder = await prisma.orders.update({
                     data: {
                         status: ORDERSTATUS.CANCELED

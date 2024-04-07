@@ -217,6 +217,25 @@ const validateDatetimeFuture = (prop = '', value = undefined, isEmpty = false, i
     return value
 }
 
+const validateDatetime = (prop = '', value = undefined, isEmpty = false) => {
+    console.log("validate date of " + prop)
+
+    // check time format
+    if (!isEmpty && (value == undefined || value.length == 0)) {
+        validatError(`${prop} is null`)
+    }
+
+    // check value is undefined before add
+    value = value !== undefined ? new Date(value) : undefined
+    // console.log(value)
+    if (value == "Invalid Date") {
+        validatError(`this ${prop} data is not date format`)
+    }
+
+    console.log(`validate ${prop} is passed`)
+    return value
+}
+
 const validatePhone = (prop = '', value) => {
     let re = /^\(?(\d{3})\)?[- ]?(\d{3})[- ]?(\d{4})|\(?(\d{3})\)?[- ]?(\d{3})[- ]?(\d{4})[- ]?\d{1}$/;
     if (value === undefined) {
@@ -288,6 +307,7 @@ module.exports.validateRole = validateRole
 module.exports.validateDouble = validateDouble
 module.exports.validateStrArray = validateStrArray
 module.exports.validateDatetimeFuture = validateDatetimeFuture
+module.exports.validateDatetime = validateDatetime
 module.exports.validatePhone = validatePhone
 module.exports.validateCode = validateCode
 module.exports.validateIdForTesting = validateIdForTesting

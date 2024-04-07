@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.2/css/bootstrap.min.css"
+    />
+    <title>Poc chat</title>
+    <style>
+      body {
+        padding-top: 50px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="chat">
+      <p>
+        username: <input type="text" id="inputUser" value="<%= username %>" />
+      </p>
+      <p>
+        message: <input type="text" id="inputMessage" value="<%= message %>" />
+      </p>
+      <button onclick="sendMessage()">Send</button>
+      <div id="messages"></div>
+    </div>
+
+    <!-- Include Socket.IO library -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+
+      // Receive message history from server
+      socket.on("load messages", function (messages) {
+        let messagesList = document.getElementById("messages");
+        messages.forEach(function (msg) {
+          let item = document.createElement("li");
+          item.innerHTML = "<strong>" + msg.sender + "</strong>: " + msg.message;
+          messagesList.appendChild(item);
+        });
+      });
+
+      socket.on("chat message", function (msg) {
+        // Receive new message from server
+        let item = document.createElement("li");
+        item.innerHTML =
+          "<strong>" + msg.sender + "</strong>: " + msg.message;
+        document.getElementById("messages").appendChild(item);
+      });
+
+      function sendMessage() {
+        const inputUser = document.getElementById("inputUser").value;
+        const inputMessage = document.getElementById("inputMessage").value;
+        socket.emit("chat message", {
+          sender: inputUser,
+          message: inputMessage,
+        });
+        document.getElementById("inputMessage").value = "Test";
+      }
+    </script>
+  </body>
+</html>
