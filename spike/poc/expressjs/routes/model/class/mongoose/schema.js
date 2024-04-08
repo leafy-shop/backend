@@ -11,6 +11,16 @@ const chatLogSchema = new Schema({
   time: { type: Date, default: Date.now }
 });
 
+const chatRoomSchema = new Schema({
+  roomId: String,
+  customer: String,
+  supplier: String,
+  time: { type: Date, default: Date.now }
+});
+
+
 const chat = mongoose.model('chatLog', chatLogSchema);
+const chatRoom = mongoose.model('chatRoom', chatRoomSchema)
 
 module.exports.chat = chat
+module.exports.chatRoom = chatRoom
