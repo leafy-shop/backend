@@ -1041,26 +1041,28 @@ router.get('/all/reviews', async (req, res, next) => {
     // and return page that sorted by updateAt item
     try {
         let filter_rv = await prisma.item_reviews.findMany({
-            where: {
-                rating: {
-                    gte: 3,
-                    lte: 5
-                },
-            },
+            // where: {
+            //     rating: {
+            //         gte: 3,
+            //         lte: 5
+            //     },
+            // },
             select: reviewView,
             orderBy: { createdAt: "desc" }
         })
 
         let avg_rating = await prisma.item_reviews.aggregate({
             _avg: {
-                rating: true
+                PQrating: true,
+                SSrating: true,
+                DSrating: true
             },
         })
 
         // return to page with page number and page size
         let page_rv = paginationList(filter_rv, pageN, limitN, 10)
         // return average review
-        page_rv.avg_rating = avg_rating._avg.rating
+        page_rv.avg_rating = parseFloat((avg_rating._avg.PQrating + avg_rating._avg.SSrating + avg_rating._avg.DSrating) / 3).toFixed(1)
         // console.log(page_rv.list)
         page_rv.list = page_rv.list.map(rv => {
             rv.name = rv.accounts.username
@@ -1068,6 +1070,10 @@ router.get('/all/reviews', async (req, res, next) => {
             // Replace this with the IANA timezone you desire
             rv.time = getDifferentTime(rv.createdAt)
             rv.createdAt = undefined
+            rv.rating = parseFloat((rv.PQrating + rv.SSrating + rv.DSrating)/3).toFixed(2)
+            rv.PQrating = undefined
+            rv.SSrating = undefined
+            rv.DSrating = undefined
             return rv
         })
 
@@ -1120,7 +1126,11 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
             // Replace this with the IANA timezone you desire
             review.time = getDifferentTime(review.createdAt);
             review.createdAt = undefined;
-            review.size = review.size === "No" ? undefined : review.size;
+            review.rating = parseFloat((review.PQrating + review.SSrating + review.DSrating)/3).toFixed(2)
+            review.PQrating = undefined
+            review.SSrating = undefined
+            review.DSrating = undefined
+            review.userId = undefined
             updatedReviews.push(await getIconImage(deleteNullValue(review)));
         }
 
@@ -1134,10 +1144,7 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
 // POST - add reviews into product id
 router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
     try {
-        let { itemReviewId, comment, rating, style, size } = req.body
-
-        size = size !== undefined ? size : "No"
-        style = style !== undefined ? style : "No"
+        let { itemReviewId, comment, PQrating, SSrating, DSrating, style, size } = req.body
 
         // find item id
         let item = await verifyDetailId(validateInt("validate itemId", req.params.prodId), style, size)
@@ -1158,10 +1165,12 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
                 itemReviewId: itemReviewId !== undefined ? itemReviewId : id,
                 itemId: item.itemId,
                 username: req.user.username,
-                comment: validateStr("item comment", comment, 200),
-                rating: validateInt("item rating", rating, 500, 1, 5),
-                size: size,
-                style: style
+                comment: validateStr("review comment", comment, 200),
+                PQrating: validateInt("review product quanlity rating", PQrating, false, 1, 5),
+                SSrating: validateInt("review seller service rating", SSrating, false, 1, 5),
+                DSrating: validateInt("review delivery service rating", DSrating, false, 1, 5),
+                size: validateStr("item size",size, 50),
+                style: validateStr("item style",style, 20)
             }
         })
 
@@ -1185,15 +1194,15 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
 
 
 // DELETE - delete review by review id and product id
-router.delete('/:prodId/reviews/:commentId', JwtAuth, async (req, res, next) => {
+router.delete('/:prodId/reviews/:commentId', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     try {
         let { prodId, commentId } = req.params
 
         // find item id
         let item = await findReviewById(validateInt("validate itemId", prodId), commentId)
 
-        // check if supplier role delete other username that not same finding commend that throw to exception
-        if ([ROLE.Supplier, ROLE.User].includes(req.user.role) && review.username !== req.user.username) forbiddenError("user can delete your comment only")
+        // check item owner can delete review only
+        if (req.user.role !== ROLE.Supplier && item.itemOwner !== req.user.username) forbiddenError("supplier can delete your item owner review only")
 
         // find id to delete product
         await prisma.item_reviews.delete({
@@ -1467,9 +1476,11 @@ const findAllReviewByItemId = async (prodId, sort, name = undefined) => {
 
 const changeTotalRating = async (id) => {
     // get average value of rating in item id
-    avg_review = await prisma.item_reviews.aggregate({
+    let avg_review = await prisma.item_reviews.aggregate({
         _avg: {
-            rating: true
+            PQrating: true,
+            SSrating: true,
+            DSrating: true
         },
         where: {
             itemId: id
@@ -1479,7 +1490,7 @@ const changeTotalRating = async (id) => {
     // update average rating in item id
     await prisma.items.update({
         data: {
-            totalRating: avg_review._avg.rating.toFixed(1)
+            totalRating: (avg_review._avg.PQrating + avg_review._avg.SSrating + avg_review._avg.DSrating)/3
         },
         where: {
             itemId: id

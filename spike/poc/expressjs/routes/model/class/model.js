@@ -36,7 +36,9 @@ const reviewView = {
         }
     },
     comment: true,
-    rating: true,
+    PQrating: true,
+    SSrating: true,
+    DSrating: true,
     createdAt: true
 }
 
@@ -49,7 +51,9 @@ const reviewViewOwner = {
         }
     },
     comment: true,
-    rating: true,
+    PQrating: true,
+    SSrating: true,
+    DSrating: true,
     like: true,
     style: true,
     size: true,
