@@ -17,7 +17,7 @@ const { findImagePath, listFirstImage, listAllImage } = require('../../model/cla
 const prisma = new PrismaClient()
 // const crypto = require("crypto");
 // const { DateTime } = require("luxon");
-const { deleteNullValue } = require('../../model/class/utils/modelMapping')
+const { deleteNullValue, sanitizeCircularReferences } = require('../../model/class/utils/modelMapping')
 const { getDifferentTime } = require('../../model/class/utils/datetimeUtils');
 const { ITEMTYPE, ITEMSIZE, ITEMEVENT } = require('../../model/enum/item');
 
@@ -482,11 +482,13 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         let item = await verifyId(validateInt("validate itemId", req.params.id))
 
         // find item_details and map to item
-        item.styles = await prisma.item_details.findMany({
+        let skuGroup = await prisma.item_sku.findMany({
             where: {
                 itemId: item.itemId
             }
         })
+
+        // console.log(skuGroup)
 
         // check user is supplier
         // if (req.user !== undefined && req.user.role === ROLE.Supplier && item.itemOwner !== req.user.email)
@@ -531,15 +533,45 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         // }).catch(err => {
         //     next(err)
         // })
-        const stylesWithImages = await Promise.all(
-            item.styles.map(async (product) => {
-                product.itemId = undefined
-                // Fetch image for each product style
-                return await getProductStyleImage(productConverter(product), item.itemId);
-            })
-        );
 
-        item.styles = stylesWithImages;
+        // style converter
+        item.styles = []
+        for (const sku of skuGroup) {
+            const itemVariants = await prisma.item_details.findMany({
+                where: {
+                    AND: [
+                        { itemId: sku.itemId },
+                        { style: sku.SKUstyle }
+                    ]
+                }
+            });
+    
+            const skuSizes = {
+                style: sku.SKUstyle,
+                sizes: [],
+                minPriceSKU: Infinity,
+                maxPriceSKU: -Infinity
+            };
+    
+            const priceRange = [];
+            itemVariants.forEach(product => {
+                const { style, itemId, price, ...rest } = product;
+                priceRange.push(price);
+                skuSizes.sizes.push(rest);
+                return { ...rest };
+            });
+    
+            skuSizes.minPriceSKU = Math.min(...priceRange);
+            skuSizes.maxPriceSKU = priceRange.length <= 1 ? 0 : Math.max(...priceRange);
+    
+            const skuImage = await getProductStyleImage(sku.SKUstyle, sku.itemId);
+            skuSizes.images = skuImage;
+
+            // console.log(skuSizes.images)
+    
+            item.styles.push(skuSizes);
+        }
+
         // Respond with the updated product object
         return res.json(productConverter(item));
     } catch (err) {
@@ -750,7 +782,7 @@ router.post('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, 
             data: sizes
         });
 
-        return res.status(201).json({"message": "item sku:" + style + " has been added"});
+        return res.status(201).json({ "message": "item sku:" + style + " has been added" });
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -1070,7 +1102,7 @@ router.get('/all/reviews', async (req, res, next) => {
             // Replace this with the IANA timezone you desire
             rv.time = getDifferentTime(rv.createdAt)
             rv.createdAt = undefined
-            rv.rating = parseFloat((rv.PQrating + rv.SSrating + rv.DSrating)/3).toFixed(2)
+            rv.rating = parseFloat((rv.PQrating + rv.SSrating + rv.DSrating) / 3).toFixed(2)
             rv.PQrating = undefined
             rv.SSrating = undefined
             rv.DSrating = undefined
@@ -1126,7 +1158,7 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
             // Replace this with the IANA timezone you desire
             review.time = getDifferentTime(review.createdAt);
             review.createdAt = undefined;
-            review.rating = parseFloat((review.PQrating + review.SSrating + review.DSrating)/3).toFixed(2)
+            review.rating = parseFloat((review.PQrating + review.SSrating + review.DSrating) / 3).toFixed(2)
             review.PQrating = undefined
             review.SSrating = undefined
             review.DSrating = undefined
@@ -1169,8 +1201,8 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
                 PQrating: validateInt("review product quanlity rating", PQrating, false, 1, 5),
                 SSrating: validateInt("review seller service rating", SSrating, false, 1, 5),
                 DSrating: validateInt("review delivery service rating", DSrating, false, 1, 5),
-                size: validateStr("item size",size, 50),
-                style: validateStr("item style",style, 20)
+                size: validateStr("item size", size, 50),
+                style: validateStr("item style", style, 20)
             }
         })
 
@@ -1330,9 +1362,7 @@ const getProductImage = async (product) => {
 }
 
 const getProductStyleImage = async (style, id) => {
-    style.images = await listAllImage(findImagePath("products", id + '/' + style.style))
-    console.log(style.images)
-    return style
+    return await listAllImage(findImagePath("products", id + '/' + style))
 }
 
 const getIconImage = async (user) => {
@@ -1490,7 +1520,7 @@ const changeTotalRating = async (id) => {
     // update average rating in item id
     await prisma.items.update({
         data: {
-            totalRating: (avg_review._avg.PQrating + avg_review._avg.SSrating + avg_review._avg.DSrating)/3
+            totalRating: (avg_review._avg.PQrating + avg_review._avg.SSrating + avg_review._avg.DSrating) / 3
         },
         where: {
             itemId: id

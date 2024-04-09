@@ -37,7 +37,7 @@ router.get('/', JwtAuth, async (req, res) => {
 
     // get all order list
     orders = await Promise.all(orders.map(async order => {
-        order.total = parseFloat(order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)).toFixed(2)
+        order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
         order.order_details = await Promise.all(order.order_details.map(async od => {
             let item = await verifyItemId(od.itemId)
             od.itemname = item.name
@@ -98,7 +98,7 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
         if (orders.length !== 0) {
             orders = await Promise.all(orders.map(async order => {
                 // console.log(order)
-                order.total = parseFloat(order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)).toFixed(2)
+                order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
                 order.order_details = await Promise.all(order.order_details.map(async od => {
                     let item = await verifyItemId(od.itemId)
                     od.itemname = item.name
@@ -194,11 +194,11 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
         order.order_details = await Promise.all(order.order_details.map(async od => {
             let item = await verifyItemId(od.itemId)
             od.totalRating = item.totalRating
-            od.totalPrice = parseFloat(od.priceEach * od.qtyOrder).toFixed(2)
+            od.totalPrice = od.priceEach * od.qtyOrder
             od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
             return od
         }))
-        order.total = parseFloat(order.order_details.reduce((pre, order) => pre + Number(order.totalPrice), 0)).toFixed(2)
+        order.total = order.order_details.reduce((pre, order) => pre + Number(order.totalPrice), 0)
 
         return res.json(orderConverter(order))
     } catch (err) {

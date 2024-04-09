@@ -54,12 +54,12 @@ router.get('/', JwtAuth, async (req, res, next) => {
                 let product = await verifyProductId(cart.itemId, cart.itemStyle, cart.itemSize)
                 // console.log(filterGroupCart)
                 cart.image = await listFirstImage(findImagePath("products", cart.itemId), "main.png")
-                cart.priceEach = parseFloat(product.price).toFixed(2)
+                cart.priceEach = product.price
                 cart.sessionId = undefined
                 let itemname = await verifyItemOwner(cart.itemId)
                 cart.itemName = itemname.name
                 cart.stock = product.stock
-                cart.totalItemQty = parseFloat(product.price * cart.qty).toFixed(2)
+                cart.totalItemQty = product.price * cart.qty
                 return timeConverter(cart)
             }))
 
@@ -70,9 +70,9 @@ router.get('/', JwtAuth, async (req, res, next) => {
         }
 
         // declare value for return on my cart session
-        resultSession.total = parseFloat(resultSession.carts.reduce((pre, cur) => pre + cur.cartOwner.reduce((pre2, cur2) => pre2 + Number(cur2.totalItemQty), 0), 0)).toFixed(2)
-        resultSession.shipping = parseFloat(0).toFixed(2);
-        resultSession.tax = parseFloat(0).toFixed(2);
+        resultSession.total = resultSession.carts.reduce((pre, cur) => pre + cur.cartOwner.reduce((pre2, cur2) => pre2 + Number(cur2.totalItemQty), 0), 0)
+        resultSession.shipping = 0;
+        resultSession.tax = 0;
         return res.json(timeConverter(resultSession));
     } catch (err) {
         next(err)

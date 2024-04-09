@@ -22,9 +22,9 @@ const productConverter = (product, model) => {
   product = deleteNullValue(product)
 
   // floating string to float convertor
-  if (product.totalRating !== undefined) product.totalRating = parseFloat(product.totalRating)
-  if (product.minPrice !== undefined) product.minPrice = parseFloat(product.minPrice).toFixed(2)
-  if (product.maxPrice !== undefined) product.maxPrice = parseFloat(product.maxPrice).toFixed(2)
+  if (product.totalRating !== undefined) product.totalRating = product.totalRating
+  if (product.minPrice !== undefined) product.minPrice = product.minPrice
+  if (product.maxPrice !== undefined) product.maxPrice = product.maxPrice
 
   // array converter
   if (product.tag !== undefined) product.tag = product.tag.split(",")
@@ -33,51 +33,6 @@ const productConverter = (product, model) => {
   if (product.images !== undefined) product.images = product.images.split(",")
 
   if (product.item_review !== undefined) product.item_review = product.item_review.map(review => timeConverter(review))
-
-  // style converter
-  if (product.styles !== undefined) {
-    // price format
-    product.styles = product.styles.map(style => {
-      // if (style.size !== undefined && style.size.length !== 0) style.size = style.size.split(",")
-      // console.log(style.price)
-      if (style.price !== undefined) style.price = parseFloat(style.price).toFixed(2)
-      return style
-    })
-
-    // assign list style template
-    let styleList = new Set()
-    let styleData = []
-
-    // resize style size
-    product.styles.forEach(product => {
-      styleData.push(product)
-      styleList.add(product.style)
-    })
-    // console.log(styleData)
-
-    let newStyleData = []
-    // merge by style list
-    styleList.forEach(style => {
-      let mergeStyle = styleData.filter(product => product.style == style)
-      let newMergeStyle = {}
-      // console.log(mergeStyle)
-      newMergeStyle = mergeStyle[0]
-      console.log(newMergeStyle)
-      if (mergeStyle.length > 1) {
-        newMergeStyle.sizes = []
-        mergeStyle.forEach(inStyle => {
-          newMergeStyle.sizes.push({ size: inStyle.size, stock: inStyle.stock, price: inStyle.price })
-        })
-        newMergeStyle.size = undefined
-        newMergeStyle.stock = undefined
-        newMergeStyle.price = undefined
-      }
-      // console.log(newMergeStyle)
-      newStyleData.push(newMergeStyle)
-    })
-
-    product.styles = newStyleData
-  }
 
   // time converter
   product = timeConverter(product)
@@ -126,7 +81,7 @@ const orderConverter = (order) => {
 }
 
 const orderDetailConverter = (order) => {
-  order.priceEach = parseFloat(order.priceEach).toFixed(2)
+  order.priceEach = order.priceEach
   return timeConverter(order)
 }
 
