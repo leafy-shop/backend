@@ -448,6 +448,8 @@ router.get('/supplier/:owner', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), a
                 filter_pd = filter_pd.sort((a, b) => a.allStock - b.allStock)
             }
         }
+
+        // console.log(filter_pd)
         // Paginate the filtered product list
         const page_pd = paginationList(filter_pd, pageN, limitN, 10);
 
@@ -545,14 +547,14 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
                     ]
                 }
             });
-    
+
             const skuSizes = {
                 style: sku.SKUstyle,
                 sizes: [],
                 minPriceSKU: Infinity,
                 maxPriceSKU: -Infinity
             };
-    
+
             const priceRange = [];
             itemVariants.forEach(product => {
                 const { style, itemId, price, ...rest } = product;
@@ -561,15 +563,15 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
                 skuSizes.sizes.push(rest);
                 return { ...rest };
             });
-    
+
             skuSizes.minPriceSKU = Math.min(...priceRange);
             skuSizes.maxPriceSKU = priceRange.length <= 1 ? 0 : Math.max(...priceRange);
-    
+
             const skuImage = await getProductStyleImage(sku.SKUstyle, sku.itemId);
             skuSizes.images = skuImage;
 
             // console.log(skuSizes.images)
-    
+
             item.styles.push(skuSizes);
         }
 
@@ -1053,7 +1055,7 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2025') {
                 err.message = "item id " + req.params.id + " does not exist"
-            } else if(err.code) {
+            } else if (err.code) {
                 err.message = "item id " + req.params.id + " cannot delete when user who had already paid order or reviewed"
             }
         }
@@ -1098,7 +1100,7 @@ router.get('/all/reviews', async (req, res, next) => {
         // return to page with page number and page size
         let page_rv = paginationList(filter_rv, pageN, limitN, 10)
         // return average review
-        page_rv.avg_rating = parseFloat((avg_rating._avg.PQrating + avg_rating._avg.SSrating + avg_rating._avg.DSrating) / 3).toFixed(1)
+        page_rv.avg_rating = (avg_rating._avg.PQrating + avg_rating._avg.SSrating + avg_rating._avg.DSrating) / 3
         // console.log(page_rv.list)
         page_rv.list = page_rv.list.map(rv => {
             rv.name = rv.accounts.username
@@ -1106,7 +1108,7 @@ router.get('/all/reviews', async (req, res, next) => {
             // Replace this with the IANA timezone you desire
             rv.time = getDifferentTime(rv.createdAt)
             rv.createdAt = undefined
-            rv.rating = parseFloat((rv.PQrating + rv.SSrating + rv.DSrating) / 3).toFixed(2)
+            rv.rating = (rv.PQrating + rv.SSrating + rv.DSrating) / 3
             rv.PQrating = undefined
             rv.SSrating = undefined
             rv.DSrating = undefined
@@ -1162,7 +1164,7 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
             // Replace this with the IANA timezone you desire
             review.time = getDifferentTime(review.createdAt);
             review.createdAt = undefined;
-            review.rating = parseFloat((review.PQrating + review.SSrating + review.DSrating) / 3).toFixed(2)
+            review.rating = (review.PQrating + review.SSrating + review.DSrating) / 3
             review.PQrating = undefined
             review.SSrating = undefined
             review.DSrating = undefined
@@ -1617,6 +1619,7 @@ const haveItemSolesIn2Month = async (product) => {
             }
         }
     })
+    // console.log(orders)
     product.sold = orders.reduce((cur, pre) => {
         return cur + pre.order_details.reduce((cur1, pre1) => cur1 + pre1.qtyOrder, 0)
     }, 0)

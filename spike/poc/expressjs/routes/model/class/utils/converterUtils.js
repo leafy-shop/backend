@@ -21,10 +21,10 @@ const productConverter = (product, model) => {
   // delete null value
   product = deleteNullValue(product)
 
-  // floating string to float convertor
-  if (product.totalRating !== undefined) product.totalRating = product.totalRating
-  if (product.minPrice !== undefined) product.minPrice = product.minPrice
-  if (product.maxPrice !== undefined) product.maxPrice = product.maxPrice
+  // // floating string to float convertor
+  // if (product.totalRating !== undefined) product.totalRating = product.totalRating
+  // if (product.minPrice !== undefined) product.minPrice = product.minPrice
+  // if (product.maxPrice !== undefined) product.maxPrice = product.maxPrice
 
   // array converter
   if (product.tag !== undefined) product.tag = product.tag.split(",")
