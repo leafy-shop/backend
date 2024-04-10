@@ -1048,9 +1048,12 @@ router.delete('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req
     } catch (err) {
         // if product is not found
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            console.log(err.code)
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2025') {
                 err.message = "item id " + req.params.id + " does not exist"
+            } else if(err.code) {
+                err.message = "item id " + req.params.id + " cannot delete when user who had already paid order or reviewed"
             }
         }
         next(err)
