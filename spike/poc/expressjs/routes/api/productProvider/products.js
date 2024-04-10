@@ -556,6 +556,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
             const priceRange = [];
             itemVariants.forEach(product => {
                 const { style, itemId, price, ...rest } = product;
+                rest.price = price
                 priceRange.push(price);
                 skuSizes.sizes.push(rest);
                 return { ...rest };
