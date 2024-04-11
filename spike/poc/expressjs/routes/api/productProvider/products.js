@@ -558,7 +558,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
             const priceRange = [];
             itemVariants.forEach(product => {
                 const { style, itemId, price, ...rest } = product;
-                rest.price = price
+                rest.price = parseFloat(price)
                 priceRange.push(price);
                 skuSizes.sizes.push(rest);
                 return { ...rest };
@@ -574,6 +574,8 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
 
             item.styles.push(skuSizes);
         }
+
+        console.log(item)
 
         // Respond with the updated product object
         return res.json(productConverter(item));
