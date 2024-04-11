@@ -556,13 +556,17 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
             };
 
             const priceRange = [];
+            const stockRange = [];
             itemVariants.forEach(product => {
                 const { style, itemId, price, ...rest } = product;
                 rest.price = parseFloat(price)
                 priceRange.push(price);
+                stockRange.push(rest.stock)
                 skuSizes.sizes.push(rest);
                 return { ...rest };
             });
+
+            skuSizes.allStock = stockRange.reduce((pre, cur) => pre + cur, 0)
 
             skuSizes.minPriceSKU = Math.min(...priceRange);
             skuSizes.maxPriceSKU = priceRange.length <= 1 ? 0 : Math.max(...priceRange);

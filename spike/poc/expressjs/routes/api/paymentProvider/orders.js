@@ -114,7 +114,32 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
     } catch (err) {
         next(err)
     }
+})
 
+// count all supplier order item with status
+router.get('/supplier/count/:status', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
+    let { status } = req.query
+
+    try {
+        // console.log(validateDatetimeFuture("validate date end", new Date(dateEnd), true))
+
+        // filter item by customize itemId
+        let orders = []
+        orders = await prisma.orders.findMany({
+            where: {
+                status: status
+            }
+        })
+
+        // filter supplier owner
+        orders = orders.filter(order => {
+            return order.orderId.split("-")[0] === req.user.username
+        })
+
+        return res.json({count: orders.length})
+    } catch (err) {
+        next(err)
+    }
 })
 
 // get order item by address id
