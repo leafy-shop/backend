@@ -37,6 +37,12 @@ router.get('/', JwtAuth, async (req, res) => {
 
     // get all order list
     orders = await Promise.all(orders.map(async order => {
+        let user = await prisma.accounts.findFirst({
+            where: {
+                username: order.orderId.split("-")[0]
+            }
+        })
+        order.supplierId = user.userId
         order.itemOwner = order.orderId.split("-")[0]
         order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
         order.order_details = await Promise.all(order.order_details.map(async od => {
@@ -137,7 +143,7 @@ router.get('/supplier/count/:status', JwtAuth, verifyRole(ROLE.Admin, ROLE.Suppl
             return order.orderId.split("-")[0] === req.user.username
         })
 
-        return res.json({count: orders.length})
+        return res.json({ count: orders.length })
     } catch (err) {
         next(err)
     }
