@@ -37,6 +37,7 @@ router.get('/', JwtAuth, async (req, res) => {
 
     // get all order list
     orders = await Promise.all(orders.map(async order => {
+        order.itemOwner = order.orderId.split("-")[0]
         order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
         order.order_details = await Promise.all(order.order_details.map(async od => {
             let item = await verifyItemId(od.itemId)
