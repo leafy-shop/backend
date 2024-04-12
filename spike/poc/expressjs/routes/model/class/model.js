@@ -114,6 +114,7 @@ let orderView = {
     order_details: {
         select: {
             itemStyle: true,
+            itemSize: true,
             itemId: true,
             qtyOrder: true,
             priceEach: true
