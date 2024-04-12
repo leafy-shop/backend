@@ -51,7 +51,7 @@ app.use('/api/image/products',require('./routes/api/imageProvider/productImage.j
 app.use('/api/images/products',require('./routes/api/imageProvider/productStyleImages.js'))
 app.use('/api/image/users',require('./routes/api/imageProvider/userImage.js'))
 app.use('/api/image/gallery',require('./routes/api/imageProvider/galleryImage.js'))
-app.use('/api/images/galleries',require('./routes/api/imageProvider/galleryImageDetails.js'))
+app.use('/api/images/gallery',require('./routes/api/imageProvider/galleryImageDetails.js'))
 app.use('/api/addresses',require('./routes/api/accountProvider/addresses.js'))
 app.use('/api/payments',require('./routes/api/accountProvider/payments.js'))
 app.use('/api/orders',require('./routes/api/paymentProvider/orders.js'))
