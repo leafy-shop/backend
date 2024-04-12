@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { validateStr, validateInt, validateDouble, validateEmail, validateStrArray, validateRole } = require('../../validation/body')
+const { validateStr, validateInt, validateDouble, validateEmail, validateStrArray, validateRole, validateIdForTesting } = require('../../validation/body')
 const { notFoundError, forbiddenError, validatError } = require('../../model/error/error')
 // const { dateTimeZoneNow } = require('../model/class/utils/datetimeUtils')
 const { userViewFav, prodList, reviewView, reviewViewOwner } = require('../../model/class/model')
@@ -502,10 +502,6 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         item = await haveItemSoles(item)
         // console.log(item.image)
 
-        // list product review to page
-        page = Number(req.query.rv_page)
-        limit = Number(req.query.rv_limit)
-
         // add on event
         if (req.user !== undefined) {
             let event = {
@@ -579,7 +575,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
             item.styles.push(skuSizes);
         }
 
-        console.log(item)
+        // console.log(item)
 
         // Respond with the updated product object
         return res.json(productConverter(item));
@@ -845,21 +841,21 @@ router.put('/isFav/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.User), async (req,
 router.patch('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
     let mapData = {}
 
-    // body params mapping
-    for (let i in req.body) {
-        if (req.body[i] != undefined) {
-            // map object from body when update in prisma model
-            mapData[i] =
-                i == "name" ? validateStr("item name", req.body[i], 100) :
-                    i == "description" ? validateStr("item description", req.body[i], 5000, true) :
-                        // i == "itemOwner" ? validateEmail("item owner", req.body[i], 100) : cannot change item owner
-                        i == "type" ? validateStr("item type", req.body[i], 20) :
-                            i == "tag" ? validateStrArray("item tag", req.body[i], 10, 20) : undefined // unused body request
-        }
-    }
-
     // update product
     try {
+        // body params mapping
+        for (let i in req.body) {
+            if (req.body[i] != undefined) {
+                // map object from body when update in prisma model
+                mapData[i] =
+                    i == "name" ? validateStr("item name", req.body[i], 100) :
+                        i == "description" ? validateStr("item description", req.body[i], 5000, true) :
+                            // i == "itemOwner" ? validateEmail("item owner", req.body[i], 100) : cannot change item owner
+                            i == "type" ? validateStr("item type", req.body[i], 20) :
+                                i == "tag" ? validateStrArray("item tag", req.body[i], 10, 20) : undefined // unused body request
+            }
+        }
+
         // find item id
         let item = await verifyId(validateInt("validate itemId", req.params.id))
 
@@ -1188,13 +1184,16 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
 // POST - add reviews into product id
 router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
     try {
-        let { itemReviewId, comment, PQrating, SSrating, DSrating, style, size } = req.body
+        let { itemReviewId, comment, PQrating, SSrating, DSrating, style, size, orderId } = req.body
 
         // find item id
         let item = await verifyDetailId(validateInt("validate itemId", req.params.prodId), style, size)
+        let order = await verifyOrderDetailId(orderId, item.itemId, style, size)
 
-        // // check size
-        // if (!item.styles[0].size.includes(size)) notFoundError(`item id ${item.itemId} size not found `)
+        if (order.isReview) validatError("This order has already reviewed")
+
+        // check size
+        if (!item.styles[0].size.includes(size)) notFoundError(`item id ${item.itemId} size not found `)
 
         // generate id
         const id = generateIdByMapping(16, req.user.username)
@@ -1209,7 +1208,7 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
                 itemReviewId: itemReviewId !== undefined ? itemReviewId : id,
                 itemId: item.itemId,
                 username: req.user.username,
-                comment: validateStr("review comment", comment, 200),
+                comment: validateStr("review comment", comment, 500),
                 PQrating: validateInt("review product quanlity rating", PQrating, false, 1, 5),
                 SSrating: validateInt("review seller service rating", SSrating, false, 1, 5),
                 DSrating: validateInt("review delivery service rating", DSrating, false, 1, 5),
@@ -1218,10 +1217,26 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
             }
         })
 
+        // change isReview to true
+        await prisma.order_details.update({
+            data: {
+                isReview: true
+            },
+            where: {
+                orderId_itemId: {
+                    orderId: order.orderId,
+                    itemId: item.itemId
+                },
+                AND: [
+                    { itemStyle: style }, { itemSize: size }
+                ]
+            }
+        })
+
         // change average of rating in this item
         await changeTotalRating(item.itemId)
 
-        return res.json(timeConverter(review))
+        return res.status(201).json(timeConverter(review))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -1236,17 +1251,16 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
     }
 })
 
-
 // DELETE - delete review by review id and product id
-router.delete('/:prodId/reviews/:commentId', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
+router.delete('/:prodId/reviews/:commentId', JwtAuth, async (req, res, next) => {
     try {
         let { prodId, commentId } = req.params
 
         // find item id
-        let item = await findReviewById(validateInt("validate itemId", prodId), commentId)
+        let review = await findReviewById(validateInt("validate itemId", prodId), commentId)
 
         // check item owner can delete review only
-        if (req.user.role !== ROLE.Supplier && item.itemOwner !== req.user.username) forbiddenError("supplier can delete your item owner review only")
+        if (req.user.role !== ROLE.Supplier && review.username !== req.user.username) forbiddenError("supplier can update your item owner review only")
 
         // find id to delete product
         await prisma.item_reviews.delete({
@@ -1256,9 +1270,57 @@ router.delete('/:prodId/reviews/:commentId', JwtAuth, verifyRole(ROLE.Admin, ROL
         })
 
         // change average of rating in this item
-        await changeTotalRating(item.itemId)
+        await changeTotalRating(review.itemId)
 
         return res.json({ message: "item review id " + commentId + " has been deleted" })
+    } catch (err) {
+        // if product is not found
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+            // The .code property can be accessed in a type-safe manner
+            if (err.code === 'P2025') {
+                err.message = "item review id " + req.params.commentId + " does not exist"
+            }
+        }
+        next(err)
+    }
+})
+
+// PUT - edit reviewed item in each order
+router.patch('/:prodId/reviews/:commentId', JwtAuth, async (req, res, next) => {
+    try {
+        let { prodId, commentId } = req.params
+
+        // find item id
+        let review = await findReviewById(validateInt("validate itemId", prodId), commentId)
+
+        // check item owner can update review only
+        if (req.user.role !== ROLE.Supplier && review.username !== req.user.username) forbiddenError("user can update your item review only")
+
+        let mapData = {}
+        // body params mapping
+        for (let i in req.body) {
+            if (req.body[i] != undefined) {
+                // map object from body when update in prisma model
+                mapData[i] =
+                    i == "comment" ? validateStr("item review", req.body[i], 500) :
+                        i == "PQrating" ? validateInt("item review product quanlity rating", req.body[i], false, 1, 5) :
+                            i == "SSrating" ? validateInt("item review selling service rating", req.body[i], false, 1, 5) :
+                                i == "DSrating" ? validateInt("item review delivery service rating", req.body[i], false, 1, 5) : undefined // unused body request
+            }
+        }
+
+        // find id to update product
+        await prisma.item_reviews.update({
+            data: mapData,
+            where: {
+                itemReviewId: commentId
+            }
+        })
+
+        // change average of rating in this item
+        await changeTotalRating(review.itemId)
+
+        return res.json({ message: "item review id " + commentId + " has been updated" })
     } catch (err) {
         // if product is not found
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -1463,6 +1525,23 @@ const verifyDetailId = async (id, sty, size) => {
         // return converter of product
         return item
     }
+}
+
+const verifyOrderDetailId = async (orderId, itemId, itemStyle, itemSize) => {
+    // find user by account username
+    let order = await prisma.order_details.findFirst({
+        where: {
+            AND: [
+                { orderId: orderId },
+                { itemId: itemId },
+                { itemStyle: itemStyle },
+                { itemSize: itemSize }
+            ]
+        }
+    })
+    // check user exist
+    if (order == null) notFoundError("your order " + orderId + " with detail of item id " + itemId + " sku style " + itemStyle + " and size " + itemSize + " does not exist")
+    return order
 }
 
 const verifyUsername = async (username) => {

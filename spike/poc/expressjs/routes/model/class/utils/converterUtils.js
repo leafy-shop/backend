@@ -61,6 +61,18 @@ const userConverter = (user) => {
 }
 
 // inner object
+const contentConverter = (content) => {
+  // delete null value
+  content = deleteNullValue(content)
+
+  // time converter
+  content = timeConverter(content)
+
+  return content
+}
+
+
+// inner object
 const orderConverter = (order) => {
 
   // delete null value
@@ -83,7 +95,6 @@ const orderConverter = (order) => {
 }
 
 const orderDetailConverter = (order) => {
-  order.priceEach = order.priceEach
   return timeConverter(order)
 }
 
@@ -172,3 +183,4 @@ module.exports.capitalizeFirstLetter = capitalizeFirstLetter
 module.exports.generateId = generateId
 module.exports.generateIdByMapping = generateIdByMapping
 module.exports.generateOrderId = generateOrderId
+module.exports.contentConverter = contentConverter

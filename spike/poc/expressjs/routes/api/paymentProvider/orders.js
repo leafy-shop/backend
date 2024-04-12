@@ -48,6 +48,7 @@ router.get('/', JwtAuth, async (req, res) => {
         order.order_details = await Promise.all(order.order_details.map(async od => {
             let item = await verifyItemId(od.itemId)
             od.itemname = item.name
+            od.priceEach = Number(od.priceEach)
             od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
             return od
         }))
@@ -108,6 +109,7 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
                 order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
                 order.order_details = await Promise.all(order.order_details.map(async od => {
                     let item = await verifyItemId(od.itemId)
+                    od.priceEach = Number(od.priceEach)
                     od.itemname = item.name
                     return od
                 }))
@@ -125,23 +127,28 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
 
 // count all supplier order item with status
 router.get('/supplier/count/:status', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
-    let { status } = req.query
+    let { status } = req.params
 
     try {
         // console.log(validateDatetimeFuture("validate date end", new Date(dateEnd), true))
 
         // filter item by customize itemId
         let orders = []
-        orders = await prisma.orders.findMany({
-            where: {
-                status: status
-            }
-        })
+        if (status === "all") {
+            orders = await prisma.orders.findMany()
+        } else {
+            orders = await prisma.orders.findMany({
+                where: {
+                    status: status
+                }
+            })
+        }
 
         // filter supplier owner
         orders = orders.filter(order => {
             return order.orderId.split("-")[0] === req.user.username
         })
+        console.log(orders)
 
         return res.json({ count: orders.length })
     } catch (err) {
@@ -219,13 +226,15 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
         // if they are supplier role
         // console.log(order.orderId.split("-")[0])
         // console.log(order.orderId.split("-")[1])
-        if (req.user.role === ROLE.Supplier && (order.orderId.split("-")[0] === req.user.username || order.orderId.split("-")[1] !== req.user.username)) {
+
+        if (req.user.role === ROLE.Supplier && (order.orderId.split("-")[0] === req.user.username)) {
             forbiddenError("you cannot see order in other user except yourself or your item order")
         }
 
         order.order_details = await Promise.all(order.order_details.map(async od => {
             let item = await verifyItemId(od.itemId)
-            od.totalRating = item.totalRating
+            od.priceEach = Number(od.priceEach)
+            od.totalRating = Number(item.totalRating)
             od.totalPrice = od.priceEach * od.qtyOrder
             od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
             return od

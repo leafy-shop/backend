@@ -54,7 +54,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
                 let product = await verifyProductId(cart.itemId, cart.itemStyle, cart.itemSize)
                 // console.log(filterGroupCart)
                 cart.image = await listFirstImage(findImagePath("products", cart.itemId), "main.png")
-                cart.priceEach = product.price
+                cart.priceEach = Number(product.price)
                 cart.sessionId = undefined
                 let itemname = await verifyItemOwner(cart.itemId)
                 cart.itemName = itemname.name

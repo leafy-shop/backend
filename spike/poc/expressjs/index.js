@@ -45,13 +45,17 @@ app.use('/api/authentication',require('./routes/api/authentication/auth.js'))
 app.use('/api/products',require('./routes/api/productProvider/products.js'))
 app.use('/api/users',require('./routes/api/accountProvider/users.js'))
 app.use('/api/carts',require('./routes/api/productProvider/carts.js'))
+app.use('/api/contents',require('./routes/api/productProvider/garden_content.js'))
 // app.use('/api/problems',require('./routes/api/problem.js'))
 app.use('/api/image/products',require('./routes/api/imageProvider/productImage.js'))
 app.use('/api/images/products',require('./routes/api/imageProvider/productStyleImages.js'))
 app.use('/api/image/users',require('./routes/api/imageProvider/userImage.js'))
+app.use('/api/image/gallery',require('./routes/api/imageProvider/galleryImage.js'))
+app.use('/api/images/galleries',require('./routes/api/imageProvider/galleryImageDetails.js'))
 app.use('/api/addresses',require('./routes/api/accountProvider/addresses.js'))
 app.use('/api/payments',require('./routes/api/accountProvider/payments.js'))
 app.use('/api/orders',require('./routes/api/paymentProvider/orders.js'))
+
 app.use('/chat',require('./routes/socket/chat.js').router)
 
 // use ejs for rendering

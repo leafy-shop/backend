@@ -24,12 +24,10 @@ module.exports.productStorage = multerS3({
   bucket,
   contentType: multerS3.AUTO_CONTENT_TYPE,
   metadata: async (req, file, cb) => {
-    console.log(mode)
     cb(null, { fieldName: file.fieldname });
   },
   key: (req, file, cb) => {
     let path = fs.findImagePath("products", req.params.id)
-    console.log(path)
     cb(null, `${path}/main.png`);
   }
 });
@@ -39,12 +37,10 @@ module.exports.productStyleStorage = multerS3({
   bucket,
   contentType: multerS3.AUTO_CONTENT_TYPE,
   metadata: async (req, file, cb) => {
-    console.log(mode)
     cb(null, { fieldName: file.fieldname });
   },
   key: (req, file, cb) => {
     let path = fs.findImagePath("products", req.params.id, req.params.style)
-    console.log(path)
     cb(null, `${path}/${file.originalname}`);
   }
 });
@@ -54,12 +50,10 @@ module.exports.userIconStorage = multerS3({
   bucket,
   contentType: multerS3.AUTO_CONTENT_TYPE,
   metadata: async (req, file, cb) => {
-    console.log(mode)
     cb(null, { fieldName: file.fieldname });
   },
   key: (req, file, cb) => {
     let path = fs.findImagePath("users", req.params.id)
-    console.log(path)
     cb(null, `${path}/main.png`);
   }
 });
@@ -69,12 +63,39 @@ module.exports.userCoverStorage = multerS3({
   bucket,
   contentType: multerS3.AUTO_CONTENT_TYPE,
   metadata: async (req, file, cb) => {
-    console.log(mode)
     cb(null, { fieldName: file.fieldname });
   },
   key: (req, file, cb) => {
     let path = fs.findImagePath("users", req.params.id)
-    console.log(path)
     cb(null, `${path}/cover_photo.png`);
+  }
+});
+
+module.exports.galleryStorage = multerS3({
+  s3,
+  bucket,
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  metadata: async (req, file, cb) => {
+    cb(null, { fieldName: file.fieldname });
+  },
+  key: (req, file, cb) => {
+    let path = fs.findImagePath("contents", req.params.id)
+    cb(null, `${path}/main.png`);
+  }
+});
+
+
+module.exports.galleryDetailStorage = multerS3({
+  s3,
+  bucket,
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  metadata: async (req, file, cb) => {
+    cb(null, { fieldName: file.fieldname });
+  },
+  key: (req, file, cb) => {
+    setTimeout(() => {
+      let path = fs.findImagePath("contents", req.params.id, "details")
+      cb(null, `${path}/${new Date().getTime()}.png`);
+    }, 1);
   }
 });

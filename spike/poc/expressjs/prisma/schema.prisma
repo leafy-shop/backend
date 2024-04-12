@@ -47,7 +47,7 @@ model items {
   name          String          @db.VarChar(100)
   description   String          @db.VarChar(5000)
   itemOwner     String
-  items         accounts        @relation(fields: [itemOwner], references: [username], map: "Items_itemOwner_fkey")
+  accounts      accounts        @relation(fields: [itemOwner], references: [username], map: "Items_itemOwner_fkey")
   type          String          @db.VarChar(20)
   tag           String          @db.VarChar(500)
   totalRating   Decimal         @default(0.0) @db.Decimal(2, 1)
@@ -61,7 +61,7 @@ model items {
   item_reviews  item_reviews[]
   order_details order_details[]
 
-  @@index([itemId], map: "fk_items_users1_idx")
+  @@index([itemOwner], map: "fk_items_users1_idx")
 }
 
 model item_sku {
@@ -101,7 +101,7 @@ model item_reviews {
   itemId            Int
   username          String              @db.VarChar(20)
   items             items               @relation(fields: [itemId], references: [itemId], map: "ItemReview_itemId_fkey")
-  accounts          accounts            @relation(fields: [username], references: [username], map: "Itemreview_username_fkey")
+  accounts          accounts            @relation(fields: [username], references: [username], map: "ItemReview_username_fkey")
   comment           String              @db.VarChar(500)
   PQrating          Int                 @default(0)
   SSrating          Int                 @default(0)
@@ -110,6 +110,7 @@ model item_reviews {
   style             String              @db.VarChar(50)
   size              String              @default("No") @db.VarChar(50)
   createdAt         DateTime            @default(dbgenerated("NOW()"))
+  updatedAt         DateTime?           @default(dbgenerated("NOW()"))
   item_review_likes item_review_likes[]
 
   @@index([itemId, style, size], map: "fk_ItemReview_items_idx")
@@ -150,6 +151,9 @@ model accounts {
   item_events       item_events[]
   session_cart      session_cart[]
   orders            orders[]
+  contents          contents[]
+  gallery_comments  gallery_comments[]
+  content_likes     content_likes[]
 }
 
 model addresses {
@@ -196,9 +200,49 @@ model order_details {
   items     items    @relation(fields: [itemId], references: [itemId], map: "Order_details_itemId_fkey")
   qtyOrder  Int      @default(1)
   priceEach Decimal  @default(0.00) @db.Decimal(32, 2)
+  isReview  Boolean  @default(false)
   createdAt DateTime @default(dbgenerated("NOW()"))
 
   @@id([orderId, itemId])
   @@index([orderId], map: "fk_Order_details_idx")
   @@index([itemId], map: "fk_Order_details_items_idx")
+}
+
+model contents {
+  contentId        Int                @id @default(autoincrement())
+  name             String             @db.VarChar(100)
+  description      String?            @db.VarChar(5000)
+  contentOwner     String
+  accounts         accounts           @relation(fields: [contentOwner], references: [username], map: "Contents_contentOwner_fkey")
+  style            String             @db.VarChar(50)
+  like             Int                @default(0)
+  createdAt        DateTime           @default(dbgenerated("NOW()"))
+  updatedAt        DateTime?          @default(dbgenerated("NOW()"))
+  gallery_comments gallery_comments[]
+  content_likes    content_likes[]
+
+  @@index([contentOwner], map: "fk_contents_users1_idx")
+}
+
+model gallery_comments {
+  commentId String   @id @db.VarChar(53)
+  username  String   @db.VarChar(20)
+  accounts  accounts @relation(fields: [username], references: [username], map: "GalleryComment_username_fkey")
+  contentId Int
+  contents  contents @relation(fields: [contentId], references: [contentId], map: "GalleryComment_contentId_fkey")
+  comment   String   @db.VarChar(500)
+  createdAt DateTime @default(dbgenerated("NOW()"))
+
+  @@index([contentId], map: "fk_GalleryComment_commentId_idx")
+}
+
+model content_likes {
+  username  String   @db.VarChar(20)
+  contentId Int
+  contents  contents @relation(fields: [contentId], references: [contentId], map: "ContentLike_contentId_fkey")
+  accounts  accounts @relation(fields: [username], references: [username], map: "ContentLike_accounts_fkey")
+
+  @@id([contentId, username])
+  @@index([contentId], map: "fk_ContentLike_gallery_content1_idx")
+  @@index([username], map: "fk_ContentLike_users1_idx")
 }

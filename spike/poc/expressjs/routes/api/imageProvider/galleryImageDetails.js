@@ -3,18 +3,18 @@ const router = express.Router();
 path = require("path");
 const multer = require("multer");
 require('dotenv').config().parsed
-const { JwtAuth, verifyRole, ProductFileAuthorization } = require('../../../middleware/jwtAuth')
+const { JwtAuth, verifyRole, ProductFileAuthorization, GalleryFileAuthorization } = require('../../../middleware/jwtAuth')
 
-const { bucket, s3, storage, mode, productStyleStorage } = require("../../../config/minio_config");
+const { bucket, s3, galleryDetailStorage } = require("../../../config/minio_config");
 const { ROLE } = require("../../model/enum/role");
 const { deleteAllImage, findImagePath, listAllImage } = require("../../model/class/utils/imageList");
 
 const upload = multer({
-    storage: productStyleStorage,
+    storage: galleryDetailStorage,
     limits: {
         fileSize: 1024 * 1024 * 1,
     },
-    limits: { files: 10 },
+    limits: { files: 5 },
     fileFilter(req, file, cb) {
         // filter file content type
         if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
@@ -27,11 +27,11 @@ const upload = multer({
 
 // upload multiple image
 // condition (file size < 1 MB, file multipart, file upload per solution, file type image only, path storage property)
-router.post("/:id/:style", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), ProductFileAuthorization, async (req, res, next) => {
+router.post("/:id", JwtAuth, GalleryFileAuthorization, async (req, res, next) => {
     // list all object when exist
     try {
         // remove image before reupload
-        const folder = findImagePath("products", req.params.id, req.params.style)
+        const folder = findImagePath("contents", req.params.id, "details")
         const listedObjects = await listAllImage(folder)
 
         if (listedObjects.length != 0) {
@@ -61,8 +61,8 @@ router.post("/:id/:style", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), Produ
 });
 
 // delete multiple image
-router.delete("/:id/:style", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), ProductFileAuthorization, async (req, res) => {
-    const folder = findImagePath("products", req.params.id, req.params.style);
+router.delete("/:id", JwtAuth, GalleryFileAuthorization, async (req, res) => {
+    const folder = findImagePath("contents", req.params.id, "details");
     const fileNames = req.body.files || []
     const numberFiles = []
 
@@ -105,9 +105,9 @@ router.delete("/:id/:style", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), Pro
 });
 
 // delete all image
-router.delete("/:id/:style/all", JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), ProductFileAuthorization, async (req, res) => {
-    const folder = findImagePath("products", req.params.id, req.params.style);
-    console.log(folder)
+router.delete("/:id/all", JwtAuth, GalleryFileAuthorization, async (req, res) => {
+    const folder = findImagePath("contents", req.params.id, "details");
+    // console.log(folder)
 
     // delete all image
     return await deleteAllImage(res, folder)

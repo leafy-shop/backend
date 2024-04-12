@@ -54,7 +54,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // upload single image
-// condition (file size < 8 MB, file multipart, file upload per solution, file type image only, path storage property)
+// condition (file size < 1 MB, file multipart, file upload per solution, file type image only, path storage property)
 router.post("/:id", JwtAuth, UserFileAuthorization, uploadIcon.single("file"), async (req, res, next) => {
     try {
         if (req.file) {
@@ -108,7 +108,7 @@ router.get("/:id/coverphoto", async (req, res) => {
 });
 
 // upload single image
-// condition (file size < 8 MB, file multipart, file upload per solution, file type image only, path storage property)
+// condition (file size < 2 MB, file multipart, file upload per solution, file type image only, path storage property)
 router.post("/:id/coverphoto", JwtAuth, UserFileAuthorization, uploadCover.single("file"), async (req, res, next) => {
     try {
         if (req.file) {
