@@ -1106,7 +1106,7 @@ router.get('/all/reviews', async (req, res, next) => {
         // return average review
         page_rv.avg_rating = (avg_rating._avg.PQrating + avg_rating._avg.SSrating + avg_rating._avg.DSrating) / 3
         // console.log(page_rv.list)
-        page_rv.list = page_rv.list.map(rv => {
+        page_rv.list = page_rv.list.map(async rv => {
             rv.name = rv.accounts.username
             rv.accounts = undefined
             // Replace this with the IANA timezone you desire
@@ -1173,6 +1173,21 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
             review.SSrating = undefined
             review.DSrating = undefined
             review.userId = undefined
+            let like = false
+            if (req.user) {
+                let reviewLike = await prisma.item_review_likes.findFirst({
+                    where: {
+                        AND: [
+                            { username: req.user.username },
+                            { itemReviewId: review.itemReviewId }
+                        ]
+                    }
+                })
+                if (reviewLike !== null) {
+                    like = true
+                }
+            }
+            review.isLike = like
             updatedReviews.push(await getIconImage(deleteNullValue(review)));
         }
 

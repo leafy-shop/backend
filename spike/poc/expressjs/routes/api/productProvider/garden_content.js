@@ -70,6 +70,21 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
 
         // Fetch images for content list
         const contentList = await Promise.all(page_ct.list.map(async (content) => {
+            let like = false
+            if (req.user) {
+                let ContentLike = await prisma.content_likes.findFirst({
+                    where: {
+                        AND: [
+                            { username: req.user.username },
+                            { contentId: content.contentId }
+                        ]
+                    }
+                })
+                if (ContentLike !== null) {
+                    like = true
+                }
+            }
+            content.isLike = like
             return await getContentImage(contentConverter(content));
         }));
 
