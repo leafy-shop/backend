@@ -3,18 +3,18 @@ const router = express.Router();
 path = require("path");
 const multer = require("multer");
 require('dotenv').config().parsed
-const { JwtAuth, verifyRole, ProductFileAuthorization, GalleryFileAuthorization } = require('../../../middleware/jwtAuth')
+const { JwtAuth, ReviewFileAuthorization } = require('../../../middleware/jwtAuth')
+const imageList = require('../../model/class/utils/imageList')
 
-const { bucket, s3, galleryDetailStorage } = require("../../../config/minio_config");
-const { ROLE } = require("../../model/enum/role");
+const { bucket, s3, reviewStorage } = require("../../../config/minio_config");
 const { deleteAllImage, findImagePath, listAllImage } = require("../../model/class/utils/imageList");
 
 const upload = multer({
-    storage: galleryDetailStorage,
+    storage: reviewStorage,
     limits: {
         fileSize: 1024 * 1024 * 1,
     },
-    limits: { files: 10 },
+    limits: { files: 5 },
     fileFilter(req, file, cb) {
         // filter file content type
         if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
@@ -25,13 +25,27 @@ const upload = multer({
     }
 });
 
+// read image (not found case)
+router.get("/:id/:filename", async (req, res) => {
+    const folder = imageList.findImagePath("reviews",req.params.id);
+    console.log(folder)
+    const fileName = `${folder}/${req.params.filename}`;
+    const params = { Bucket: bucket, Key: fileName };
+  
+    let file = await s3.getObject(params, function (err, data) {
+      // not found case
+      if (err) return res.status(404).json({ message: "File not found" });
+      return res.status(200).type("image/png").send(data.Body);
+    });
+});
+
 // upload multiple image
 // condition (file size < 1 MB, file multipart, file upload per solution, file type image only, path storage property)
-router.post("/:id", JwtAuth, GalleryFileAuthorization, async (req, res, next) => {
+router.post("/:id", JwtAuth, ReviewFileAuthorization, async (req, res, next) => {
     // list all object when exist
     try {
         // remove image before reupload
-        const folder = findImagePath("contents", req.params.id, "details")
+        const folder = findImagePath("reviews", req.params.id)
         const listedObjects = await listAllImage(folder)
 
         if (listedObjects.length != 0) {
@@ -61,8 +75,8 @@ router.post("/:id", JwtAuth, GalleryFileAuthorization, async (req, res, next) =>
 });
 
 // delete multiple image
-router.delete("/:id", JwtAuth, GalleryFileAuthorization, async (req, res) => {
-    const folder = findImagePath("contents", req.params.id, "details");
+router.delete("/:id", JwtAuth, ReviewFileAuthorization, async (req, res) => {
+    const folder = findImagePath("reviews", req.params.id);
     const fileNames = req.body.files || []
     const numberFiles = []
 
@@ -105,8 +119,8 @@ router.delete("/:id", JwtAuth, GalleryFileAuthorization, async (req, res) => {
 });
 
 // delete all image
-router.delete("/:id/all", JwtAuth, GalleryFileAuthorization, async (req, res) => {
-    const folder = findImagePath("contents", req.params.id, "details");
+router.delete("/:id/all", JwtAuth, ReviewFileAuthorization, async (req, res) => {
+    const folder = findImagePath("reviews", req.params.id);
     // console.log(folder)
 
     // delete all image

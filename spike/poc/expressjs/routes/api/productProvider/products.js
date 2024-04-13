@@ -1188,6 +1188,7 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
                 }
             }
             review.isLike = like
+            review.images = await getReviewImage(review.itemReviewId)
             updatedReviews.push(await getIconImage(deleteNullValue(review)));
         }
 
@@ -1454,6 +1455,10 @@ const getProductImage = async (product) => {
 
 const getProductStyleImage = async (style, id) => {
     return await listAllImage(findImagePath("products", id + '/' + style))
+}
+
+const getReviewImage = async (id) => {
+    return await listAllImage(findImagePath("reviews", id))
 }
 
 const getIconImage = async (user) => {

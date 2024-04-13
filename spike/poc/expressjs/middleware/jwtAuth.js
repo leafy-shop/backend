@@ -170,6 +170,35 @@ exports.UserFileAuthorization = async (req, res, next) => {
   }
 }
 
+exports.ReviewFileAuthorization = async (req, res, next) => {
+  try {
+    // incase non admin role
+    if (req.user.role !== ROLE.Admin) {
+      // find user email by id
+      let review = await prisma.item_reviews.findFirst({
+        where: {
+          itemReviewId: req.params.id
+        }
+      })
+      // for all role
+      if (review === null) {
+        notFoundError("review id " + req.params.id + " not found")
+      }
+        
+      // find item owner by id
+      if (req.user.username !== review.username) {
+        validatError("you can't manage other reviews images except yourself.")
+      }
+    }
+    next()
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      console.log(err.code)
+    }
+    next(err)
+  }
+}
+
 exports.GalleryFileAuthorization = async (req, res, next) => {
   try {
     // incase non admin role

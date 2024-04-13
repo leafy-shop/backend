@@ -50,6 +50,7 @@ app.use('/api/contents',require('./routes/api/productProvider/garden_content.js'
 app.use('/api/image/products',require('./routes/api/imageProvider/productImage.js'))
 app.use('/api/images/products',require('./routes/api/imageProvider/productStyleImages.js'))
 app.use('/api/image/users',require('./routes/api/imageProvider/userImage.js'))
+app.use('/api/images/reviews',require('./routes/api/imageProvider/reviewImages.js'))
 app.use('/api/image/gallery',require('./routes/api/imageProvider/galleryImage.js'))
 app.use('/api/images/gallery',require('./routes/api/imageProvider/galleryImageDetails.js'))
 app.use('/api/addresses',require('./routes/api/accountProvider/addresses.js'))

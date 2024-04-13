@@ -71,6 +71,22 @@ module.exports.userCoverStorage = multerS3({
   }
 });
 
+module.exports.reviewStorage = multerS3({
+  s3,
+  bucket,
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  metadata: async (req, file, cb) => {
+    cb(null, { fieldName: file.fieldname });
+  },
+  key: (req, file, cb) => {
+    setTimeout(() => {
+      let path = fs.findImagePath("reviews", req.params.id)
+      cb(null, `${path}/${new Date().getTime()}.png`);
+    }, 1)
+  }
+});
+
+
 module.exports.galleryStorage = multerS3({
   s3,
   bucket,
