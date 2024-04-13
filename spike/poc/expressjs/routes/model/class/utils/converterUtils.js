@@ -13,7 +13,6 @@ let timeConverter = (value) => {
 
 // inner object
 const productConverter = (product, model) => {
-  console.log(product)
   // filter product mapping with model
   if (model !== undefined) {
     product = modelMapper(product, model)
@@ -23,7 +22,7 @@ const productConverter = (product, model) => {
   product = deleteNullValue(product)
 
   // floating string to float convertor
-  console.log(product)
+  // console.log(product)
   if (product.totalRating !== undefined) product.totalRating = parseFloat(product.totalRating)
   if (product.minPrice !== undefined) product.minPrice = parseFloat(product.minPrice)
   if (product.maxPrice !== undefined) product.maxPrice = parseFloat(product.maxPrice)

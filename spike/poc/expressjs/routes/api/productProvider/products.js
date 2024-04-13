@@ -154,7 +154,13 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                                 description: {
                                     contains: product
                                 }
-                            }],
+                            },
+                            {
+                                itemOwner: {
+                                    contains: product
+                                }
+                            }
+                        ],
                         minPrice: {
                             lte: max_price,
                             gte: min_price
@@ -251,7 +257,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
             }
             // console.log(filter_pd)
             filter_pd = filter_pd.filter(prod => {
-                return (product !== undefined ? prod.name.includes(product) || prod.description.includes(product) : true) &&
+                return (product !== undefined ? prod.name.toLowerCase().includes(product.toLowerCase()) || prod.description.toLowerCase().includes(product.toLowerCase()) || prod.itemOwner.toLowerCase().includes(product.toLowerCase()) : true) &&
                     (min_price !== undefined ? Number(prod.minPrice) > min_price : true) &&
                     (max_price !== undefined ? Number(prod.minPrice) < max_price : true) &&
                     (isNaN(rating) || rating === undefined ? true : (Number(prod.totalRating) >= ratingScale[rating - 1][0] && Number(prod.totalRating) <= ratingScale[rating - 1][1])) &&
@@ -435,18 +441,14 @@ router.get('/supplier/:owner', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), a
         }))
 
         // check item sold
-        if (sort_name == "sales") {
-            if (sort == "desc") {
+        if (sort_name === "sales") {
+            if (sort === "desc") {
                 filter_pd = filter_pd.sort((a, b) => b.sold - a.sold)
             } else {
                 filter_pd = filter_pd.sort((a, b) => a.sold - b.sold)
             }
-        } else if (sort_name == "soldout") {
-            if (sort == "desc") {
-                filter_pd = filter_pd.sort((a, b) => b.allStock - a.allStock)
-            } else {
-                filter_pd = filter_pd.sort((a, b) => a.allStock - b.allStock)
-            }
+        } else if (sort_name === "soldout") {
+            filter_pd = filter_pd.filter(product => product.allStock == 0)
         }
 
         // console.log(filter_pd)

@@ -15,7 +15,7 @@ let router = express.Router()
 
 // get all account order item
 router.get('/', JwtAuth, async (req, res) => {
-    let { ownerItemOrProduct, status, sort, page, limit } = req.query
+    let { owner_item_or_product, status, sort, page, limit } = req.query
 
     let pageN = Number(page)
     let limitN = Number(limit)
@@ -57,7 +57,7 @@ router.get('/', JwtAuth, async (req, res) => {
 
     // filter owner name or order details as itemname 
     orders = orders.filter(order => {
-        return (ownerItemOrProduct !== undefined ? order.orderId.split("-")[0].includes(ownerItemOrProduct) || order.order_details.some(od => od.itemname.includes(ownerItemOrProduct)) : true)
+        return (owner_item_or_product !== undefined ? order.orderId.split("-")[0].toLowerCase().includes(owner_item_or_product.toLowerCase()) || order.order_details.some(od => od.itemname.toLowerCase().includes(owner_item_or_product.toLowerCase())) : true)
     })
 
     let page_order = paginationList(orders, pageN, limitN, 10)
