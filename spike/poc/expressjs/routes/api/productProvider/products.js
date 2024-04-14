@@ -642,6 +642,8 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
         if (styles.length > 10) {
             validatError("This product already have maximum 10 sku per item so they cannot have sku anymore.")
         }
+        let styleArray = []
+        let sizeArray = []
         styles = styles.map(sty => {
             // console.log(sty)
             sty.style = sty.style === undefined || sty.style.length === 0 ? validatError("item detail must have sku style code") : validateStr("item sku style", sty.style, 20)
@@ -649,14 +651,24 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
             if (sty.sizes.length > 10) {
                 validatError("Product already have maximum 10 sizes per item sku so they cannot have sku anymore.")
             }
+            if (styleArray.includes(sty.style)) {
+                validatError("Creating product have duplicating sku style of " + sty.style)
+            }
+            styleArray.push(sty.style)
             sty.sizes = sty.sizes.map(size => {
                 // console.log(size)
                 size.size = validateStr("item size from " + sty.style, size.size, 50)
                 size.price = validateDouble("item price from " + sty.style, size.price, false, 0)
                 size.stock = validateInt("item stock from " + sty.style, size.stock, false, 1)
                 priceList.push(size.price)
+                if (sizeArray.includes(size.size)) {
+                    validatError("Creating product have duplicating of sku style " + sty.style + " variant size " + size.size)
+                }
+                sizeArray.push(size.size)
                 return size
             })
+            sizeArray = []
+
             return sty
         })
         priceRange.minPrice = Math.min(...priceList)
@@ -688,7 +700,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
             let sku = await prisma.item_sku.create({
                 data: {
                     itemId: input.itemId,
-                    SKUstyle: sty.style,
+                    SKUstyle: sty.style
                 }
             });
 
@@ -738,6 +750,7 @@ router.post('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, 
     // created product from request body and validation
     try {
         // console.log(sty)
+        let sizeArray = []
         style = style === undefined || style.length === 0 ? validatError("item detail must have sku style code") : validateStr("item sku style", style, 20)
         sizes = sizes === undefined || !Array.isArray(sizes) || sizes.length === 0 ? validatError("item detail in sku must be have size") : sizes
         if (sizes.length > 10) {
@@ -748,6 +761,10 @@ router.post('/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, 
             size.size = validateStr("item size from " + style, size.size, 50)
             size.price = validateDouble("item price from " + style, size.price, false, 0)
             size.stock = validateInt("item stock from " + style, size.stock, false, 1)
+            if (sizeArray.includes(size.size)) {
+                validatError("Creating product have duplicating of sku style " + style + " variant size " + size.size)
+            }
+            sizeArray.push(size.size)
             return size
         })
 
@@ -890,6 +907,7 @@ router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async 
     // update product
     let { id, style } = req.params
     let { sizes } = req.body
+    let sizeArray = []
 
     try {
         if (sizes.length === 0 || !Array.isArray(sizes)) {
@@ -900,6 +918,10 @@ router.put('/:id/:style', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async 
             size.size = validateStr("item size", size.size, 50)
             size.price = validateDouble("item price", size.price, false, 0)
             size.stock = validateInt("item stock", size.stock, false, 1)
+            if (sizeArray.includes(size.size)) {
+                validatError("Creating product have duplicating of sku style " + style + " variant size " + size.size)
+            }
+            sizeArray.push(size.size)
             return size
         })
 
