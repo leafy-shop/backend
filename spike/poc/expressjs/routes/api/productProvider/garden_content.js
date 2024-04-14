@@ -33,7 +33,7 @@ dotenv.config();
 // GET - all page contents by filter and sort
 router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     // query params
-    let { page, limit, style, sort_name, sort } = req.query
+    let { page, limit, style, sort_name, sort, contentOwner } = req.query
 
     // page number and page size
     let pageN = Number(page)
@@ -45,20 +45,26 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     if (sort_name == "latest") {
         sortModel.createdAt = (sort === "desc") ? "desc" : "asc"
     }
-    // else if (sort_name == "popular") {
-    // }
+    else if (sort_name == "popular") {
+        sortModel.like = (sort === "desc") ? "desc" : "asc"
+    }
     else {
         sortModel.updatedAt = "desc"
     }
 
     // filter single and between value from style query and return page that sorted by updateAt content
     try {
-
+        let filterOwner = {}
+        if (req.user) {
+            filterOwner.contentOwner = { not: req.user.username }
+        } else {
+            filterOwner.contentOwner = contentOwner ? { not: contentOwner } : undefined
+        }
         let filter_pd = await prisma.contents.findMany({
             where: {
                 AND: [
                     { style: style },
-                    { contentOwner: req.user ? { not: req.user.username } : undefined }
+                    filterOwner
                 ]
 
             },
@@ -119,8 +125,9 @@ router.get('/owner', JwtAuth, async (req, res, next) => {
     if (sort_name == "latest") {
         sortModel.createdAt = (sort === "desc") ? "desc" : "asc"
     }
-    // else if (sort_name == "popular") {
-    // }
+    else if (sort_name == "popular") {
+        sortModel.like = (sort === "desc") ? "desc" : "asc"
+    }
     else {
         sortModel.updatedAt = "desc"
     }

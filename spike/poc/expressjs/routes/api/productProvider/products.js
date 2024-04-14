@@ -10,7 +10,7 @@ const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('../../../middleware/jw
 const { PrismaClient, Prisma } = require('@prisma/client');
 // const { deleteNullValue } = require('../model/class/utils/modelMapping');
 // const { mode } = require('../../config/minio_config');
-const { productConverter, timeConverter, paginationList, generateIdByMapping } = require('../../model/class/utils/converterUtils');
+const { productConverter, timeConverter, paginationList, generateIdByMapping, reviewConvertor } = require('../../model/class/utils/converterUtils');
 const { ROLE } = require('../../model/enum/role');
 const { ORDERSTATUS } = require('../../model/enum/order');
 const { findImagePath, listFirstImage, listAllImage } = require('../../model/class/utils/imageList');
@@ -1188,8 +1188,8 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
 
         for (let review of item_reviews.list) {
             // Replace this with the IANA timezone you desire
-            review.time = getDifferentTime(review.createdAt);
-            review.createdAt = undefined;
+            // review.time = getDifferentTime(review.createdAt);
+            // review.createdAt = undefined;
             review.rating = (review.PQrating + review.SSrating + review.DSrating) / 3
             review.PQrating = undefined
             review.SSrating = undefined
@@ -1211,7 +1211,7 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
             }
             review.isLike = like
             review.images = await getReviewImage(review.itemReviewId)
-            updatedReviews.push(await getIconImage(deleteNullValue(review)));
+            updatedReviews.push(await getIconImage(reviewConvertor(review)));
         }
 
         item_reviews.list = updatedReviews;
@@ -1276,7 +1276,7 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
         // change average of rating in this item
         await changeTotalRating(item.itemId)
 
-        return res.status(201).json(timeConverter(review))
+        return res.status(201).json(reviewConvertor(review))
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner

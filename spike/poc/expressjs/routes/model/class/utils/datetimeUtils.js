@@ -11,14 +11,54 @@ const dateTimeZoneNow = (date) => {
         year: 'numeric',
         month: 'numeric',
         day: 'numeric',
-        hour12: false, // Use 24-hour format
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
+        // hour12: false, // Use 24-hour format
+        // hour: '2-digit',
+        // minute: '2-digit',
+        // second: '2-digit',
+    };
+
+    // Use the IANA time zone identifier for your target timezone
+    return new Intl.DateTimeFormat('th-TH', options).format(date);
+}
+
+const dateTimeZoneContentFormat = (date) => {
+    // Set the target timezone to UTC+7:00
+    // const timeZone = 'Asia/Bangkok';
+
+    // Format the date with the new timezone
+    const options = {
+        timeZone: 'UTC',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        // hour12: false, // Use 24-hour format
+        // hour: '2-digit',
+        // minute: '2-digit',
+        // second: '2-digit',
     };
 
     // Use the IANA time zone identifier for your target timezone
     return new Intl.DateTimeFormat('en-US', options).format(date);
+}
+
+const dateTimeZoneReviewFormat = (date) => {
+    // Set the target timezone to UTC+7:00
+    // const timeZone = 'Asia/Bangkok';
+
+    // Format the date with the new timezone
+    const options = {
+        timeZone: 'UTC',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        // hour12: false, // Use 24-hour format
+        // hour: '2-digit',
+        // minute: '2-digit',
+        // second: '2-digit',
+    };
+
+    // Use the IANA time zone identifier for your target timezone
+    return new Intl.DateTimeFormat('en-GB', options).format(date);
 }
 
 const getDifferentTime = (jsdate) => {
@@ -68,4 +108,6 @@ const getDifferentTime = (jsdate) => {
 }
 
 module.exports.dateTimeZoneNow = dateTimeZoneNow
+module.exports.dateTimeZoneContentFormat = dateTimeZoneContentFormat
+module.exports.dateTimeZoneReviewFormat = dateTimeZoneReviewFormat
 module.exports.getDifferentTime = getDifferentTime

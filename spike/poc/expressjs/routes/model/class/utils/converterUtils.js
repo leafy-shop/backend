@@ -1,4 +1,4 @@
-const { dateTimeZoneNow } = require("./datetimeUtils");
+const { dateTimeZoneNow, dateTimeZoneContentFormat, dateTimeZoneReviewFormat } = require("./datetimeUtils");
 // const { listFirstImage, findImagePath } = require("./imageList");
 const { modelMapper, deleteNullValue } = require("./modelMapping");
 const crypto = require("crypto")
@@ -65,11 +65,22 @@ const contentConverter = (content) => {
   content = deleteNullValue(content)
 
   // time converter
-  content = timeConverter(content)
+  if (content.createdAt !== undefined) content.createdAt = dateTimeZoneContentFormat(content.createdAt);
+  if (content.updatedAt !== undefined) content.updatedAt = dateTimeZoneContentFormat(content.updatedAt);
 
   return content
 }
 
+// inner object
+const reviewConvertor = (review) => {
+  review = deleteNullValue(review)
+
+  // time converter
+  if (review.createdAt !== undefined) review.createdAt = dateTimeZoneReviewFormat(review.createdAt);
+  if (review.updatedAt !== undefined) review.updatedAt = dateTimeZoneReviewFormat(review.updatedAt);
+
+  return review
+}
 
 // inner object
 const orderConverter = (order) => {
@@ -150,12 +161,12 @@ const generateIdByMapping = (length, attribute) => {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   const charactersLength = characters.length;
   let customId = '';
-  
+
   for (let i = 0; i < length; i++) {
-      const randomIndex = crypto.randomInt(0, charactersLength);
-      customId += characters.charAt(randomIndex);
+    const randomIndex = crypto.randomInt(0, charactersLength);
+    customId += characters.charAt(randomIndex);
   }
-  
+
   return `${attribute}-${customId}`;
 }
 
@@ -163,12 +174,12 @@ const generateOrderId = (attribute) => {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789';
   const charactersLength = characters.length;
   let customId = '';
-  
+
   for (let i = 0; i < 12; i++) {
-      const randomIndex = crypto.randomInt(0, charactersLength);
-      customId += characters.charAt(randomIndex);
+    const randomIndex = crypto.randomInt(0, charactersLength);
+    customId += characters.charAt(randomIndex);
   }
-  
+
   return `${attribute}-${customId}`;
 }
 
@@ -183,3 +194,4 @@ module.exports.generateId = generateId
 module.exports.generateIdByMapping = generateIdByMapping
 module.exports.generateOrderId = generateOrderId
 module.exports.contentConverter = contentConverter
+module.exports.reviewConvertor = reviewConvertor
