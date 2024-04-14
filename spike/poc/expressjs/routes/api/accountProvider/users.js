@@ -134,7 +134,6 @@ router.get('/garden_designer', async (req, res, next) => {
         let filter_u = await prisma.accounts.findMany({
             where: {
                 AND: [
-                    { role: ROLE.GD_DESIGNER },
                     { status: true }
                 ]
             },
@@ -142,6 +141,19 @@ router.get('/garden_designer', async (req, res, next) => {
             orderBy: { updatedAt: "desc" }
         })
 
+        let usersWithContent = await Promise.all(filter_u.map(async user => {
+            let content = await prisma.contents.aggregate({
+                _sum: {like: true},
+                where: {
+                    contentOwner: user.username
+                }
+            })
+            user.like = content._sum.like === null ? 0 : content._sum.like
+            return user
+        }))
+
+        usersWithContent = usersWithContent.filter(user => user.like > 0)
+        filter_u = usersWithContent.sort((a,b) => a.like - b.like)
         // make to page
         let page_u = paginationList(filter_u, page, limit, 10)
 
