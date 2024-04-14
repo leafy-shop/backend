@@ -70,6 +70,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
 
         // Fetch images for content list
         const contentList = await Promise.all(page_ct.list.map(async (content) => {
+            
             let like = false
             if (req.user) {
                 let ContentLike = await prisma.content_likes.findFirst({
@@ -85,6 +86,13 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                 }
             }
             content.isLike = like
+
+            let comment = await prisma.gallery_comments.count({
+                where: {
+                    contentId: content.contentId
+                }
+            })
+            content.comment = comment
             return await getContentImage(contentConverter(content));
         }));
 
@@ -138,6 +146,12 @@ router.get('/owner', JwtAuth, async (req, res, next) => {
 
         // Fetch images for content list
         const contentList = await Promise.all(page_ct.list.map(async (content) => {
+            let comment = await prisma.gallery_comments.count({
+                where: {
+                    contentId: content.contentId
+                }
+            })
+            content.comment = comment
             return await getContentImage(contentConverter(content));
         }));
 
@@ -159,6 +173,13 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         let path = findImagePath("contents", content.contentId)
         content.image = await listFirstImage(path, "main.png")
         content.images = await getContentDetailImage(content.contentId)
+
+        let comment = await prisma.gallery_comments.count({
+            where: {
+                contentId: content.contentId
+            }
+        })
+        content.comment = comment
         
         // Respond with the updated content object
         return res.json(contentConverter(content));
