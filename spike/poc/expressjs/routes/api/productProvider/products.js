@@ -1128,7 +1128,7 @@ router.get('/all/reviews', async (req, res, next) => {
         // return average review
         page_rv.avg_rating = (avg_rating._avg.PQrating + avg_rating._avg.SSrating + avg_rating._avg.DSrating) / 3
         // console.log(page_rv.list)
-        page_rv.list = page_rv.list.map(async rv => {
+        page_rv.list = await Promise.all(page_rv.list.map(async rv => {
             rv.name = rv.accounts.username
             rv.accounts = undefined
             // Replace this with the IANA timezone you desire
@@ -1139,7 +1139,7 @@ router.get('/all/reviews', async (req, res, next) => {
             rv.SSrating = undefined
             rv.DSrating = undefined
             return rv
-        })
+        }))
 
         return res.send(page_rv)
 
