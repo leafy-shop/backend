@@ -1227,8 +1227,10 @@ router.get('/:prodId/reviews/:reviewId', JwtAuth, async (req, res, next) => {
         // find item id
         let review = await findReviewById(validateInt("validate itemId", req.params.prodId),validateStr("validate reviewId", req.params.reviewId, 53))
 
+        if (req.user.username !== review.username) forbiddenError("This user can see your review detail only")
+
         review.rating = (review.PQrating + review.SSrating + review.DSrating) / 3
-        review.userId = undefined
+
         let item = await prisma.items.findFirst({ where: { itemId: review.itemId }})
         review.itemname = item.name
         review.images = await getReviewImage(review.itemReviewId)
@@ -1244,6 +1246,8 @@ router.get('/review_orders/:orderId', JwtAuth, async (req, res, next) => {
     try {
         // find item id
         let item_reviews = await findReviewByOrderId(validateStr("validate reviewId", req.params.orderId, 53))
+
+        if (req.user.username !== item_reviews[0].username) forbiddenError("This user can see your review in your order only")
         // console.log(item_reviews)
         let updatedReviews = [];
 
