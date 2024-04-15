@@ -111,6 +111,7 @@ let orderView = {
     customerName: true,
     status: true,
     createdAt: true,
+    address: true,
     order_details: {
         select: {
             itemStyle: true,
