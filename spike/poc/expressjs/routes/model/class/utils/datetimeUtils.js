@@ -123,8 +123,15 @@ const getDifferentTime = (jsdate) => {
     }
 }
 
+const addHours = (date, hours) => {
+    const hoursToAdd = hours * 60 * 60 * 1000;
+    date.setTime(date.getTime() + hoursToAdd);
+    return date;
+}
+
 module.exports.dateTimeZoneNow = dateTimeZoneNow
 module.exports.dateTimeZoneOrderNow = dateTimeZoneOrderNow
 module.exports.dateTimeZoneContentFormat = dateTimeZoneContentFormat
 module.exports.dateTimeZoneReviewFormat = dateTimeZoneReviewFormat
 module.exports.getDifferentTime = getDifferentTime
+module.exports.addHours = addHours

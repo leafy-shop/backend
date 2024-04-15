@@ -109,6 +109,7 @@ model item_reviews {
   like              Int                 @default(0)
   style             String              @db.VarChar(50)
   size              String              @default("No") @db.VarChar(50)
+  orderId           String              @db.VarChar(53)
   createdAt         DateTime            @default(dbgenerated("NOW()"))
   updatedAt         DateTime?           @default(dbgenerated("NOW()"))
   item_review_likes item_review_likes[]
@@ -203,7 +204,6 @@ model order_details {
   items     items    @relation(fields: [itemId], references: [itemId], map: "Order_details_itemId_fkey")
   qtyOrder  Int      @default(1)
   priceEach Decimal  @default(0.00) @db.Decimal(32, 2)
-  isReview  Boolean  @default(false)
   createdAt DateTime @default(dbgenerated("NOW()"))
 
   @@id([orderId, itemId])

@@ -9,6 +9,7 @@ const { ITEMEVENT } = require('../../model/enum/item');
 const { ORDERSTATUS } = require('../../model/enum/order');
 const { orderView, orderDetailView } = require('../../model/class/model');
 const { listFirstImage, findImagePath } = require('../../model/class/utils/imageList');
+const { addHours } = require('../../model/class/utils/datetimeUtils');
 let prisma = new PrismaClient()
 
 let router = express.Router()
@@ -356,7 +357,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
                     customerName: accountAddress.username,
                     address: addressFormat,
                     status: ORDERSTATUS.PENDING,
-                    paidOrderDate: new Date()
+                    paidOrderDate: addHours(new Date(), 7)
                 }
             })
 
@@ -626,7 +627,7 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
                 customerName: accountAddress.username,
                 address: addressFormat,
                 status: ORDERSTATUS.PENDING,
-                paidOrderDate: new Date()
+                paidOrderDate: addHours(new Date(), 7)
             }
         })
 
@@ -702,7 +703,7 @@ router.put('/prepare_order/:orderId', JwtAuth, verifyRole(ROLE.Admin, ROLE.Suppl
             updatedOrder = await prisma.orders.update({
                 data: {
                     status: ORDERSTATUS.INPROGRESS,
-                    shippedOrderDate: new Date()
+                    shippedOrderDate: addHours(new Date(), 7)
                 },
                 where: {
                     orderId: order.orderId
@@ -737,7 +738,7 @@ router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
                 updatedOrder = await prisma.orders.update({
                     data: {
                         status: ORDERSTATUS.COMPLETED,
-                        receivedOrderDate: new Date()
+                        receivedOrderDate: addHours(new Date(), 7)
                     },
                     where: {
                         orderId: order.orderId

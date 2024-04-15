@@ -18,7 +18,7 @@ const prisma = new PrismaClient()
 // const crypto = require("crypto");
 // const { DateTime } = require("luxon");
 const { deleteNullValue, sanitizeCircularReferences } = require('../../model/class/utils/modelMapping')
-const { getDifferentTime } = require('../../model/class/utils/datetimeUtils');
+const { getDifferentTime, addHours } = require('../../model/class/utils/datetimeUtils');
 const { ITEMTYPE, ITEMSIZE, ITEMEVENT } = require('../../model/enum/item');
 
 const dotenv = require('dotenv');
@@ -1221,6 +1221,53 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
     }
 })
 
+// GET - get review in product id and review id
+router.get('/:prodId/reviews/:reviewId', JwtAuth, async (req, res, next) => {
+    try {
+        // find item id
+        let review = await findReviewById(validateInt("validate itemId", req.params.prodId),validateStr("validate reviewId", req.params.reviewId, 53))
+
+        review.rating = (review.PQrating + review.SSrating + review.DSrating) / 3
+        review.userId = undefined
+        let item = await prisma.items.findFirst({ where: { itemId: review.itemId }})
+        review.itemname = item.name
+        review.images = await getReviewImage(review.itemReviewId)
+        review = await getIconImage(reviewConvertor(review));
+        return res.send(review);
+    } catch (err) {
+        next(err)
+    }
+})
+
+// GET - get review in product id and order id
+router.get('/review_orders/:orderId', JwtAuth, async (req, res, next) => {
+    try {
+        // find item id
+        let item_reviews = await findReviewByOrderId(validateStr("validate reviewId", req.params.orderId, 53))
+        // console.log(item_reviews)
+        let updatedReviews = [];
+
+        for (let review of item_reviews) {
+            // Replace this with the IANA timezone you desire
+            // review.time = getDifferentTime(review.createdAt);
+            // review.createdAt = undefined;
+            review.rating = (review.PQrating + review.SSrating + review.DSrating) / 3
+            review.PQrating = undefined
+            review.SSrating = undefined
+            review.DSrating = undefined
+            review.userId = undefined
+            let item = await prisma.items.findFirst({ where: { itemId: review.itemId }})
+            review.itemname = item.name
+            review.images = await getReviewImage(review.itemReviewId)
+            updatedReviews.push(await getIconImage(reviewConvertor(review)));
+        }
+        
+        return res.send(updatedReviews);
+    } catch (err) {
+        next(err)
+    }
+})
+
 // POST - add reviews into product id
 router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
     try {
@@ -1229,8 +1276,19 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
         // find item id
         let item = await verifyDetailId(validateInt("validate itemId", req.params.prodId), style, size)
         let order = await verifyOrderDetailId(orderId, item.itemId, style, size)
+        let itemReview = await prisma.item_reviews.findMany({
+            where: {
+                AND: [
+                    {itemId: item.itemId},
+                    {style: style},
+                    {size: size},
+                    {orderId: orderId}
+                ]
+            }
+        })
+        // console.log(itemReview)
 
-        if (order.isReview) validatError("This order has already reviewed")
+        if (itemReview.length !== 0) validatError("This order has already reviewed")
 
         // check size
         if (!item.styles[0].size.includes(size)) notFoundError(`item id ${item.itemId} size not found `)
@@ -1253,33 +1311,18 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
                 SSrating: validateInt("review seller service rating", SSrating, false, 1, 5),
                 DSrating: validateInt("review delivery service rating", DSrating, false, 1, 5),
                 size: validateStr("item size", size, 50),
-                style: validateStr("item style", style, 20)
+                style: validateStr("item style", style, 20),
+                orderId: orderId
             }
         })
 
         // change status of order rating date
         await prisma.orders.update({
             data: {
-                rateOrderDate: new Date()
+                rateOrderDate: addHours(new Date(), 7)
             },
             where: {
                 orderId: order.orderId
-            }
-        })
-
-        // change isReview to true
-        await prisma.order_details.update({
-            data: {
-                isReview: true
-            },
-            where: {
-                orderId_itemId: {
-                    orderId: order.orderId,
-                    itemId: item.itemId
-                },
-                AND: [
-                    { itemStyle: style }, { itemSize: size }
-                ]
             }
         })
 
@@ -1690,6 +1733,21 @@ const findReviewById = async (prodId, commendId) => {
 
     return review
 }
+
+const findReviewByOrderId = async (orderId) => {
+    // get review by itemReview, item id and username
+    let review = await prisma.item_reviews.findMany({
+        where: {
+            orderId: orderId
+        }
+    })
+
+    // check that product is found
+    if (review.length === 0) notFoundError("item with order id " + orderId + " does not exist")
+
+    return review
+}
+
 
 const findReviewLike = async (username, commendId) => {
     // get review by itemReview, item id and username
