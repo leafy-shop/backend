@@ -99,6 +99,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                     username: content.contentOwner
                 }
             })
+            content.userId = user.userId
             content.icon = await listFirstImage(findImagePath("users", user.userId), "main.png")
             return await getContentImage(contentConverter(content));
         }));
@@ -188,6 +189,14 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
             }
         })
         content.comment = comment
+
+        let user = await prisma.accounts.findFirst({
+            where: {
+                username: content.contentOwner
+            }
+        })
+        content.userId = user.userId
+        content.icon = await listFirstImage(findImagePath("users", user.userId), "main.png")
         
         // Respond with the updated content object
         return res.json(contentConverter(content));
