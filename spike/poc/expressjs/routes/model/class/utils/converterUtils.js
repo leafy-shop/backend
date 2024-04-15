@@ -1,4 +1,4 @@
-const { dateTimeZoneNow, dateTimeZoneContentFormat, dateTimeZoneReviewFormat } = require("./datetimeUtils");
+const { dateTimeZoneNow, dateTimeZoneContentFormat, dateTimeZoneReviewFormat, dateTimeZoneOrderNow } = require("./datetimeUtils");
 // const { listFirstImage, findImagePath } = require("./imageList");
 const { modelMapper, deleteNullValue } = require("./modelMapping");
 const crypto = require("crypto")
@@ -89,10 +89,14 @@ const orderConverter = (order) => {
   order = deleteNullValue(order)
 
   // time converter
-  order = timeConverter(order)
+  // order = timeConverter(order)
 
   // shipped date
-  if (order.shippedDate) order.shippedDate = dateTimeZoneNow(order.shippedDate)
+  if (order.createdAt) order.createdAt = dateTimeZoneOrderNow(order.createdAt)
+  if (order.paidOrderDate) order.paidOrderDate = dateTimeZoneOrderNow(order.paidOrderDate)
+  if (order.shippedOrderDate) order.shippedOrderDate = dateTimeZoneOrderNow(order.shippedOrderDate)
+  if (order.receivedOrderDate) order.receivedOrderDate = dateTimeZoneOrderNow(order.receivedOrderDate)
+  if (order.rateOrderDate) order.rateOrderDate = dateTimeZoneOrderNow(order.rateOrderDate)
 
   // order details
   if (order.order_details) {

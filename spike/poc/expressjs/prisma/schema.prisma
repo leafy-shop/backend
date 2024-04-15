@@ -181,14 +181,17 @@ model payments {
 }
 
 model orders {
-  orderId       String          @id @db.VarChar(53)
-  customerName  String          @db.VarChar(20)
-  accounts      accounts        @relation(fields: [customerName], references: [username], map: "Orders_customer_fkey")
-  address       String          @db.VarChar(500)
-  status        String          @db.VarChar(20)
-  createdAt     DateTime        @default(dbgenerated("NOW()"))
-  shippedDate   DateTime?
-  order_details order_details[]
+  orderId           String          @id @db.VarChar(53)
+  customerName      String          @db.VarChar(20)
+  accounts          accounts        @relation(fields: [customerName], references: [username], map: "Orders_customer_fkey")
+  address           String          @db.VarChar(500)
+  status            String          @db.VarChar(20)
+  createdAt         DateTime        @default(dbgenerated("NOW()"))
+  paidOrderDate     DateTime?
+  shippedOrderDate  DateTime?
+  receivedOrderDate DateTime?
+  rateOrderDate     DateTime?
+  order_details     order_details[]
 }
 
 model order_details {

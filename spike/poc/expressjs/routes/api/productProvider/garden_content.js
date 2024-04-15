@@ -33,7 +33,7 @@ dotenv.config();
 // GET - all page contents by filter and sort
 router.get('/', UnstrictJwtAuth, async (req, res, next) => {
     // query params
-    let { page, limit, style, sort_name, sort, contentOwner } = req.query
+    let { page, limit, style, sort_name, sort, content_owner } = req.query
 
     // page number and page size
     let pageN = Number(page)
@@ -54,17 +54,11 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
 
     // filter single and between value from style query and return page that sorted by updateAt content
     try {
-        let filterOwner = {}
-        if (req.user) {
-            filterOwner.contentOwner = { not: req.user.username }
-        } else {
-            filterOwner.contentOwner = contentOwner ? { not: contentOwner } : undefined
-        }
         let filter_pd = await prisma.contents.findMany({
             where: {
                 AND: [
                     { style: style },
-                    filterOwner
+                    { contentOwner: content_owner }
                 ]
 
             },
@@ -99,6 +93,13 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                 }
             })
             content.comment = comment
+
+            let user = await prisma.accounts.findFirst({
+                where: {
+                    username: content.contentOwner
+                }
+            })
+            content.icon = await listFirstImage(findImagePath("users", user.userId), "main.png")
             return await getContentImage(contentConverter(content));
         }));
 

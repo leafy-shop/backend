@@ -1257,6 +1257,16 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
             }
         })
 
+        // change status of order rating date
+        await prisma.orders.update({
+            data: {
+                rateOrderDate: new Date()
+            },
+            where: {
+                orderId: order.orderId
+            }
+        })
+
         // change isReview to true
         await prisma.order_details.update({
             data: {

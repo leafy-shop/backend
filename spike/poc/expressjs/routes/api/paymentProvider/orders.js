@@ -7,7 +7,7 @@ const { notFoundError, forbiddenError, validatError } = require('../../model/err
 const { ROLE } = require('../../model/enum/role');
 const { ITEMEVENT } = require('../../model/enum/item');
 const { ORDERSTATUS } = require('../../model/enum/order');
-const { orderView } = require('../../model/class/model');
+const { orderView, orderDetailView } = require('../../model/class/model');
 const { listFirstImage, findImagePath } = require('../../model/class/utils/imageList');
 let prisma = new PrismaClient()
 
@@ -355,7 +355,8 @@ router.post('/', JwtAuth, async (req, res, next) => {
                     orderId: orderId,
                     customerName: accountAddress.username,
                     address: addressFormat,
-                    status: ORDERSTATUS.PENDING
+                    status: ORDERSTATUS.PENDING,
+                    paidOrderDate: new Date()
                 }
             })
 
@@ -624,7 +625,8 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
                 orderId: orderId,
                 customerName: accountAddress.username,
                 address: addressFormat,
-                status: ORDERSTATUS.PENDING
+                status: ORDERSTATUS.PENDING,
+                paidOrderDate: new Date()
             }
         })
 
@@ -691,16 +693,16 @@ router.put('/prepare_order/:orderId', JwtAuth, verifyRole(ROLE.Admin, ROLE.Suppl
             forbiddenError("you cannot edit order in other supplier orders except yourself orders")
         }
 
-        let { orderStatus, shippedDate } = req.body
+        let { orderStatus } = req.body
 
         orderStatus = validateRole("validate order status", orderStatus, ORDERSTATUS, false)
 
         // before transit
-        if (orderStatus === ORDERSTATUS.INPROGRESS) {
+        if (orderStatus === ORDERSTATUS.INPROGRESS && order.paidOrderDate) {
             updatedOrder = await prisma.orders.update({
                 data: {
                     status: ORDERSTATUS.INPROGRESS,
-                    shippedDate: validateDatetimeFuture("validate shipped date", shippedDate, false, true)
+                    shippedOrderDate: new Date()
                 },
                 where: {
                     orderId: order.orderId
@@ -731,10 +733,11 @@ router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
 
         // checkout order when send to customer
         if (order.customerName === req.user.username && orderStatus === ORDERSTATUS.COMPLETED) {
-            if (order.status === ORDERSTATUS.INPROGRESS) {
+            if (order.status === ORDERSTATUS.INPROGRESS && order.shippedOrderDate) {
                 updatedOrder = await prisma.orders.update({
                     data: {
-                        status: ORDERSTATUS.COMPLETED
+                        status: ORDERSTATUS.COMPLETED,
+                        receivedOrderDate: new Date()
                     },
                     where: {
                         orderId: order.orderId
@@ -748,7 +751,7 @@ router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
             } else if (order.status === ORDERSTATUS.PENDING) {
                 validatError("customer must be wait from supplier confirm to prepared transit items")
             } else {
-                validatError("customer cannot edit item when order status is completed or canceled")
+                validatError("customer cannot edit item when order status is not completed or canceled")
             }
             // cancel order
         } else if (order.customerName === req.user.username && orderStatus === ORDERSTATUS.CANCELED) {
@@ -833,7 +836,7 @@ const verifyOrderId = async (orderId) => {
                 { orderId: orderId }
             ]
         },
-        select: orderView
+        select: orderDetailView
     })
     if (order == null) notFoundError("order id " + orderId + " does not exist")
     return order

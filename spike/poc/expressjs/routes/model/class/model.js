@@ -124,6 +124,28 @@ let orderView = {
     }
 }
 
+let orderDetailView = {
+    orderId: true,
+    customerName: true,
+    status: true,
+    createdAt: true,
+    paidOrderDate: true,
+    shippedOrderDate: true,
+    receivedOrderDate: true,
+    rateOrderDate: true,
+    address: true,
+    order_details: {
+        select: {
+            itemStyle: true,
+            itemSize: true,
+            itemId: true,
+            qtyOrder: true,
+            priceEach: true,
+            isReview: true
+        }
+    }
+}
+
 module.exports.userView = userView
 module.exports.userDetailView = userDetailView
 module.exports.gardenDesignerView = gardenDesignerView
@@ -133,3 +155,4 @@ module.exports.prodList = prodList
 module.exports.supplierView = supplierView
 module.exports.reviewViewOwner = reviewViewOwner
 module.exports.orderView = orderView
+module.exports.orderDetailView = orderDetailView
