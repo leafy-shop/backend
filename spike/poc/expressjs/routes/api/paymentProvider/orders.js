@@ -191,7 +191,7 @@ router.get('/supplier/count/:status', JwtAuth, verifyRole(ROLE.Admin, ROLE.Suppl
         orders = orders.filter(order => {
             return order.orderId.split("-")[0] === req.user.username
         })
-        console.log(orders)
+        // console.log(orders)
 
         return res.json({ count: orders.length })
     } catch (err) {
@@ -276,12 +276,14 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
 
         order.order_details = await Promise.all(order.order_details.map(async od => {
             let item = await verifyItemId(od.itemId)
+            od.itemname = item.name
             od.priceEach = Number(od.priceEach)
             od.totalRating = Number(item.totalRating)
             od.totalPrice = od.priceEach * od.qtyOrder
             od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
             return od
         }))
+        order.itemOwner = order.orderId.split("-")[0]
         order.total = order.order_details.reduce((pre, order) => pre + Number(order.totalPrice), 0)
 
         return res.json(orderConverter(order))
