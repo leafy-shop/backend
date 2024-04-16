@@ -25,7 +25,7 @@
     "ejs": "^3.1.9",
     "express": "^4.18.2",
     "express-rate-limit": "^6.9.0",
-    "firebase-admin": "^11.10.1",
+    "firebase-admin": "^12.0.0",
     "http": "^0.0.1-security",
     "jsonwebtoken": "^9.0.1",
     "luxon": "^3.4.4",
@@ -36,6 +36,8 @@
     "multer-s3": "^2.10.0",
     "nodemailer": "^6.9.4",
     "numeric": "^1.2.6",
+    "promptpay-qr": "^0.5.0",
+    "qrcode": "^1.5.3",
     "socket.io": "^4.7.5",
     "svd-js": "^1.1.1",
     "uuid": "^9.0.0"

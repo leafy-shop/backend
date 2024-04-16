@@ -10,6 +10,8 @@ const { ORDERSTATUS } = require('../../model/enum/order');
 const { orderView, orderDetailView } = require('../../model/class/model');
 const { listFirstImage, findImagePath } = require('../../model/class/utils/imageList');
 const { addHours } = require('../../model/class/utils/datetimeUtils');
+const QRCode = require('qrcode')
+const generatePayload = require('promptpay-qr')
 let prisma = new PrismaClient()
 
 let router = express.Router()
@@ -293,6 +295,51 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
     }
 })
 
+router.post('/prompt_pay/:orderId', JwtAuth, async (req, res, next) => {
+    const { orderId } = req.params;
+
+    try {
+        // find order
+        const order = await verifyOrderId(orderId);
+
+        // check order
+        if (order.status !== ORDERSTATUS.PENDING) {
+            validatError("your order cannot pay when status change")
+        } else if (order.customerName !== req.user.username) {
+            forbiddenError("you can pay with your order only")
+        }
+
+        // use supplier account number
+        const payment = await verifyPayment(order.orderId.split("-")[0]);
+
+        // total amount in order
+        order.amount = order.order_details.reduce((pre, cur) => pre += cur.priceEach * cur.qtyOrder, 0)
+
+        // generate qr code payload
+        const payload = generatePayload(payment.bankAccount, { amount: order.amount });
+        const option = {
+            color: {
+                dark: '#000',
+                light: '#fff'
+            }
+        }
+
+        // generate qr code with data url 64 bits
+        QRCode.toDataURL(payload, option, (err, url) => {
+            if (err) {
+                validatError("generate failure")
+            }
+            else {
+                return res.status(200).json({
+                    QRUrl: url
+                })
+            }
+        })
+    } catch (err) {
+        next(err)
+    }
+})
+
 // place order item with cart
 router.post('/', JwtAuth, async (req, res, next) => {
     try {
@@ -356,8 +403,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
                     orderId: orderId,
                     customerName: accountAddress.username,
                     address: addressFormat,
-                    status: ORDERSTATUS.PENDING,
-                    paidOrderDate: addHours(new Date(), 7)
+                    status: ORDERSTATUS.REQUIRED
                 }
             })
 
@@ -470,121 +516,6 @@ router.post('/', JwtAuth, async (req, res, next) => {
     }
 })
 
-// // place order item
-// router.post('/again', JwtAuth, async (req, res, next) => {
-//     try {
-//         let { orderBodyId, orderId, addressId } = req.body
-
-//         // find address account
-//         let accountAddress = await verifyAddressId(validateStr("validate account address", addressId, 53))
-
-//         // find cart items
-//         let order = await verifyOrderId(orderId)
-
-//         // console.log(selectedSession)
-
-//         // validate other address place order 
-//         if (req.user.role !== ROLE.Admin && req.user.username !== accountAddress.username) {
-//             forbiddenError("user cannot place order by other people except yourself")
-//         }
-
-//         if (req.user.role !== ROLE.Admin && order.customerName !== req.user.username) {
-//             forbiddenError("you can pay with your order again only");
-//         }
-
-//         let orderDetails = await prisma.order_details.findMany({
-//             where: {
-//                 orderId: order.orderId
-//             }
-//         })
-//         // validate some cart in owner item
-//         for (let detail of orderDetails) {
-//             const stock = await verifyId(detail.itemId, detail.itemSize, detail.itemStyle)
-//             if (stock == null) notFoundError("size and style of item id " + id + " does not exist")
-
-//             if (detail.qtyOrder > stock.stock) {
-//                 validatError("you cannot pay order when your quantity in order is more than quantity in item stock");
-//             }
-//         }
-
-//         // edited address
-//         let addressFormat = (accountAddress.subDistrinct !== undefined ? `${accountAddress.address} ${accountAddress.subDistrinct} ${accountAddress.distrinct} ${accountAddress.province} ${accountAddress.postalCode}` :
-//             `${accountAddress.address} ${accountAddress.distrinct} ${accountAddress.province} ${accountAddress.postalCode}`)
-
-//         let returnOrder = {}
-
-//         // add order by address and status etc.
-//         let newOrderId = orderBodyId !== undefined ? validateIdForTesting(orderId.split("-")[0], orderBodyId) : generateOrderId(orderId.split("-")[0])
-//         returnOrder = await prisma.orders.create({
-//             data: {
-//                 orderId: newOrderId,
-//                 customerName: accountAddress.username,
-//                 address: addressFormat,
-//                 status: ORDERSTATUS.PENDING
-//             }
-//         })
-
-//         // find selected cart
-//         let returnOrderDetails = []
-//         let totalPrice = 0
-//         for (let detail of orderDetails) {
-//             let itemDetail = await verifyId(detail.itemId, detail.itemSize, detail.itemStyle)
-//             // add order details
-//             let orderInput = await prisma.order_details.create({
-//                 data: {
-//                     orderId: newOrderId,
-//                     itemStyle: itemDetail.style,
-//                     itemId: itemDetail.itemId,
-//                     itemSize: itemDetail.size,
-//                     qtyOrder: detail.qtyOrder,
-//                     priceEach: itemDetail.price
-//                 }
-//             })
-//             // push orderInput
-//             returnOrderDetails.push(orderDetailConverter(orderInput))
-
-//             // add to cart on item event behaviour
-//             await prisma.item_events.create({
-//                 data: {
-//                     itemId: itemDetail.itemId,
-//                     userId: req.user.id,
-//                     itemEvent: ITEMEVENT.PAID
-//                 }
-//             })
-
-//             // remove item stock per quantity
-//             await prisma.item_details.update({
-//                 where: {
-//                     itemId_style_size: {
-//                         style: detail.itemStyle,
-//                         itemId: detail.itemId,
-//                         size: detail.itemSize,
-//                     }
-//                 },
-//                 data: {
-//                     stock: {
-//                         decrement: detail.qtyOrder
-//                     }
-//                 }
-//             })
-//             totalPrice += itemDetail.price * detail.qtyOrder
-//         }
-
-//         returnOrder.itemOwner = newOrderId.split("-")[0]
-//         returnOrder.returnOrderDetails = returnOrderDetails
-
-//         return res.status(201).json(returnOrder)
-//     } catch (err) {
-//         if (err instanceof Prisma.PrismaClientKnownRequestError) {
-//             // The .code property can be accessed in a type-safe manner
-//             if (err.meta.target === 'PRIMARY') {
-//                 err.message = "order of user is duplicated"
-//             }
-//         }
-//         next(err)
-//     }
-// })
-
 // pay item without cart on order item
 router.post('/no_cart', JwtAuth, async (req, res, next) => {
     try {
@@ -626,8 +557,7 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
                 orderId: orderId,
                 customerName: accountAddress.username,
                 address: addressFormat,
-                status: ORDERSTATUS.PENDING,
-                paidOrderDate: addHours(new Date(), 7)
+                status: ORDERSTATUS.REQUIRED,
             }
         })
 
@@ -781,6 +711,37 @@ router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
     }
 })
 
+// changing order status
+router.put('/paid_order/:orderId', JwtAuth, async (req, res, next) => {
+    try {
+        let order = await verifyOrderId(req.params.orderId)
+
+        let updatedOrder = {}
+
+        // checkout order when send to customer
+        if (order.customerName === req.user.username && order.status === ORDERSTATUS.REQUIRED) {
+            updatedOrder = await prisma.orders.update({
+                data: {
+                    status: ORDERSTATUS.PENDING,
+                    paidOrderDate: addHours(new Date(), 7)
+                },
+                where: {
+                    orderId: order.orderId
+                },
+                include: {
+                    order_details: true
+                }
+            })
+            updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+            return res.json(orderConverter(updatedOrder))
+        } else {
+            validatError("customer cannot paid order when this order has already to paid")
+        }
+    } catch (err) {
+        next(err)
+    }
+})
+
 
 //----------------------------------------- method zone ----------------------------------------------------
 
@@ -856,6 +817,19 @@ const verifyOrderIdByAddress = async (addressId) => {
     })
     if (order.length === 0) notFoundError("order id " + addressId + " does not exist")
     return order
+}
+
+const verifyPayment = async (username) => {
+    let payment = await prisma.payments.findFirst({
+        where: {
+            AND: [
+                { username: username },
+                { isDefault: true }
+            ]
+        }
+    })
+    if (payment == null) notFoundError("please create your payment first before transaction")
+    return payment
 }
 
 module.exports = router

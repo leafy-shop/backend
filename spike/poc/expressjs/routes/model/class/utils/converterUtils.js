@@ -109,7 +109,8 @@ const orderConverter = (order) => {
 }
 
 const orderDetailConverter = (order) => {
-  return timeConverter(order)
+  order.createdAt = dateTimeZoneOrderNow(order.createdAt)
+  return order
 }
 
 // phone string

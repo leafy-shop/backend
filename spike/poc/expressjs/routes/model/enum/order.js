@@ -1,5 +1,6 @@
 let ORDERSTATUS = Object.freeze({
     // supplier
+    REQUIRED: "required",
     PENDING: "pending",
     INPROGRESS: "in progress",
     // driver
