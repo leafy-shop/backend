@@ -699,7 +699,7 @@ router.put('/prepare_order/:orderId', JwtAuth, verifyRole(ROLE.Admin, ROLE.Suppl
         orderStatus = validateRole("validate order status", orderStatus, ORDERSTATUS, false)
 
         // before transit
-        if (orderStatus === ORDERSTATUS.INPROGRESS && order.paidOrderDate) {
+        if (orderStatus === ORDERSTATUS.INPROGRESS) {
             updatedOrder = await prisma.orders.update({
                 data: {
                     status: ORDERSTATUS.INPROGRESS,
