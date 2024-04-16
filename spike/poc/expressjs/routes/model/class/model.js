@@ -118,8 +118,7 @@ let orderView = {
             itemSize: true,
             itemId: true,
             qtyOrder: true,
-            priceEach: true,
-            isReview: true
+            priceEach: true
         }
     }
 }
@@ -140,8 +139,7 @@ let orderDetailView = {
             itemSize: true,
             itemId: true,
             qtyOrder: true,
-            priceEach: true,
-            isReview: true
+            priceEach: true
         }
     }
 }
