@@ -1130,8 +1130,6 @@ router.get('/all/reviews', async (req, res, next) => {
         page_rv.avg_rating = (avg_rating._avg.PQrating + avg_rating._avg.SSrating + avg_rating._avg.DSrating) / 3
         // console.log(page_rv.list)
         page_rv.list = await Promise.all(page_rv.list.map(async rv => {
-            rv.name = rv.accounts.username
-            rv.accounts = undefined
             // Replace this with the IANA timezone you desire
             rv.time = getDifferentTime(rv.createdAt)
             rv.createdAt = undefined
@@ -1211,6 +1209,12 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
             }
             review.isLike = like
             review.images = await getReviewImage(review.itemReviewId)
+            let user = await prisma.accounts.findFirst({
+                where: {
+                    username: review.username
+                }
+            })
+            review.userId = user.userId
             updatedReviews.push(await getIconImage(reviewConvertor(review)));
         }
 
@@ -1234,7 +1238,7 @@ router.get('/:prodId/reviews/:reviewId', JwtAuth, async (req, res, next) => {
         let item = await prisma.items.findFirst({ where: { itemId: review.itemId }})
         review.itemname = item.name
         review.images = await getReviewImage(review.itemReviewId)
-        review = await getIconImage(reviewConvertor(review));
+        review = await reviewConvertor(review);
         return res.send(review);
     } catch (err) {
         next(err)
@@ -1257,8 +1261,7 @@ router.get('/review_orders/:orderId', JwtAuth, async (req, res, next) => {
             // review.time = getDifferentTime(review.createdAt);
             review.username = undefined;
             review.like = undefined
-            review.images = await getReviewImage(review.itemReviewId)
-            updatedReviews.push(await getIconImage(reviewConvertor(review)));
+            updatedReviews.push(reviewConvertor(review));
         }
         
         return res.send(updatedReviews);
@@ -1537,7 +1540,7 @@ const getReviewImage = async (id) => {
 
 const getIconImage = async (user) => {
     user.image = await listFirstImage(findImagePath("users", user.userId), "main.png")
-    // console.log(user)
+    // console.log(user.image)
     return user
 }
 

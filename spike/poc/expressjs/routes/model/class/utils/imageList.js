@@ -48,8 +48,11 @@ let listFirstImage = async (folder, filename = "main.png") => {
         // list all object when exist
         let object = undefined
         const listObjects = await s3.listObjectsV2(listObjectsParams).promise();
+        // console.log(listObjects)
         listObjects.Contents.forEach(obj => {
-            if (obj.Key.endsWith(filename)) {
+            let matchname = obj.Key.split("/").slice(3,5)
+            // console.log(matchname)
+            if (matchname[0] === filename) {
                 console.log(`Found image: ${filename}`);
                 // You can perform further processing or download the image here
                 object = filename
