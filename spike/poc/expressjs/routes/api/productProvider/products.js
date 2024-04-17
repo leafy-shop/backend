@@ -1229,13 +1229,13 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
 router.get('/:prodId/reviews/:reviewId', JwtAuth, async (req, res, next) => {
     try {
         // find item id
-        let review = await findReviewById(validateInt("validate itemId", req.params.prodId),validateStr("validate reviewId", req.params.reviewId, 53))
+        let review = await findReviewById(validateInt("validate itemId", req.params.prodId), validateStr("validate reviewId", req.params.reviewId, 53))
 
         if (req.user.username !== review.username) forbiddenError("This user can see your review detail only")
 
         review.rating = (review.PQrating + review.SSrating + review.DSrating) / 3
 
-        let item = await prisma.items.findFirst({ where: { itemId: review.itemId }})
+        let item = await prisma.items.findFirst({ where: { itemId: review.itemId } })
         review.itemname = item.name
         review.images = await getReviewImage(review.itemReviewId)
         review = await reviewConvertor(review);
@@ -1246,25 +1246,25 @@ router.get('/:prodId/reviews/:reviewId', JwtAuth, async (req, res, next) => {
 })
 
 // GET - get review in product id and order id
-router.get('/review_orders/:orderId', JwtAuth, async (req, res, next) => {
+router.get('/review_orders/:orderId/:productId/:itemStyle/:itemSize', JwtAuth, async (req, res, next) => {
     try {
+        let { orderId, productId, itemStyle, itemSize } = req.params
+
         // find item id
-        let item_reviews = await findReviewByOrderId(validateStr("validate reviewId", req.params.orderId, 53))
-        console.log(item_reviews)
-
-        if (req.user.username !== item_reviews[0].username) forbiddenError("This user can see your review in your order only")
+        let item_review = await findReviewByOrderId(
+            validateStr("validate orderId", orderId, 53),
+            validateInt("validate productId", Number(productId)),
+            validateStr("validate style", itemStyle, 20),
+            validateStr("validate size", itemSize, 50)
+        )
         // console.log(item_reviews)
-        let updatedReviews = [];
 
-        for (let review of item_reviews) {
-            // Replace this with the IANA timezone you desire
-            // review.time = getDifferentTime(review.createdAt);
-            review.username = undefined;
-            review.like = undefined
-            updatedReviews.push(reviewConvertor(review));
-        }
-        
-        return res.send(updatedReviews);
+        if (req.user.username !== item_review.username) forbiddenError("This user can see your review in your order only")
+        // console.log(item_reviews)
+        item_review.username = undefined;
+        item_review.like = undefined
+
+        return res.send(reviewConvertor(item_review));
     } catch (err) {
         next(err)
     }
@@ -1281,10 +1281,10 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
         let itemReview = await prisma.item_reviews.findMany({
             where: {
                 AND: [
-                    {itemId: item.itemId},
-                    {style: style},
-                    {size: size},
-                    {orderId: orderId}
+                    { itemId: item.itemId },
+                    { style: style },
+                    { size: size },
+                    { orderId: orderId }
                 ]
             }
         })
@@ -1728,17 +1728,22 @@ const findReviewById = async (prodId, commendId) => {
     return review
 }
 
-const findReviewByOrderId = async (orderId) => {
+const findReviewByOrderId = async (orderId, itemId, itemStyle, itemSize) => {
     // get review by itemReview, item id and username
-    let review = await prisma.item_reviews.findMany({
+    let review = await prisma.item_reviews.findFirst({
         where: {
-            orderId: orderId
+            AND: [
+                { orderId: orderId },
+                { itemId: itemId },
+                { style: itemStyle },
+                { size: itemSize }
+            ]
         },
         select: reviewViewOrder
     })
 
     // check that product is found
-    if (review.length === 0) notFoundError("item with order id " + orderId + " does not exist")
+    if (review === null) notFoundError("item with order id " + orderId + " does not exist")
 
     return review
 }
