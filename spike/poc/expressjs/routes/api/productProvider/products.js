@@ -636,7 +636,8 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
 
         let priceRange = {}
         let priceList = []
-        if (styles.length === 0 || !Array.isArray(styles)) {
+        console.log(styles)
+        if (!Array.isArray(styles) || styles.length === 0) {
             validatError("created item must have at least 1 style item")
         }
         if (styles.length > 10) {
@@ -1254,11 +1255,8 @@ router.get('/review_orders/:orderId', JwtAuth, async (req, res, next) => {
         for (let review of item_reviews) {
             // Replace this with the IANA timezone you desire
             // review.time = getDifferentTime(review.createdAt);
-            // review.createdAt = undefined;
-            review.userId = undefined
+            review.username = undefined;
             review.like = undefined
-            let item = await prisma.items.findFirst({ where: { itemId: review.itemId }})
-            review.itemname = item.name
             review.images = await getReviewImage(review.itemReviewId)
             updatedReviews.push(await getIconImage(reviewConvertor(review)));
         }

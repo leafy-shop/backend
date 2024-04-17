@@ -40,6 +40,7 @@ const reviewView = {
 
 const reviewViewOwner = {
     itemReviewId: true,
+    itemId: true,
     username: true,
     comment: true,
     PQrating: true,
@@ -53,13 +54,12 @@ const reviewViewOwner = {
 
 const reviewViewOrder = {
     itemReviewId: true,
+    itemId: true,
     username: true,
     comment: true,
     PQrating: true,
     SSrating: true,
     DSrating: true,
-    style: true,
-    size: true,
     createdAt: true
 }
 
