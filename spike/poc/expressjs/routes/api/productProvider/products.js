@@ -1276,7 +1276,7 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
         let { itemReviewId, comment, PQrating, SSrating, DSrating, style, size, orderId } = req.body
 
         // find item id
-        let item = await verifyDetailId(validateInt("validate itemId", req.params.prodId), style, size)
+        let item = await verifyId(validateInt("validate itemId", req.params.prodId))
         let order = await verifyOrderDetailId(orderId, item.itemId, style, size)
         let itemReview = await prisma.item_reviews.findMany({
             where: {
@@ -1292,8 +1292,8 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
 
         if (itemReview.length !== 0) validatError("This order has already reviewed")
 
-        // check size
-        if (!item.styles[0].size.includes(size)) notFoundError(`item id ${item.itemId} size not found `)
+        // // check size
+        // if (!item.styles[0].size.includes(size)) notFoundError(`item id ${item.itemId} size not found `)
 
         // generate id
         const id = generateIdByMapping(16, req.user.username)
