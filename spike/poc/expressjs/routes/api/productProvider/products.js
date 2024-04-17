@@ -4,7 +4,7 @@ const router = express.Router();
 const { validateStr, validateInt, validateDouble, validateEmail, validateStrArray, validateRole, validateIdForTesting } = require('../../validation/body')
 const { notFoundError, forbiddenError, validatError } = require('../../model/error/error')
 // const { dateTimeZoneNow } = require('../model/class/utils/datetimeUtils')
-const { userViewFav, prodList, reviewView, reviewViewOwner } = require('../../model/class/model')
+const { userViewFav, prodList, reviewView, reviewViewOwner, reviewViewOrder } = require('../../model/class/model')
 const { JwtAuth, verifyRole, UnstrictJwtAuth } = require('../../../middleware/jwtAuth')
 
 const { PrismaClient, Prisma } = require('@prisma/client');
@@ -1194,7 +1194,6 @@ router.get('/:prodId/reviews', UnstrictJwtAuth, async (req, res, next) => {
             review.PQrating = undefined
             review.SSrating = undefined
             review.DSrating = undefined
-            review.userId = undefined
             let like = false
             if (req.user) {
                 let reviewLike = await prisma.item_review_likes.findFirst({
@@ -1246,6 +1245,7 @@ router.get('/review_orders/:orderId', JwtAuth, async (req, res, next) => {
     try {
         // find item id
         let item_reviews = await findReviewByOrderId(validateStr("validate reviewId", req.params.orderId, 53))
+        console.log(item_reviews)
 
         if (req.user.username !== item_reviews[0].username) forbiddenError("This user can see your review in your order only")
         // console.log(item_reviews)
@@ -1255,11 +1255,8 @@ router.get('/review_orders/:orderId', JwtAuth, async (req, res, next) => {
             // Replace this with the IANA timezone you desire
             // review.time = getDifferentTime(review.createdAt);
             // review.createdAt = undefined;
-            review.rating = (review.PQrating + review.SSrating + review.DSrating) / 3
-            review.PQrating = undefined
-            review.SSrating = undefined
-            review.DSrating = undefined
             review.userId = undefined
+            review.like = undefined
             let item = await prisma.items.findFirst({ where: { itemId: review.itemId }})
             review.itemname = item.name
             review.images = await getReviewImage(review.itemReviewId)
@@ -1670,7 +1667,7 @@ const verifyUsername = async (username) => {
 const findAllReviewByItemId = async (prodId, sort, name = undefined) => {
     let sortModel = (sort === 'newest' ? { createdAt: 'desc' } : sort === 'oldest' ? { createdAt: 'asc' } : undefined)
 
-    console.log(name)
+    // console.log(name)
 
     // get review by itemReview, item id and username
     let review = await prisma.item_reviews.findMany({
@@ -1684,14 +1681,6 @@ const findAllReviewByItemId = async (prodId, sort, name = undefined) => {
 
     // check that product is found
     if (review == null) notFoundError("item id " + prodId + " does not exist")
-
-    // changing username to name
-    review = review.map(rv => {
-        rv.username = rv.accounts.username
-        rv.userId = rv.accounts.userId
-        rv.accounts = undefined
-        return rv
-    })
 
     return review
 }
@@ -1743,7 +1732,8 @@ const findReviewByOrderId = async (orderId) => {
     let review = await prisma.item_reviews.findMany({
         where: {
             orderId: orderId
-        }
+        },
+        select: reviewViewOrder
     })
 
     // check that product is found
