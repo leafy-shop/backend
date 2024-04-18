@@ -394,7 +394,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
         let addressFormat = (accountAddress.subDistrinct !== undefined ? `${accountAddress.address} ${accountAddress.subDistrinct} ${accountAddress.distrinct} ${accountAddress.province} ${accountAddress.postalCode}` :
             `${accountAddress.address} ${accountAddress.distrinct} ${accountAddress.province} ${accountAddress.postalCode}`)
 
-        let orders = {}
+        // let orders = []
         for (let selectOwner in selectedSession) {
             // add order by address and status etc.
             let orderId = orderBodyId !== undefined ? validateIdForTesting(selectedSession[selectOwner].sessionId.split("-")[0], orderBodyId) : generateOrderId(selectedSession[selectOwner].sessionId.split("-")[0])
@@ -409,13 +409,14 @@ router.post('/', JwtAuth, async (req, res, next) => {
 
             // find selected cart
             let selectedCart = mycart.filter(cart => cart.sessionId === selectedSession[selectOwner].sessionId)
-            let orderDetails = []
+            // let orderDetails = {}
             let totalPrice = 0
+            // console.log(selectedCart)
             for (let cart of selectedCart) {
                 let itemDetail = await verifyId(cart.itemId, cart.itemSize, cart.itemStyle)
                 if (itemDetail == null) notFoundError("size and style of item id " + id + " does not exist")
                 // add order details
-                let orderInput = await prisma.order_details.create({
+                await prisma.order_details.create({
                     data: {
                         orderId: orderId,
                         itemStyle: cart.itemStyle,
@@ -425,17 +426,9 @@ router.post('/', JwtAuth, async (req, res, next) => {
                         priceEach: itemDetail.price
                     }
                 })
+                // console.log(orderInput)
                 // push orderInput
-                orderDetails.push(orderDetailConverter(orderInput))
-
-                // add to cart on item event behaviour
-                await prisma.item_events.create({
-                    data: {
-                        itemId: cart.itemId,
-                        userId: req.user.id,
-                        itemEvent: ITEMEVENT.PAID
-                    }
-                })
+                // orderDetails.order_details = orderDetailConverter(orderInput)
 
                 // remove all selected cart item
                 let mycart = await prisma.carts.findFirst({
@@ -466,9 +459,12 @@ router.post('/', JwtAuth, async (req, res, next) => {
                 //         }
                 //     }
                 // })
-                orders[selectedSession[selectOwner].sessionId.split("-")[0]] = orderDetails
+                
                 totalPrice += itemDetail.price * cart.qty
             }
+            // console.log(orderDetails)
+            // orders[selectedSession[selectOwner].sessionId.split("-")[0]] = orderDetails
+
             // console.log(totalPrice)
 
             // // delete session cart
@@ -504,7 +500,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
             // })
         }
 
-        return res.status(201).json(orders)
+        return res.status(201).json({"message":"all orders selected are place before paid"})
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -576,15 +572,6 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
         // map model
         orderInput.order_details = []
         orderInput.order_details.push(order_detail)
-
-        // add to cart on item event behaviour
-        await prisma.item_events.create({
-            data: {
-                itemId: item.itemId,
-                userId: req.user.id,
-                itemEvent: ITEMEVENT.PAID
-            }
-        })
 
         // // remove item stock per quantity
         // await prisma.item_details.update({
@@ -734,6 +721,15 @@ router.put('/paid_order/:orderId', JwtAuth, async (req, res, next) => {
             })
 
             for (od of order.order_details) {
+                // add to cart on item event behaviour
+                await prisma.item_events.create({
+                    data: {
+                        itemId: od.itemId,
+                        userId: req.user.id,
+                        itemEvent: ITEMEVENT.PAID
+                    }
+                })
+
                 // remove item stock per quantity
                 await prisma.item_details.update({
                     where: {
@@ -755,6 +751,68 @@ router.put('/paid_order/:orderId', JwtAuth, async (req, res, next) => {
         } else {
             validatError("customer cannot paid order when this order has already to paid or cannot paid in other user")
         }
+    } catch (err) {
+        next(err)
+    }
+})
+
+// changing paid of order status with multiple selection
+router.put('/paid_order', JwtAuth, async (req, res, next) => {
+    try {
+        let { orders } = req.body
+        let updatedOrderList = []
+        for (let orderId of orders) {
+            let order = await verifyOrderId(orderId)
+
+            // checkout order when send to customer
+            if (order.customerName === req.user.username && order.status === ORDERSTATUS.REQUIRED) {
+                let updatedOrder = await prisma.orders.update({
+                    data: {
+                        status: ORDERSTATUS.PENDING,
+                        paidOrderDate: addHours(new Date(), 7)
+                    },
+                    where: {
+                        orderId: order.orderId
+                    },
+                    include: {
+                        order_details: true
+                    }
+                })
+
+                for (od of order.order_details) {
+                    // add to cart on item event behaviour
+                    await prisma.item_events.create({
+                        data: {
+                            itemId: od.itemId,
+                            userId: req.user.id,
+                            itemEvent: ITEMEVENT.PAID
+                        }
+                    })
+
+                    // remove item stock per quantity
+                    await prisma.item_details.update({
+                        where: {
+                            itemId_style_size: {
+                                style: od.itemStyle,
+                                itemId: od.itemId,
+                                size: od.itemSize
+                            }
+                        },
+                        data: {
+                            stock: {
+                                decrement: od.qtyOrder
+                            }
+                        }
+                    })
+                }
+                updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+                updatedOrderList.push(orderConverter(updatedOrder))
+            } else {
+                validatError("customer cannot paid order when this order has already to paid or cannot paid in other user")
+            }
+        }
+        return res.json(updatedOrderList)
+
     } catch (err) {
         next(err)
     }
