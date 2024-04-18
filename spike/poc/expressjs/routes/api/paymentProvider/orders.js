@@ -295,50 +295,50 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
     }
 })
 
-router.post('/prompt_pay/:orderId', JwtAuth, async (req, res, next) => {
-    const { orderId } = req.params;
+// router.post('/prompt_pay/:orderId', JwtAuth, async (req, res, next) => {
+//     const { orderId } = req.params;
 
-    try {
-        // find order
-        const order = await verifyOrderId(orderId);
+//     try {
+//         // find order
+//         const order = await verifyOrderId(orderId);
 
-        // check order
-        if (order.status !== ORDERSTATUS.PENDING) {
-            validatError("your order cannot pay when status change")
-        } else if (order.customerName !== req.user.username) {
-            forbiddenError("you can pay with your order only")
-        }
+//         // check order
+//         if (order.status !== ORDERSTATUS.PENDING) {
+//             validatError("your order cannot pay when status change")
+//         } else if (order.customerName !== req.user.username) {
+//             forbiddenError("you can pay with your order only")
+//         }
 
-        // use supplier account number
-        const payment = await verifyPayment(order.orderId.split("-")[0]);
+//         // use supplier account number
+//         const payment = await verifyPayment(order.orderId.split("-")[0]);
 
-        // total amount in order
-        order.amount = order.order_details.reduce((pre, cur) => pre += cur.priceEach * cur.qtyOrder, 0)
+//         // total amount in order
+//         order.amount = order.order_details.reduce((pre, cur) => pre += cur.priceEach * cur.qtyOrder, 0)
 
-        // generate qr code payload
-        const payload = generatePayload(payment.bankAccount, { amount: order.amount });
-        const option = {
-            color: {
-                dark: '#000',
-                light: '#fff'
-            }
-        }
+//         // generate qr code payload
+//         const payload = generatePayload(payment.bankAccount, { amount: order.amount });
+//         const option = {
+//             color: {
+//                 dark: '#000',
+//                 light: '#fff'
+//             }
+//         }
 
-        // generate qr code with data url 64 bits
-        QRCode.toDataURL(payload, option, (err, url) => {
-            if (err) {
-                validatError("generate failure")
-            }
-            else {
-                return res.status(200).json({
-                    QRUrl: url
-                })
-            }
-        })
-    } catch (err) {
-        next(err)
-    }
-})
+//         // generate qr code with data url 64 bits
+//         QRCode.toDataURL(payload, option, (err, url) => {
+//             if (err) {
+//                 validatError("generate failure")
+//             }
+//             else {
+//                 return res.status(200).json({
+//                     QRUrl: url
+//                 })
+//             }
+//         })
+//     } catch (err) {
+//         next(err)
+//     }
+// })
 
 // place order item with cart
 router.post('/', JwtAuth, async (req, res, next) => {
@@ -451,21 +451,21 @@ router.post('/', JwtAuth, async (req, res, next) => {
                     }
                 })
 
-                // remove item stock per quantity
-                await prisma.item_details.update({
-                    where: {
-                        itemId_style_size: {
-                            style: cart.itemStyle,
-                            itemId: cart.itemId,
-                            size: cart.itemSize,
-                        }
-                    },
-                    data: {
-                        stock: {
-                            decrement: cart.qty
-                        }
-                    }
-                })
+                // // remove item stock per quantity
+                // await prisma.item_details.update({
+                //     where: {
+                //         itemId_style_size: {
+                //             style: cart.itemStyle,
+                //             itemId: cart.itemId,
+                //             size: cart.itemSize,
+                //         }
+                //     },
+                //     data: {
+                //         stock: {
+                //             decrement: cart.qty
+                //         }
+                //     }
+                // })
                 orders[selectedSession[selectOwner].sessionId.split("-")[0]] = orderDetails
                 totalPrice += itemDetail.price * cart.qty
             }
@@ -586,21 +586,21 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
             }
         })
 
-        // remove item stock per quantity
-        await prisma.item_details.update({
-            where: {
-                itemId_style_size: {
-                    style: style,
-                    itemId: item.itemId,
-                    size: size
-                }
-            },
-            data: {
-                stock: {
-                    decrement: qty
-                }
-            }
-        })
+        // // remove item stock per quantity
+        // await prisma.item_details.update({
+        //     where: {
+        //         itemId_style_size: {
+        //             style: style,
+        //             itemId: item.itemId,
+        //             size: size
+        //         }
+        //     },
+        //     data: {
+        //         stock: {
+        //             decrement: qty
+        //         }
+        //     }
+        // })
         return res.status(201).json(orderConverter(orderInput))
         // return res.json({orderId: orderId})
     } catch (err) {
@@ -732,10 +732,28 @@ router.put('/paid_order/:orderId', JwtAuth, async (req, res, next) => {
                     order_details: true
                 }
             })
+
+            for (od of order.order_details) {
+                // remove item stock per quantity
+                await prisma.item_details.update({
+                    where: {
+                        itemId_style_size: {
+                            style: od.itemStyle,
+                            itemId: od.itemId,
+                            size: od.itemSize
+                        }
+                    },
+                    data: {
+                        stock: {
+                            decrement: od.qtyOrder
+                        }
+                    }
+                })
+            }
             updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
             return res.json(orderConverter(updatedOrder))
         } else {
-            validatError("customer cannot paid order when this order has already to paid")
+            validatError("customer cannot paid order when this order has already to paid or cannot paid in other user")
         }
     } catch (err) {
         next(err)
