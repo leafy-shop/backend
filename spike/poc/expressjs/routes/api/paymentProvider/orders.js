@@ -10,8 +10,8 @@ const { ORDERSTATUS } = require('../../model/enum/order');
 const { orderView, orderDetailView } = require('../../model/class/model');
 const { listFirstImage, findImagePath } = require('../../model/class/utils/imageList');
 const { addHours } = require('../../model/class/utils/datetimeUtils');
-const QRCode = require('qrcode')
-const generatePayload = require('promptpay-qr')
+// const QRCode = require('qrcode')
+// const generatePayload = require('promptpay-qr')
 let prisma = new PrismaClient()
 
 let router = express.Router()
@@ -24,52 +24,65 @@ router.get('/', JwtAuth, async (req, res, next) => {
     let limitN = Number(limit)
 
     try {
-        // get all item orders by address Id sort by created at
-        let orders = await prisma.orders.findMany({
-            where: {
-                status: status
-            },
-            select: orderView,
-            orderBy: {
-                createdAt: sort === "asc" ? "asc" : "desc"
-            }
+        let groupOrder = await prisma.orders.groupBy({
+            by: ["orderGroupId"]
         })
 
-        orders = orders.filter(order => {
-            return order.customerName === req.user.username
-        })
-
-        // get all order list
-        orders = await Promise.all(orders.map(async order => {
-            let user = await prisma.accounts.findFirst({
+        let orders = []
+        for (orderGroupId of groupOrder) {
+            // get all item orders by address Id sort by created at
+            let innerOrders = await prisma.orders.findMany({
                 where: {
-                    username: order.orderId.split("-")[0]
+                    AND: [
+                        {status: status},
+                        {orderGroupId: orderGroupId.orderGroupId}
+                    ]
+                },
+                select: orderView,
+                orderBy: {
+                    createdAt: sort === "asc" ? "asc" : "desc"
                 }
             })
-            order.supplierId = user.userId
-            order.itemOwner = order.orderId.split("-")[0]
-            order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
-            order.isOutStock = true
-            order.address = undefined
 
-            order.order_details = await Promise.all(order.order_details.map(async od => {
-                let item = await verifyItemId(od.itemId)
-                od.itemname = item.name
-                od.priceEach = Number(od.priceEach)
-                od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
-                let itemDetail = await verifyId(od.itemId, od.itemSize, od.itemStyle)
-                if (itemDetail !== null && itemDetail.stock > 0) {
-                    order.isOutStock = false
-                }
-                return od
+            innerOrders = innerOrders.filter(order => {
+                return order.customerName === req.user.username
+            })
+
+            // get all order list
+            innerOrders = await Promise.all(innerOrders.map(async order => {
+                let user = await prisma.accounts.findFirst({
+                    where: {
+                        username: order.orderId.split("-")[0]
+                    }
+                })
+                order.supplierId = user.userId
+                order.itemOwner = order.orderId.split("-")[0]
+                order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+                order.isOutStock = true
+                order.address = undefined
+
+                order.order_details = await Promise.all(order.order_details.map(async od => {
+                    let item = await verifyItemId(od.itemId)
+                    od.itemname = item.name
+                    od.priceEach = Number(od.priceEach)
+                    od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
+                    let itemDetail = await verifyId(od.itemId, od.itemSize, od.itemStyle)
+                    if (itemDetail !== null && itemDetail.stock > 0) {
+                        order.isOutStock = false
+                    }
+                    return od
+                }))
+                return orderConverter(order)
             }))
-            return orderConverter(order)
-        }))
 
-        // filter owner name or order details as itemname 
-        orders = orders.filter(order => {
-            return (search !== undefined ? order.orderId.split("-")[0].toLowerCase().includes(search.toLowerCase()) || order.order_details.some(od => od.itemname.toLowerCase().includes(search.toLowerCase())) : true)
-        })
+            // filter owner name or order details as itemname 
+            innerOrders = innerOrders.filter(order => {
+                return (search !== undefined ? order.orderId.split("-")[0].toLowerCase().includes(search.toLowerCase()) || order.order_details.some(od => od.itemname.toLowerCase().includes(search.toLowerCase())) : true)
+            })
+
+            let orderModel = {orderGroupId: orderGroupId.orderGroupId, orders: innerOrders}
+            orders.push(orderModel)
+        }
 
         let page_order = paginationList(orders, pageN, limitN, 10)
 
@@ -81,7 +94,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
 })
 
 // count all customer order item with status
-router.get('/count/:status', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res, next) => {
+router.get('/count/:status', JwtAuth, async (req, res, next) => {
     let { status } = req.params
 
     try {
@@ -343,7 +356,7 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
 // place order item with cart
 router.post('/', JwtAuth, async (req, res, next) => {
     try {
-        let { orderBodyId, carts, addressId } = req.body
+        let { orderBodyId, orderGroupBodyId, carts, addressId } = req.body
 
         // find address account
         let accountAddress = await verifyAddressId(validateStr("validate account address", addressId, 53))
@@ -394,13 +407,14 @@ router.post('/', JwtAuth, async (req, res, next) => {
         let addressFormat = (accountAddress.subDistrinct !== undefined ? `${accountAddress.address} ${accountAddress.subDistrinct} ${accountAddress.distrinct} ${accountAddress.province} ${accountAddress.postalCode}` :
             `${accountAddress.address} ${accountAddress.distrinct} ${accountAddress.province} ${accountAddress.postalCode}`)
 
-        // let orders = []
+        let orderGroupId = orderGroupBodyId !== undefined ? validateIdForTesting(req.user.username, orderGroupBodyId) : generateOrderId(req.user.username)
         for (let selectOwner in selectedSession) {
             // add order by address and status etc.
             let orderId = orderBodyId !== undefined ? validateIdForTesting(selectedSession[selectOwner].sessionId.split("-")[0], orderBodyId) : generateOrderId(selectedSession[selectOwner].sessionId.split("-")[0])
             await prisma.orders.create({
                 data: {
                     orderId: orderId,
+                    orderGroupId: orderGroupId,
                     customerName: accountAddress.username,
                     address: addressFormat,
                     status: ORDERSTATUS.REQUIRED
@@ -459,7 +473,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
                 //         }
                 //     }
                 // })
-                
+
                 totalPrice += itemDetail.price * cart.qty
             }
             // console.log(orderDetails)
@@ -500,7 +514,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
             // })
         }
 
-        return res.status(201).json({"message":"all orders selected are place before paid"})
+        return res.status(201).json({ "message": "all orders selected are place before paid" })
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -515,7 +529,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
 // pay item without cart on order item
 router.post('/no_cart', JwtAuth, async (req, res, next) => {
     try {
-        let { orderBodyId, itemId, style, size, qty, addressId } = req.body
+        let { orderBodyId, orderGroupBodyId, itemId, style, size, qty, addressId } = req.body
 
         // find address account
         let accountAddress = await verifyAddressId(validateStr("validate account address", addressId, 53))
@@ -547,13 +561,16 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
 
         // add order by address and status etc.
         let orderId = orderBodyId !== undefined ? validateIdForTesting(item.itemOwner, orderBodyId) : generateOrderId(item.itemOwner)
+        let orderGroupId = orderGroupBodyId !== undefined ? validateIdForTesting(req.user.username, orderGroupBodyId) : generateOrderId(req.user.username)
         // console.log(orderId)
         let orderInput = await prisma.orders.create({
             data: {
                 orderId: orderId,
+                orderGroupId: orderGroupId,
                 customerName: accountAddress.username,
                 address: addressFormat,
-                status: ORDERSTATUS.REQUIRED,
+                status: ORDERSTATUS.PENDING,
+                paidOrderDate: addHours(new Date(), 7)
             }
         })
 
@@ -573,21 +590,21 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
         orderInput.order_details = []
         orderInput.order_details.push(order_detail)
 
-        // // remove item stock per quantity
-        // await prisma.item_details.update({
-        //     where: {
-        //         itemId_style_size: {
-        //             style: style,
-        //             itemId: item.itemId,
-        //             size: size
-        //         }
-        //     },
-        //     data: {
-        //         stock: {
-        //             decrement: qty
-        //         }
-        //     }
-        // })
+        // remove item stock per quantity
+        await prisma.item_details.update({
+            where: {
+                itemId_style_size: {
+                    style: style,
+                    itemId: item.itemId,
+                    size: size
+                }
+            },
+            data: {
+                stock: {
+                    decrement: qty
+                }
+            }
+        })
         return res.status(201).json(orderConverter(orderInput))
         // return res.json({orderId: orderId})
     } catch (err) {
@@ -699,74 +716,17 @@ router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
 })
 
 // changing order status
-router.put('/paid_order/:orderId', JwtAuth, async (req, res, next) => {
+router.put('/paid_order/:orderGroupId', JwtAuth, async (req, res, next) => {
     try {
-        let order = await verifyOrderId(req.params.orderId)
+        let orderGroup = await verifyOrderGroupId(req.params.orderGroupId)
 
-        let updatedOrder = {}
-
-        // checkout order when send to customer
-        if (order.customerName === req.user.username && order.status === ORDERSTATUS.REQUIRED) {
-            updatedOrder = await prisma.orders.update({
-                data: {
-                    status: ORDERSTATUS.PENDING,
-                    paidOrderDate: addHours(new Date(), 7)
-                },
-                where: {
-                    orderId: order.orderId
-                },
-                include: {
-                    order_details: true
-                }
-            })
-
-            for (od of order.order_details) {
-                // add to cart on item event behaviour
-                await prisma.item_events.create({
-                    data: {
-                        itemId: od.itemId,
-                        userId: req.user.id,
-                        itemEvent: ITEMEVENT.PAID
-                    }
-                })
-
-                // remove item stock per quantity
-                await prisma.item_details.update({
-                    where: {
-                        itemId_style_size: {
-                            style: od.itemStyle,
-                            itemId: od.itemId,
-                            size: od.itemSize
-                        }
-                    },
-                    data: {
-                        stock: {
-                            decrement: od.qtyOrder
-                        }
-                    }
-                })
-            }
-            updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
-            return res.json(orderConverter(updatedOrder))
-        } else {
-            validatError("customer cannot paid order when this order has already to paid or cannot paid in other user")
-        }
-    } catch (err) {
-        next(err)
-    }
-})
-
-// changing paid of order status with multiple selection
-router.put('/paid_order', JwtAuth, async (req, res, next) => {
-    try {
-        let { orders } = req.body
-        let updatedOrderList = []
-        for (let orderId of orders) {
-            let order = await verifyOrderId(orderId)
+        let orderPayment = []
+        for (let order of orderGroup) {
+            let updatedOrder = {}
 
             // checkout order when send to customer
             if (order.customerName === req.user.username && order.status === ORDERSTATUS.REQUIRED) {
-                let updatedOrder = await prisma.orders.update({
+                updatedOrder = await prisma.orders.update({
                     data: {
                         status: ORDERSTATUS.PENDING,
                         paidOrderDate: addHours(new Date(), 7)
@@ -805,18 +765,80 @@ router.put('/paid_order', JwtAuth, async (req, res, next) => {
                         }
                     })
                 }
+                updatedOrder.orderGroupId = undefined
                 updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
-                updatedOrderList.push(orderConverter(updatedOrder))
             } else {
                 validatError("customer cannot paid order when this order has already to paid or cannot paid in other user")
             }
+            orderPayment.push(orderConverter(updatedOrder))
         }
-        return res.json(updatedOrderList)
-
+        return res.json({ orderGroupId: req.params.orderGroupId, list: orderPayment })
     } catch (err) {
         next(err)
     }
 })
+
+// // changing paid of order status with multiple selection
+// router.put('/paid_order', JwtAuth, async (req, res, next) => {
+//     try {
+//         let { orders } = req.body
+//         let updatedOrderList = []
+//         for (let orderId of orders) {
+//             let order = await verifyOrderId(orderId)
+
+//             // checkout order when send to customer
+//             if (order.customerName === req.user.username && order.status === ORDERSTATUS.REQUIRED) {
+//                 let updatedOrder = await prisma.orders.update({
+//                     data: {
+//                         status: ORDERSTATUS.PENDING,
+//                         paidOrderDate: addHours(new Date(), 7)
+//                     },
+//                     where: {
+//                         orderId: order.orderId
+//                     },
+//                     include: {
+//                         order_details: true
+//                     }
+//                 })
+
+//                 for (od of order.order_details) {
+//                     // add to cart on item event behaviour
+//                     await prisma.item_events.create({
+//                         data: {
+//                             itemId: od.itemId,
+//                             userId: req.user.id,
+//                             itemEvent: ITEMEVENT.PAID
+//                         }
+//                     })
+
+//                     // remove item stock per quantity
+//                     await prisma.item_details.update({
+//                         where: {
+//                             itemId_style_size: {
+//                                 style: od.itemStyle,
+//                                 itemId: od.itemId,
+//                                 size: od.itemSize
+//                             }
+//                         },
+//                         data: {
+//                             stock: {
+//                                 decrement: od.qtyOrder
+//                             }
+//                         }
+//                     })
+//                 }
+//                 updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+//                 updatedOrderList.push(orderConverter(updatedOrder))
+//             } else {
+//                 validatError("customer cannot paid order when this order has already to paid or cannot paid in other user")
+//             }
+//         }
+//         return res.json(updatedOrderList)
+
+//     } catch (err) {
+//         next(err)
+//     }
+// })
 
 
 //----------------------------------------- method zone ----------------------------------------------------
@@ -880,18 +902,18 @@ const verifyOrderId = async (orderId) => {
     return order
 }
 
-const verifyOrderIdByAddress = async (addressId) => {
+const verifyOrderGroupId = async (groupId) => {
     let order = await prisma.orders.findMany({
         where: {
             AND: [
-                { addressId: addressId }
+                { orderGroupId: groupId }
             ]
         },
         include: {
             order_details: true
         }
     })
-    if (order.length === 0) notFoundError("order id " + addressId + " does not exist")
+    if (order.length === 0) notFoundError("order group id " + orderGroupId + " does not exist")
     return order
 }
 

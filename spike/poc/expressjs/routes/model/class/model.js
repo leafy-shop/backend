@@ -102,6 +102,7 @@ const userViewFav = () => {
 
 let orderView = {
     orderId: true,
+    orderGroupId: true,
     customerName: true,
     status: true,
     createdAt: true,

@@ -1,10 +1,9 @@
 const express = require('express')
 const router = express.Router()
-const { getToken, getUser, isExpired, encryptInformation } = require('../../model/class/utils/jwtUtils')
-const { errorRes, notFoundError, unAuthorizedError, forbiddenError } = require('../../model/error/error')
+const { getToken, getUser} = require('../../model/class/utils/jwtUtils')
+const { errorRes, unAuthorizedError, forbiddenError } = require('../../model/error/error')
 const argon2 = require('argon2')
 const crypto = require('crypto')
-const cryptoJs = require('crypto-js')
 // const { v4: uuidv4 } = require('uuid')
 
 // const bcrypt = require('bcrypt')
@@ -16,8 +15,6 @@ const { PrismaClient } = require('@prisma/client')
 const { UnstrictJwtAuth, JwtAuth, refreshTokenAuth } = require('../../../middleware/jwtAuth')
 const { ROLE } = require('../../model/enum/role')
 const { validatePassword } = require('../../validation/body')
-const { sendMail, signup_email } = require('../../../config/email_config')
-const { refreshToken } = require('firebase-admin/app')
 const prisma = new PrismaClient()
 
 // get config vars
@@ -159,13 +156,10 @@ router.post('/', async (req, res, next) => {
 
 router.post('/refresh', refreshTokenAuth, async (req, res, next) => {
     try {
-        // console.log(req.user)
         // เรียกข้อมูล user โดยใช้ username
         let user = await prisma.accounts.findFirst({
             where: { username: req.user.username }
         })
-
-        // console.log(user)
 
         // สร้าง refresh token ใหม่ทั้ง token และ refreshToken
         let userToken = {
@@ -238,7 +232,7 @@ router.get("/signout", (req, res) => {
 
 router.get('/verify', async (req, res, next) => {
     // let { verify } = req.cookies
-    let { path, email_phone, vf_token } = req.query
+    let { email_phone } = req.query
 
     try {
         // เรียกข้อมูล user โดยใช้ email
@@ -257,29 +251,25 @@ router.get('/verify', async (req, res, next) => {
             return res.status(404).json(errorRes(`user email or phone does not exist`, req.originalUrl))
         }
 
-        // ตรวจสอบว่า path ไหนไปได้บ้าง
-        if (!["login", "resetpwd"].includes(path)) {
-            forbiddenError("url path is invalid or not found")
+        // // ตรวจสอบว่า path ไหนไปได้บ้าง
+        // if (!["login", "resetpwd"].includes(path)) {
+        //     forbiddenError("url path is invalid or not found")
+        // }
+
+        // เปลี่ยนให้ user สามารถสร้าง token ได้ก่อนจะ reset password
+        // เก็บเป็น cookie ให้ผู้พัฒนา backend สามารถใช้งานได้
+        const cookieConfigToken = {
+            maxAge: 1 * 60 * 60 * 1000,
+            httpOnly: true,
+            sameSite: 'Strict'
+            // secure: true
         }
 
-        if (vf_token === undefined || vf_token !== req.cookies.vf_em) {
-            unAuthorizedError("verify token is invalid")
-        }
+        const token = crypto.randomUUID()
 
-        // เปลี่ยนให้ user สามารถ login ได้
-        await prisma.accounts.update({
-            where: {
-                email: user.email
-            },
-            data: {
-                verifyAccount: true
-            }
-        })
+        res.cookie("vf_token", token, cookieConfigToken);
 
-        // กำจัด cookie ของ verify token
-        res.clearCookie("vf_token")
-
-        return res.redirect(301, `${process.env.CLIENT_HOST}/pl4/${path}`)
+        return res.send({ vf_token: token })
     } catch (err) {
         // The .code property can be accessed in a type-safe manner
         if (err.code === 'P2025') {
@@ -290,21 +280,20 @@ router.get('/verify', async (req, res, next) => {
 })
 
 router.put('/resetpwd', UnstrictJwtAuth, async (req, res, next) => {
-    let { authorization } = req.headers
     let { email, password } = req.body
-    let { vf_em } = req.cookies
+    let { vf_token } = req.cookies
 
     try {
-        // เรียกข้อมูลที่จะยืนยัน โดยใช้ token
-        if (vf_em !== undefined && vf_em == authorization.substring(7)) {
-            res.clearCookie("vf_em")
-        } else {
-            unAuthorizedError("verify token is invalid or expired, please resign token")
-        }
-
         // user and supplier condition
         if (req.user !== undefined && [ROLE.User, ROLE.Supplier].includes(req.user.role) && req.user.email !== email) {
             forbiddenError("your cannot reset password of other user")
+        }
+
+        // เรียกข้อมูลที่จะยืนยัน โดยใช้ token
+        if (vf_token !== undefined) {
+            res.clearCookie("vf_token")
+        } else {
+            unAuthorizedError("verify token is invalid or expired, please resign token")
         }
 
         // เปลี่ยนให้ user สามารถ login ได้
@@ -316,7 +305,6 @@ router.put('/resetpwd', UnstrictJwtAuth, async (req, res, next) => {
                 password: await validatePassword("account password", password, 8, 20)
             }
         })
-        // console.log(vf_pwd_arr[vf_pwd_arr.length - 1])
 
         return res.json({ message: "user email " + email + " already change password!!" })
     } catch (err) {

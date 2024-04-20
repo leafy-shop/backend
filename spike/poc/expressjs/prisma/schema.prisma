@@ -183,6 +183,7 @@ model payments {
 
 model orders {
   orderId           String          @id @db.VarChar(53)
+  orderGroupId      String          @db.VarChar(33)
   customerName      String          @db.VarChar(20)
   accounts          accounts        @relation(fields: [customerName], references: [username], map: "Orders_customer_fkey")
   address           String          @db.VarChar(500)
