@@ -2,7 +2,26 @@
 const { validatError } = require('./../model/error/error')
 const argon2 = require("argon2")
 
-const validateStr = (prop = '', value = '', length = 0, isEmpty = false, isNumber = false, isBlankSpace = true, RSC = true) => {
+const validateStr = (prop = '', value = '', length = 0, isEmpty = false) => {
+    console.log("validate string of " + prop)
+    // validate is null or null value or negative value
+    if (!isEmpty && (value == undefined || value.length == 0)) {
+        validatError(`${prop} is null`)
+    }
+    // validate string format
+    if (typeof value !== 'string') {
+        validatError(`${prop}:${value} is not string format`)
+    }
+    // validate string length
+    if (value.length > length) {
+        validatError(`${prop}:${value} have length more than ${length} characters`)
+    }
+
+    console.log(`validate ${prop} is passed`)
+    return value.trim()
+}
+
+const validateUsername = (prop = '', value = '', length = 0) => {
     console.log("validate string of " + prop)
     // validate is null or null value or negative value
     if (!isEmpty && (value == undefined || value.length == 0)) {
@@ -18,25 +37,23 @@ const validateStr = (prop = '', value = '', length = 0, isEmpty = false, isNumbe
     }
 
     // validate string if they is number
-    if (!isNaN(Number(value)) && isNumber) {
+    if (!isNaN(Number(value))) {
         validatError(`${prop}:${value} is must not number`)
     }
 
     // validate string if they have space between characters
-    if (value.indexOf(' ') >= 0 && !isBlankSpace) {
+    if (value.indexOf(' ') >= 0) {
         validatError(`${prop}:${value} is must not have space between characters`)
     }
 
     let regex = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/;
     // validate special character
-    if (String(value).match(regex) && !RSC) {
+    if (String(value).match(regex)) {
         validatError(`${prop}:${value} have not special character`)
     }
-
-    if (RSC) {
-        value = value.toUpperCase()
-    }
-
+    
+    value = value.toUpperCase()
+    
     console.log(`validate ${prop} is passed`)
     return value.trim()
 }
@@ -315,3 +332,4 @@ module.exports.validateDatetime = validateDatetime
 module.exports.validatePhone = validatePhone
 module.exports.validateCode = validateCode
 module.exports.validateIdForTesting = validateIdForTesting
+module.exports.validateUsername = validateUsername

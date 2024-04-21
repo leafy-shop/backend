@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { validateStr, validateInt, validateBoolean, validateEmail, validatePassword, validateRole, validateDatetimeFuture, validatePhone } = require('../../validation/body')
+const { validateStr, validateInt, validateBoolean, validateEmail, validatePassword, validateRole, validateDatetimeFuture, validatePhone, validateUsername } = require('../../validation/body')
 let { notFoundError, validatError, forbiddenError } = require('../../model/error/error')
 let { sendMail, signup_email } = require('../../../config/email_config')
 
@@ -272,7 +272,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin), async (req, res, next) => {
         // accounts data
         let account = {
             userId: isNaN(userId) ? undefined : validateInt("item id", userId, true),
-            username: validateStr("account username", username, 20, false, false, false),
+            username: validateUsername("account username", username, 20),
             firstname: validateStr("account firstname", firstname, 50),
             lastname: validateStr("account lastname", lastname, 50),
             email: validateEmail("account email", email, 100),
@@ -332,7 +332,7 @@ router.post('/register', async (req, res, next) => {
         // accounts data
         let account = {
             userId: isNaN(userId) ? undefined : validateInt("item id", userId, true),
-            username: validateStr("account username", username, 20, false, false, false),
+            username: validateUsername("account username", username, 20),
             firstname: validateStr("account firstname", firstname, 50),
             lastname: validateStr("account lastname", lastname, 50),
             email: validateEmail("account email", email, 100),
