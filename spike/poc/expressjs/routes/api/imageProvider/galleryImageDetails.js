@@ -11,10 +11,10 @@ const { deleteAllImage, findImagePath, listAllImage } = require("../../model/cla
 
 const upload = multer({
     storage: galleryDetailStorage,
-    limits: {
+    limits: { 
         fileSize: 1024 * 1024 * 1,
+        files: 10
     },
-    limits: { files: 10 },
     fileFilter(req, file, cb) {
         // filter file content type
         if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {

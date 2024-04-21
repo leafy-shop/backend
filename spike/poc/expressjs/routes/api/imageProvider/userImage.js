@@ -15,9 +15,10 @@ const uploadIcon = multer({
     storage: userIconStorage,
     limits: {
         fileSize: 1024 * 1024 * 1,
+        files: 1
     },
-    limits: { files: 1 },
     async fileFilter(req, file, cb) {
+        console.log(file)
         if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
             return cb(new Error("Please upload a image file type jpg, jpeg or png"));
         }
@@ -27,10 +28,10 @@ const uploadIcon = multer({
 
 const uploadCover = multer({
     storage: userCoverStorage,
-    limits: {
+    limits: { 
         fileSize: 1024 * 1024 * 2,
+        files: 1 
     },
-    limits: { files: 1 },
     async fileFilter(req, file, cb) {
         if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
             return cb(new Error("Please upload a image file type jpg, jpeg or png"));
