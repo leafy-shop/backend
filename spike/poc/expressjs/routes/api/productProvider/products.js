@@ -166,8 +166,8 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                             gte: min_price
                         },
                         totalRating: {
-                            gt: isNaN(rating) ? undefined : ratingScale[rating - 1][0],
-                            lte: isNaN(rating) ? undefined : ratingScale[rating - 1][1]
+                            gt: isNaN(rating) && (rating < 1 && rating > 5)  ? undefined : ratingScale[rating - 1][0],
+                            lte: isNaN(rating) && (rating < 1 && rating > 5) ? undefined : ratingScale[rating - 1][1]
                         },
                         favprd: favFilter,
                         itemOwner: owner
