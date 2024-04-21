@@ -378,13 +378,13 @@ router.post('/', JwtAuth, async (req, res, next) => {
         // console.log(selectedSession)
 
         // validate other address place order 
-        if (req.user.role !== ROLE.Admin && req.user.username !== accountAddress.username) {
+        if (req.user.username !== accountAddress.username) {
             forbiddenError("user cannot place order by other people except yourself")
         }
 
         // validate some cart in owner item
         for (const cart of mycart) {
-            if (req.user.role !== ROLE.Admin && cart.sessionId.split("-")[0] === req.user.username) {
+            if (cart.sessionId.split("-")[0] === req.user.username) {
                 forbiddenError("you cannot pay with your own cart");
             }
 
@@ -544,7 +544,7 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
         if (selectedItem == null) notFoundError("size and style of item id " + id + " does not exist")
 
         // validate other address place order
-        if (req.user.role !== ROLE.Admin && req.user.username !== accountAddress.username) {
+        if (req.user.username !== accountAddress.username) {
             forbiddenError("user cannot place order by other people except yourself")
         }
 
