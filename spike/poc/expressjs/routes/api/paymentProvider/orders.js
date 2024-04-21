@@ -10,6 +10,7 @@ const { ORDERSTATUS } = require('../../model/enum/order');
 const { orderView, orderDetailView } = require('../../model/class/model');
 const { listFirstImage, findImagePath } = require('../../model/class/utils/imageList');
 const { addHours } = require('../../model/class/utils/datetimeUtils');
+const { escapeXML } = require('ejs');
 // const QRCode = require('qrcode')
 // const generatePayload = require('promptpay-qr')
 let prisma = new PrismaClient()
@@ -633,7 +634,7 @@ router.put('/prepare_order/:orderId', JwtAuth, verifyRole(ROLE.Admin, ROLE.Suppl
         orderStatus = validateRole("validate order status", orderStatus, ORDERSTATUS, false)
 
         // before transit
-        if (orderStatus === ORDERSTATUS.INPROGRESS) {
+        if (orderStatus === ORDERSTATUS.INPROGRESS && order.status === ORDERSTATUS.PENDING) {
             updatedOrder = await prisma.orders.update({
                 data: {
                     status: ORDERSTATUS.INPROGRESS,
@@ -649,7 +650,7 @@ router.put('/prepare_order/:orderId', JwtAuth, verifyRole(ROLE.Admin, ROLE.Suppl
             updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
             return res.json(orderConverter(updatedOrder))
         } else {
-            validatError("supplier must prepared product for transit to user only")
+            validatError("supplier must be preparing product for transit to user only")
         }
     } catch (err) {
         next(err)
@@ -660,14 +661,11 @@ router.put('/prepare_order/:orderId', JwtAuth, verifyRole(ROLE.Admin, ROLE.Suppl
 router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
     try {
         let order = await verifyOrderId(req.params.orderId)
-        let { orderStatus } = req.body
-
-        orderStatus = validateRole("validate order status", orderStatus, ORDERSTATUS, false)
 
         let updatedOrder = {}
 
         // checkout order when send to customer
-        if (order.customerName === req.user.username && orderStatus === ORDERSTATUS.COMPLETED) {
+        if (order.customerName === req.user.username) {
             if (order.status === ORDERSTATUS.INPROGRESS && order.shippedOrderDate) {
                 updatedOrder = await prisma.orders.update({
                     data: {
@@ -683,29 +681,8 @@ router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
                 })
                 updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
                 return res.json(orderConverter(updatedOrder))
-            } else if (order.status === ORDERSTATUS.PENDING) {
-                validatError("customer must be wait from supplier confirm to prepared transit items")
             } else {
-                validatError("customer cannot edit item when order status is not completed or canceled")
-            }
-            // cancel order
-        } else if (order.customerName === req.user.username && orderStatus === ORDERSTATUS.CANCELED) {
-            if (order.status === ORDERSTATUS.REQUIRED) {
-                updatedOrder = await prisma.orders.update({
-                    data: {
-                        status: ORDERSTATUS.CANCELED
-                    },
-                    where: {
-                        orderId: order.orderId
-                    },
-                    include: {
-                        order_details: true
-                    }
-                })
-                updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
-                return res.json(orderConverter(updatedOrder))
-            } else {
-                validatError("customer cannot cancel after paid item on order")
+                validatError("customer must be recieving product only")
             }
         } else {
             forbiddenError("you cannot edit other customer order except yourself")
@@ -718,6 +695,10 @@ router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
 // changing order status
 router.put('/paid_order/:orderGroupId', JwtAuth, async (req, res, next) => {
     try {
+        let { orderStatus } = req.body
+
+        orderStatus = validateRole("validate order status", orderStatus, ORDERSTATUS, false)
+
         let orderGroup = await verifyOrderGroupId(req.params.orderGroupId)
 
         let orderPayment = []
@@ -725,7 +706,7 @@ router.put('/paid_order/:orderGroupId', JwtAuth, async (req, res, next) => {
             let updatedOrder = {}
 
             // checkout order when send to customer
-            if (order.customerName === req.user.username && order.status === ORDERSTATUS.REQUIRED) {
+            if (order.customerName === req.user.username && orderStatus === ORDERSTATUS.REQUIRED && !order.paidOrderDate) {
                 updatedOrder = await prisma.orders.update({
                     data: {
                         status: ORDERSTATUS.PENDING,
@@ -767,8 +748,23 @@ router.put('/paid_order/:orderGroupId', JwtAuth, async (req, res, next) => {
                 }
                 updatedOrder.orderGroupId = undefined
                 updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+            } // cancel order
+            else if (order.customerName === req.user.username && orderStatus === ORDERSTATUS.CANCELED && !order.paidOrderDate) {
+                updatedOrder = await prisma.orders.update({
+                    data: {
+                        status: ORDERSTATUS.CANCELED
+                    },
+                    where: {
+                        orderId: order.orderId
+                    },
+                    include: {
+                        order_details: true
+                    }
+                })
+                updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+                return res.json(orderConverter(updatedOrder))
             } else {
-                validatError("customer cannot paid order when this order has already to paid or cannot paid in other user")
+                validatError("customer cannot paid or canceled order when this order has already to paid or canceled or cannot did in other user")
             }
             orderPayment.push(orderConverter(updatedOrder))
         }
@@ -777,69 +773,6 @@ router.put('/paid_order/:orderGroupId', JwtAuth, async (req, res, next) => {
         next(err)
     }
 })
-
-// // changing paid of order status with multiple selection
-// router.put('/paid_order', JwtAuth, async (req, res, next) => {
-//     try {
-//         let { orders } = req.body
-//         let updatedOrderList = []
-//         for (let orderId of orders) {
-//             let order = await verifyOrderId(orderId)
-
-//             // checkout order when send to customer
-//             if (order.customerName === req.user.username && order.status === ORDERSTATUS.REQUIRED) {
-//                 let updatedOrder = await prisma.orders.update({
-//                     data: {
-//                         status: ORDERSTATUS.PENDING,
-//                         paidOrderDate: addHours(new Date(), 7)
-//                     },
-//                     where: {
-//                         orderId: order.orderId
-//                     },
-//                     include: {
-//                         order_details: true
-//                     }
-//                 })
-
-//                 for (od of order.order_details) {
-//                     // add to cart on item event behaviour
-//                     await prisma.item_events.create({
-//                         data: {
-//                             itemId: od.itemId,
-//                             userId: req.user.id,
-//                             itemEvent: ITEMEVENT.PAID
-//                         }
-//                     })
-
-//                     // remove item stock per quantity
-//                     await prisma.item_details.update({
-//                         where: {
-//                             itemId_style_size: {
-//                                 style: od.itemStyle,
-//                                 itemId: od.itemId,
-//                                 size: od.itemSize
-//                             }
-//                         },
-//                         data: {
-//                             stock: {
-//                                 decrement: od.qtyOrder
-//                             }
-//                         }
-//                     })
-//                 }
-//                 updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
-//                 updatedOrderList.push(orderConverter(updatedOrder))
-//             } else {
-//                 validatError("customer cannot paid order when this order has already to paid or cannot paid in other user")
-//             }
-//         }
-//         return res.json(updatedOrderList)
-
-//     } catch (err) {
-//         next(err)
-//     }
-// })
-
 
 //----------------------------------------- method zone ----------------------------------------------------
 
