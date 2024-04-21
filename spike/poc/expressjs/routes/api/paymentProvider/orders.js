@@ -763,8 +763,8 @@ router.put('/paid_order/:orderGroupId', JwtAuth, async (req, res, next) => {
                         order_details: true
                     }
                 })
+                updatedOrder.orderGroupId = undefined
                 updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
-                return res.json(orderConverter(updatedOrder))
             } else {
                 validatError("customer cannot paid or canceled order when this order has already to paid or canceled or cannot did in other user")
             }
