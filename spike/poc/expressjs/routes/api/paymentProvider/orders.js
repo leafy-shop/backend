@@ -662,13 +662,17 @@ router.put('/prepare_order/:orderId', JwtAuth, verifyRole(ROLE.Admin, ROLE.Suppl
 // changing order status
 router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
     try {
+        let { orderStatus } = req.body
+
+        orderStatus = validateRole("validate order status", orderStatus, ORDERSTATUS, false)
+
         let order = await verifyOrderId(req.params.orderId)
 
         let updatedOrder = {}
 
         // checkout order when send to customer
         if (order.customerName === req.user.username) {
-            if (order.status === ORDERSTATUS.INPROGRESS && order.shippedOrderDate) {
+            if (order.status === ORDERSTATUS.INPROGRESS && orderStatus === ORDERSTATUS.COMPLETED && order.shippedOrderDate) {
                 updatedOrder = await prisma.orders.update({
                     data: {
                         status: ORDERSTATUS.COMPLETED,
