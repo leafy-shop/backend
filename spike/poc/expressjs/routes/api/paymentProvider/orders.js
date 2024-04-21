@@ -690,7 +690,7 @@ router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
             }
             // cancel order
         } else if (order.customerName === req.user.username && orderStatus === ORDERSTATUS.CANCELED) {
-            if (![ORDERSTATUS.COMPLETED, ORDERSTATUS.CANCELED].includes(order.status)) {
+            if (order.status === ORDERSTATUS.REQUIRED) {
                 updatedOrder = await prisma.orders.update({
                     data: {
                         status: ORDERSTATUS.CANCELED
@@ -705,7 +705,7 @@ router.put('/check_order/:orderId', JwtAuth, async (req, res, next) => {
                 updatedOrder.total = updatedOrder.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
                 return res.json(orderConverter(updatedOrder))
             } else {
-                validatError("customer cannot cancel after complete to recieve item or has already canceled item")
+                validatError("customer cannot cancel after paid item on order")
             }
         } else {
             forbiddenError("you cannot edit other customer order except yourself")
