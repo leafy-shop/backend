@@ -25,19 +25,75 @@ router.get('/', JwtAuth, async (req, res, next) => {
     let limitN = Number(limit)
 
     try {
-        let groupOrder = await prisma.orders.groupBy({
-            by: ["orderGroupId"]
-        })
-
         let orders = []
-        for (orderGroupId of groupOrder) {
+        if (status == ORDERSTATUS.REQUIRED) {
+            let groupOrder = await prisma.orders.groupBy({
+                by: ["orderGroupId"]
+            })
+
+            for (orderGroupId of groupOrder) {
+                // get all item orders by address Id sort by created at
+                let innerOrders = await prisma.orders.findMany({
+                    where: {
+                        AND: [
+                            { status: status },
+                            { orderGroupId: orderGroupId.orderGroupId }
+                        ]
+                    },
+                    select: orderView,
+                    orderBy: {
+                        createdAt: sort === "asc" ? "asc" : "desc"
+                    }
+                })
+
+                if (req.user.role !== ROLE.Admin) {
+                    innerOrders = innerOrders.filter(order => {
+                        return order.customerName === req.user.username
+                    })
+                }
+
+                // get all order list
+                innerOrders = await Promise.all(innerOrders.map(async order => {
+                    let user = await prisma.accounts.findFirst({
+                        where: {
+                            username: order.orderId.split("-")[0]
+                        }
+                    })
+                    order.supplierId = user.userId
+                    order.itemOwner = order.orderId.split("-")[0]
+                    order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+                    order.isOutStock = true
+                    order.address = undefined
+
+                    order.order_details = await Promise.all(order.order_details.map(async od => {
+                        let item = await verifyItemId(od.itemId)
+                        od.itemname = item.name
+                        od.priceEach = Number(od.priceEach)
+                        od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
+                        let itemDetail = await verifyId(od.itemId, od.itemSize, od.itemStyle)
+                        if (itemDetail !== null && itemDetail.stock > 0) {
+                            order.isOutStock = false
+                        }
+                        return od
+                    }))
+                    return orderConverter(order)
+                }))
+
+                // filter owner name or order details as itemname 
+                innerOrders = innerOrders.filter(order => {
+                    return (search !== undefined ? order.orderId.split("-")[0].toLowerCase().includes(search.toLowerCase()) || order.order_details.some(od => od.itemname.toLowerCase().includes(search.toLowerCase())) : true)
+                })
+
+                let orderModel = { orderGroupId: orderGroupId.orderGroupId, orders: innerOrders }
+                if (innerOrders.length !== 0) {
+                    orders.push(orderModel)
+                }
+            }
+        } else {
             // get all item orders by address Id sort by created at
-            let innerOrders = await prisma.orders.findMany({
+            orders = await prisma.orders.findMany({
                 where: {
-                    AND: [
-                        { status: status },
-                        { orderGroupId: orderGroupId.orderGroupId }
-                    ]
+                    status: status 
                 },
                 select: orderView,
                 orderBy: {
@@ -46,13 +102,13 @@ router.get('/', JwtAuth, async (req, res, next) => {
             })
 
             if (req.user.role !== ROLE.Admin) {
-                innerOrders = innerOrders.filter(order => {
+                orders = orders.filter(order => {
                     return order.customerName === req.user.username
                 })
             }
 
             // get all order list
-            innerOrders = await Promise.all(innerOrders.map(async order => {
+            orders = await Promise.all(orders.map(async order => {
                 let user = await prisma.accounts.findFirst({
                     where: {
                         username: order.orderId.split("-")[0]
@@ -79,14 +135,9 @@ router.get('/', JwtAuth, async (req, res, next) => {
             }))
 
             // filter owner name or order details as itemname 
-            innerOrders = innerOrders.filter(order => {
+            orders = orders.filter(order => {
                 return (search !== undefined ? order.orderId.split("-")[0].toLowerCase().includes(search.toLowerCase()) || order.order_details.some(od => od.itemname.toLowerCase().includes(search.toLowerCase())) : true)
             })
-
-            let orderModel = { orderGroupId: orderGroupId.orderGroupId, orders: innerOrders }
-            if (innerOrders.length !== 0) {
-                orders.push(orderModel)
-            }
         }
 
         let page_order = paginationList(orders, pageN, limitN, 10)
