@@ -1389,7 +1389,7 @@ router.patch('/:prodId/reviews/:commentId', JwtAuth, async (req, res, next) => {
         let review = await findReviewById(validateInt("validate itemId", prodId), commentId)
 
         // check item owner can update review only
-        if (req.user.role !== ROLE.Supplier && review.username !== req.user.username) forbiddenError("user can update your item review only")
+        if (review.username !== req.user.username) forbiddenError("user can update your item review only")
 
         let mapData = {}
         // body params mapping
