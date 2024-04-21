@@ -33,6 +33,10 @@ const validateStr = (prop = '', value = '', length = 0, isEmpty = false, isNumbe
         validatError(`${prop}:${value} have not special character`)
     }
 
+    if (RSC) {
+        value = value.toUpperCase()
+    }
+
     console.log(`validate ${prop} is passed`)
     return value.trim()
 }

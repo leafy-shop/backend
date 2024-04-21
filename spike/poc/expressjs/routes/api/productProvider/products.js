@@ -261,7 +261,7 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                     (min_price !== undefined ? Number(prod.minPrice) > min_price : true) &&
                     (max_price !== undefined ? Number(prod.minPrice) < max_price : true) &&
                     (isNaN(rating) || rating === undefined || (rating < 1 || rating > 5) ? true : (Number(prod.totalRating) >= ratingScale[rating - 1][0] && Number(prod.totalRating) <= ratingScale[rating - 1][1])) &&
-                    (owner !== undefined ? prod.itemOwner == owner : true)
+                    (owner !== undefined ? prod.itemOwner.toLowerCase() == owner.toLowerCase() : true)
             })
             // console.log(filter_pd)
         }
