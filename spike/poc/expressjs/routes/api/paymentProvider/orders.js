@@ -84,7 +84,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
             })
 
             let orderModel = { orderGroupId: orderGroupId.orderGroupId, orders: innerOrders }
-            if (innerOrders.length === 0) {
+            if (innerOrders.length !== 0) {
                 orders.push(orderModel)
             }
         }
