@@ -243,7 +243,7 @@ const validatePhone = (prop = '', value) => {
     }
 
     // validate format
-    if (!value.match(re)) {
+    if (!value.match(re) || isNaN(Number(value))) {
         validatError(`${prop} is not phone format`)
     }
     console.log(`validate ${prop} is passed`)
