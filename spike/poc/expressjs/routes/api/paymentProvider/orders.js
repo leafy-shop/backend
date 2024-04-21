@@ -304,7 +304,12 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
             let item = await verifyItemId(od.itemId)
             od.itemname = item.name
             od.priceEach = Number(od.priceEach)
-            od.totalRating = Number(item.totalRating)
+            let itemReview = await prisma.item_reviews.findFirst({
+                where: {
+                    orderId: order.orderId
+                }
+            })
+            od.rating = itemReview ? (itemReview.PQrating + itemReview.SSrating + itemReview.DSrating)/3 : 0
             od.totalPrice = od.priceEach * od.qtyOrder
             od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
             return od
