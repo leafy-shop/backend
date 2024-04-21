@@ -166,8 +166,8 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
                             gte: min_price
                         },
                         totalRating: {
-                            gt: isNaN(rating) && (rating < 1 && rating > 5)  ? undefined : ratingScale[rating - 1][0],
-                            lte: isNaN(rating) && (rating < 1 && rating > 5) ? undefined : ratingScale[rating - 1][1]
+                            gt: isNaN(rating) || (rating < 1 || rating > 5)  ? undefined : ratingScale[rating - 1][0],
+                            lte: isNaN(rating) || (rating < 1 || rating > 5) ? undefined : ratingScale[rating - 1][1]
                         },
                         favprd: favFilter,
                         itemOwner: owner
@@ -257,10 +257,11 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
             }
             // console.log(filter_pd)
             filter_pd = filter_pd.filter(prod => {
+                console.log((rating < 1 || rating > 5))
                 return (product !== undefined ? prod.name.toLowerCase().includes(product.toLowerCase()) || prod.description.toLowerCase().includes(product.toLowerCase()) || prod.itemOwner.toLowerCase().includes(product.toLowerCase()) : true) &&
                     (min_price !== undefined ? Number(prod.minPrice) > min_price : true) &&
                     (max_price !== undefined ? Number(prod.minPrice) < max_price : true) &&
-                    (isNaN(rating) || rating === undefined ? true : (Number(prod.totalRating) >= ratingScale[rating - 1][0] && Number(prod.totalRating) <= ratingScale[rating - 1][1])) &&
+                    (isNaN(rating) || rating === undefined || (rating < 1 || rating > 5) ? true : (Number(prod.totalRating) >= ratingScale[rating - 1][0] && Number(prod.totalRating) <= ratingScale[rating - 1][1])) &&
                     (owner !== undefined ? prod.itemOwner == owner : true)
             })
             // console.log(filter_pd)
