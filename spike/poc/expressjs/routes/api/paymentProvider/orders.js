@@ -35,8 +35,8 @@ router.get('/', JwtAuth, async (req, res, next) => {
             let innerOrders = await prisma.orders.findMany({
                 where: {
                     AND: [
-                        {status: status},
-                        {orderGroupId: orderGroupId.orderGroupId}
+                        { status: status },
+                        { orderGroupId: orderGroupId.orderGroupId }
                     ]
                 },
                 select: orderView,
@@ -45,9 +45,11 @@ router.get('/', JwtAuth, async (req, res, next) => {
                 }
             })
 
-            innerOrders = innerOrders.filter(order => {
-                return order.customerName === req.user.username
-            })
+            if (req.user.role !== ROLE.Admin) {
+                innerOrders = innerOrders.filter(order => {
+                    return order.customerName === req.user.username
+                })
+            }
 
             // get all order list
             innerOrders = await Promise.all(innerOrders.map(async order => {
@@ -81,7 +83,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
                 return (search !== undefined ? order.orderId.split("-")[0].toLowerCase().includes(search.toLowerCase()) || order.order_details.some(od => od.itemname.toLowerCase().includes(search.toLowerCase())) : true)
             })
 
-            let orderModel = {orderGroupId: orderGroupId.orderGroupId, orders: innerOrders}
+            let orderModel = { orderGroupId: orderGroupId.orderGroupId, orders: innerOrders }
             orders.push(orderModel)
         }
 
