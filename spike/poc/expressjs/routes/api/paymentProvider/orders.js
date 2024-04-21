@@ -84,7 +84,9 @@ router.get('/', JwtAuth, async (req, res, next) => {
             })
 
             let orderModel = { orderGroupId: orderGroupId.orderGroupId, orders: innerOrders }
-            orders.push(orderModel)
+            if (innerOrders.length === 0) {
+                orders.push(orderModel)
+            }
         }
 
         let page_order = paginationList(orders, pageN, limitN, 10)
