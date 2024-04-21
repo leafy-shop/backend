@@ -257,7 +257,6 @@ router.get('/', UnstrictJwtAuth, async (req, res, next) => {
             }
             // console.log(filter_pd)
             filter_pd = filter_pd.filter(prod => {
-                console.log((rating < 1 || rating > 5))
                 return (product !== undefined ? prod.name.toLowerCase().includes(product.toLowerCase()) || prod.description.toLowerCase().includes(product.toLowerCase()) || prod.itemOwner.toLowerCase().includes(product.toLowerCase()) : true) &&
                     (min_price !== undefined ? Number(prod.minPrice) > min_price : true) &&
                     (max_price !== undefined ? Number(prod.minPrice) < max_price : true) &&
