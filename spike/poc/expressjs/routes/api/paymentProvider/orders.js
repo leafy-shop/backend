@@ -93,7 +93,11 @@ router.get('/', JwtAuth, async (req, res, next) => {
                     // check order status payment and other status
                     if (order.status === ORDERSTATUS.REQUIRED) {
                         let orderGroupRequired = orders.filter(order => order.orderGroupId == groupOrderId.orderGroupId && order.status === ORDERSTATUS.REQUIRED)
-                        orderModel = { orderGroupId: groupOrderId.orderGroupId, orders: orderGroupRequired, total: orderGroupRequired.reduce((pre, cur) => pre + cur.total, 0) }
+                        orderModel = {
+                            orderGroupId: order.orderGroupId, orders: orderGroupRequired, 
+                            total: orderGroupRequired.reduce((pre, cur) => pre + cur.total, 0), 
+                            totalQty: orderGroupRequired.reduce((pre, cur) => pre + cur.order_details.reduce((pre1,cur1)=>pre1 + cur1.qtyOrder,0), 0)
+                        }
                     } else {
                         orderModel = order
                     }
@@ -369,7 +373,11 @@ router.get('/groups/:orderGroupId', JwtAuth, async (req, res, next) => {
             result.push(orderConverter(order))
         }
 
-        return res.json({orderGroupId: req.params.orderGroupId, orders: result, total: result.reduce((pre, cur) => pre + cur.total, 0)})
+        return res.json({
+            orderGroupId: req.params.orderGroupId, orders: result, 
+            total: result.reduce((pre, cur) => pre + cur.total, 0), 
+            totalQty: result.reduce((pre, cur) => pre + cur.order_details.reduce((pre1,cur1)=>pre1 + cur1.qtyOrder,0), 0)
+        })
     } catch (err) {
         next(err)
     }
@@ -652,8 +660,7 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
                 orderGroupId: orderGroupId,
                 customerName: accountAddress.username,
                 address: addressFormat,
-                status: ORDERSTATUS.PENDING,
-                paidOrderDate: addHours(new Date(), 7)
+                status: ORDERSTATUS.REQUIRED
             }
         })
 
@@ -854,7 +861,7 @@ router.put('/paid_order/:orderGroupId', JwtAuth, async (req, res, next) => {
             }
             orderPayment.push(orderConverter(updatedOrder))
         }
-        return res.json({ orderGroupId: req.params.orderGroupId, orders: orderPayment, total: orderPayment.reduce((pre, cur) => pre + cur.total, 0) })
+        return res.json({ orderGroupId: req.params.orderGroupId, orders: orderPayment })
     } catch (err) {
         next(err)
     }
