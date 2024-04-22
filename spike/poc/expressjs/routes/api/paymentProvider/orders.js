@@ -10,9 +10,9 @@ const { ORDERSTATUS } = require('../../model/enum/order');
 const { orderView, orderDetailView } = require('../../model/class/model');
 const { listFirstImage, findImagePath } = require('../../model/class/utils/imageList');
 const { addHours } = require('../../model/class/utils/datetimeUtils');
-const { escapeXML } = require('ejs');
+// const { escapeXML } = require('ejs');
 // Requiring the lodash library 
-const _ = require("lodash");
+// const _ = require("lodash");
 // const QRCode = require('qrcode')
 // const generatePayload = require('promptpay-qr')
 let prisma = new PrismaClient()
