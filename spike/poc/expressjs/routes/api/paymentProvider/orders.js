@@ -11,6 +11,8 @@ const { orderView, orderDetailView } = require('../../model/class/model');
 const { listFirstImage, findImagePath } = require('../../model/class/utils/imageList');
 const { addHours } = require('../../model/class/utils/datetimeUtils');
 const { escapeXML } = require('ejs');
+// Requiring the lodash library 
+const _ = require("lodash");
 // const QRCode = require('qrcode')
 // const generatePayload = require('promptpay-qr')
 let prisma = new PrismaClient()
@@ -25,83 +27,99 @@ router.get('/', JwtAuth, async (req, res, next) => {
     let limitN = Number(limit)
 
     try {
-        let orders = []
+        // get all item orders by address Id sort by created at
+        let orders = await prisma.orders.findMany({
+            where: {
+                AND: [
+                    { status: status }
+                ]
+            },
+            select: orderView,
+            orderBy: {
+                createdAt: sort === "asc" ? "asc" : "desc"
+            }
+        })
+
+        // console.log(groupOrder)
+        // get all item orders by address Id sort by created at
+        if (req.user.role !== ROLE.Admin) {
+            orders = orders.filter(order => {
+                return order.customerName === req.user.username
+            })
+        }
+
+        // get all order list
+        orders = await Promise.all(orders.map(async order => {
+            let user = await prisma.accounts.findFirst({
+                where: {
+                    username: order.orderId.split("-")[0]
+                }
+            })
+            order.supplierId = user.userId
+            order.itemOwner = order.orderId.split("-")[0]
+            order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+            order.isOutStock = true
+            order.address = undefined
+
+            order.order_details = await Promise.all(order.order_details.map(async od => {
+                let item = await verifyItemId(od.itemId)
+                od.itemname = item.name
+                od.priceEach = Number(od.priceEach)
+                od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
+                let itemDetail = await verifyId(od.itemId, od.itemSize, od.itemStyle)
+                if (itemDetail !== null && itemDetail.stock > 0) {
+                    order.isOutStock = false
+                }
+                return od
+            }))
+            return orderConverter(order)
+        }))
+
+        // filter owner name or order details as itemname 
+        orders = orders.filter(order => {
+            return (search !== undefined ? order.orderId.split("-")[0].toLowerCase().includes(search.toLowerCase()) || order.order_details.some(od => od.itemname.toLowerCase().includes(search.toLowerCase())) : true)
+        })
+
+        // get order group
         let groupOrder = await prisma.orders.groupBy({
             by: ["orderGroupId"]
         })
 
-        for (orderGroupId of groupOrder) {
-            // get all item orders by address Id sort by created at
-            let innerOrders = await prisma.orders.findMany({
-                where: {
-                    AND: [
-                        { status: status },
-                        { orderGroupId: orderGroupId.orderGroupId }
-                    ]
-                },
-                select: orderView,
-                orderBy: {
-                    createdAt: sort === "asc" ? "asc" : "desc"
+        let resultOrder = []
+        for (let order of orders) {
+            let orderModel = {}
+            groupOrder.forEach(groupOrderId => {
+                if (order.orderGroupId == groupOrderId.orderGroupId) {
+                    // check order status payment and other status
+                    if (order.status === ORDERSTATUS.REQUIRED) {
+                        let orderGroupRequired = orders.filter(order => order.orderGroupId == groupOrderId.orderGroupId && order.status === ORDERSTATUS.REQUIRED)
+                        orderModel = { orderGroupId: groupOrderId.orderGroupId, orders: orderGroupRequired, total: orderGroupRequired.reduce((pre, cur) => pre + cur.total, 0) }
+                    } else {
+                        orderModel = order
+                    }
                 }
             })
-
-            if (req.user.role !== ROLE.Admin) {
-                innerOrders = innerOrders.filter(order => {
-                    return order.customerName === req.user.username
-                })
-            }
-
-            // get all order list
-            innerOrders = await Promise.all(innerOrders.map(async order => {
-                let user = await prisma.accounts.findFirst({
-                    where: {
-                        username: order.orderId.split("-")[0]
-                    }
-                })
-                order.supplierId = user.userId
-                order.itemOwner = order.orderId.split("-")[0]
-                order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
-                order.isOutStock = true
-                order.address = undefined
-
-                order.order_details = await Promise.all(order.order_details.map(async od => {
-                    let item = await verifyItemId(od.itemId)
-                    od.itemname = item.name
-                    od.priceEach = Number(od.priceEach)
-                    od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
-                    let itemDetail = await verifyId(od.itemId, od.itemSize, od.itemStyle)
-                    if (itemDetail !== null && itemDetail.stock > 0) {
-                        order.isOutStock = false
-                    }
-                    return od
-                }))
-                return orderConverter(order)
-            }))
-
-            // filter owner name or order details as itemname 
-            innerOrders = innerOrders.filter(order => {
-                return (search !== undefined ? order.orderId.split("-")[0].toLowerCase().includes(search.toLowerCase()) || order.order_details.some(od => od.itemname.toLowerCase().includes(search.toLowerCase())) : true)
-            })
-
-            // check order status payment and other status
-            innerOrders.forEach(order => {
-                if (order.status === ORDERSTATUS.REQUIRED) {
-                    let orderModel = { orderGroupId: orderGroupId.orderGroupId, orders: innerOrders }
-                    orders.push(orderModel)
-                } else {
-                    orders.push(order)
-                }
-            })
+            resultOrder.push(orderModel)
         }
 
-        let page_order = paginationList(orders, pageN, limitN, 10)
+        // remove duplicate order group
+        resultOrder = resultOrder.filter((value, index) => {
+            const _value = JSON.stringify(value);
+            return index === resultOrder.findIndex(obj => {
+                return JSON.stringify(obj) === _value;
+            });
+        });
+
+        // using to page
+        let page_order = paginationList(resultOrder, pageN, limitN, 10)
 
         return res.json(page_order)
     } catch (err) {
         next(err)
     }
-
 })
+
+
 
 // count all customer order item with status
 router.get('/count/:status', JwtAuth, async (req, res, next) => {
@@ -309,7 +327,7 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
                     orderId: order.orderId
                 }
             })
-            od.rating = itemReview ? (itemReview.PQrating + itemReview.SSrating + itemReview.DSrating)/3 : 0
+            od.rating = itemReview ? (itemReview.PQrating + itemReview.SSrating + itemReview.DSrating) / 3 : 0
             od.totalPrice = od.priceEach * od.qtyOrder
             od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
             return od
@@ -318,6 +336,40 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
         order.total = order.order_details.reduce((pre, order) => pre + Number(order.totalPrice), 0)
 
         return res.json(orderConverter(order))
+    } catch (err) {
+        next(err)
+    }
+})
+
+// get order item by order id
+router.get('/groups/:orderGroupId', JwtAuth, async (req, res, next) => {
+    try {
+        let orderGroup = await verifyOrderGroupId(req.params.orderGroupId)
+
+        let result = []
+        for (order of orderGroup) {
+            // if they are user or garden designer role
+            if (ROLE.Admin !== req.user.role && order.customerName !== req.user.username) {
+                forbiddenError("you cannot see order in other user except yourself")
+            }
+
+            if (req.user.role === ROLE.Supplier && (order.orderId.split("-")[0] === req.user.username)) {
+                forbiddenError("you cannot see order in other user except yourself or your item order")
+            }
+
+            order.order_details = await Promise.all(order.order_details.map(async od => {
+                let item = await verifyItemId(od.itemId)
+                od.itemname = item.name
+                od.priceEach = Number(od.priceEach)
+                od.totalPrice = od.priceEach * od.qtyOrder
+                return od
+            }))
+            order.itemOwner = order.orderId.split("-")[0]
+            order.total = order.order_details.reduce((pre, order) => pre + Number(order.totalPrice), 0)
+            result.push(orderConverter(order))
+        }
+
+        return res.json({orderGroupId: req.params.orderGroupId, orders: result, total: result.reduce((pre, cur) => pre + cur.total, 0)})
     } catch (err) {
         next(err)
     }
@@ -529,7 +581,23 @@ router.post('/', JwtAuth, async (req, res, next) => {
             // })
         }
 
-        return res.status(201).json({ "message": "all orders selected are place before paid" })
+        let orderGroup = await verifyOrderGroupId(orderGroupId)
+        
+        let result = []
+        for (order of orderGroup) {
+            order.order_details = await Promise.all(order.order_details.map(async od => {
+                let item = await verifyItemId(od.itemId)
+                od.itemname = item.name
+                od.priceEach = Number(od.priceEach)
+                od.totalPrice = od.priceEach * od.qtyOrder
+                return od
+            }))
+            order.itemOwner = order.orderId.split("-")[0]
+            order.total = order.order_details.reduce((pre, order) => pre + Number(order.totalPrice), 0)
+            result.push(orderConverter(order))
+        }
+
+        return res.status(201).json({orderGroupId: orderGroupId, orders: result, total: result.reduce((pre, cur) => pre + cur.total, 0)})
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -786,7 +854,7 @@ router.put('/paid_order/:orderGroupId', JwtAuth, async (req, res, next) => {
             }
             orderPayment.push(orderConverter(updatedOrder))
         }
-        return res.json({ orderGroupId: req.params.orderGroupId, list: orderPayment })
+        return res.json({ orderGroupId: req.params.orderGroupId, orders: orderPayment, total: orderPayment.reduce((pre, cur) => pre + cur.total, 0) })
     } catch (err) {
         next(err)
     }
@@ -864,7 +932,7 @@ const verifyOrderGroupId = async (groupId) => {
             order_details: true
         }
     })
-    if (order.length === 0) notFoundError("order group id " + orderGroupId + " does not exist")
+    if (order.length === 0) notFoundError("order group id " + groupId + " does not exist")
     return order
 }
 
