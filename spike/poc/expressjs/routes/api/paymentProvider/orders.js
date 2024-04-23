@@ -695,21 +695,21 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
         orderInput.order_details = []
         orderInput.order_details.push(order_detail)
 
-        // remove item stock per quantity
-        await prisma.item_details.update({
-            where: {
-                itemId_style_size: {
-                    style: style,
-                    itemId: item.itemId,
-                    size: size
-                }
-            },
-            data: {
-                stock: {
-                    decrement: qty
-                }
-            }
-        })
+        // // remove item stock per quantity
+        // await prisma.item_details.update({
+        //     where: {
+        //         itemId_style_size: {
+        //             style: style,
+        //             itemId: item.itemId,
+        //             size: size
+        //         }
+        //     },
+        //     data: {
+        //         stock: {
+        //             decrement: qty
+        //         }
+        //     }
+        // })
         return res.status(201).json(orderConverter(orderInput))
         // return res.json({orderId: orderId})
     } catch (err) {
