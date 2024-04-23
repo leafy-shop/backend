@@ -507,6 +507,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
                     orderGroupId: orderGroupId,
                     customerName: accountAddress.username,
                     address: addressFormat,
+                    phone: accountAddress.phone,
                     status: ORDERSTATUS.REQUIRED
                 }
             })
@@ -675,6 +676,7 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
                 orderGroupId: orderGroupId,
                 customerName: accountAddress.username,
                 address: addressFormat,
+                phone: accountAddress.phone,
                 status: ORDERSTATUS.REQUIRED
             }
         })

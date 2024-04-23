@@ -187,6 +187,7 @@ model orders {
   customerName      String          @db.VarChar(20)
   accounts          accounts        @relation(fields: [customerName], references: [username], map: "Orders_customer_fkey")
   address           String          @db.VarChar(500)
+  phone             String          @db.VarChar(11)
   status            String          @db.VarChar(20)
   createdAt         DateTime        @default(dbgenerated("NOW()"))
   paidOrderDate     DateTime?
