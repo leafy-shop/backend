@@ -343,7 +343,12 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
             od.priceEach = Number(od.priceEach)
             let itemReview = await prisma.item_reviews.findFirst({
                 where: {
-                    orderId: order.orderId
+                    AND: [
+                        {orderId: od.orderId},
+                        {itemId: od.itemId},
+                        {style: od.itemStyle},
+                        {size: od.itemSize}
+                    ]
                 }
             })
             od.rating = itemReview ? (itemReview.PQrating + itemReview.SSrating + itemReview.DSrating) / 3 : 0

@@ -1250,6 +1250,7 @@ router.get('/review_orders/:orderId/:productId/:itemStyle/:itemSize', JwtAuth, a
     try {
         let { orderId, productId, itemStyle, itemSize } = req.params
 
+        console.log(orderId, productId, itemStyle, itemSize)
         // find item id
         let item_review = await findReviewByOrderId(
             validateStr("validate orderId", orderId, 53),
