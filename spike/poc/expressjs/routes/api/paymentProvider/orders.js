@@ -80,39 +80,54 @@ router.get('/', JwtAuth, async (req, res, next) => {
             return (search !== undefined ? order.orderId.split("-")[0].toLowerCase().includes(search.toLowerCase()) || order.order_details.some(od => od.itemname.toLowerCase().includes(search.toLowerCase())) : true)
         })
 
-        // get order group
-        let groupOrder = await prisma.orders.groupBy({
-            by: ["orderGroupId"]
-        })
+        let groupOrder = new Set()
+        orders.forEach(order => groupOrder.add(order.orderGroupId))
+
+        // console.log(orders.length)
+        // console.log(groupOrder)
 
         let resultOrder = []
-        for (let order of orders) {
+        for (let groupOrderId of groupOrder) {
             let orderModel = {}
-            groupOrder.forEach(groupOrderId => {
-                if (order.orderGroupId == groupOrderId.orderGroupId) {
-                    // check order status payment and other status
-                    if (order.status === ORDERSTATUS.REQUIRED) {
-                        let orderGroupRequired = orders.filter(order => order.orderGroupId == groupOrderId.orderGroupId && order.status === ORDERSTATUS.REQUIRED)
-                        orderModel = {
-                            orderGroupId: order.orderGroupId, orders: orderGroupRequired, 
-                            total: orderGroupRequired.reduce((pre, cur) => pre + cur.total, 0), 
-                            totalQty: orderGroupRequired.reduce((pre, cur) => pre + cur.order_details.reduce((pre1,cur1)=>pre1 + cur1.qtyOrder,0), 0)
-                        }
-                    } else {
-                        orderModel = order
-                    }
-                }
-            })
-            resultOrder.push(orderModel)
+            orderModel.orderGroupId = groupOrderId
+            orderModel.orders = orders.filter(od => od.orderGroupId === groupOrderId)
+            if (orderModel.orders.every(order => order.status === ORDERSTATUS.REQUIRED)) {
+                resultOrder.push(orderModel)
+            } else {
+                orderModel.orders.forEach(order => {
+                    resultOrder.push(order)
+                })
+            }
         }
 
-        // remove duplicate order group
-        resultOrder = resultOrder.filter((value, index) => {
-            const _value = JSON.stringify(value);
-            return index === resultOrder.findIndex(obj => {
-                return JSON.stringify(obj) === _value;
-            });
-        });
+        // let resultOrder = []
+        // for (let order of orders) {
+        //     let orderModel = {}
+        //     groupOrder.forEach(groupOrderId => {
+        //         if (order.orderGroupId == groupOrderId.orderGroupId) {
+        //             // check order status payment and other status
+        //             if (order.status === ORDERSTATUS.REQUIRED) {
+        //                 let orderGroupRequired = orders.filter(order => order.orderGroupId == groupOrderId.orderGroupId && order.status === ORDERSTATUS.REQUIRED)
+        //                 orderModel = {
+        //                     orderGroupId: order.orderGroupId, orders: orderGroupRequired, 
+        //                     total: orderGroupRequired.reduce((pre, cur) => pre + cur.total, 0), 
+        //                     totalQty: orderGroupRequired.reduce((pre, cur) => pre + cur.order_details.reduce((pre1,cur1)=>pre1 + cur1.qtyOrder,0), 0)
+        //                 }
+        //             } else {
+        //                 orderModel = order
+        //             }
+        //         }
+        //     })
+        //     resultOrder.push(orderModel)
+        // }
+
+        // // remove duplicate order group
+        // resultOrder = resultOrder.filter((value, index) => {
+        //     const _value = JSON.stringify(value);
+        //     return index === resultOrder.findIndex(obj => {
+        //         return JSON.stringify(obj) === _value;
+        //     });
+        // });
 
         // using to page
         let page_order = paginationList(resultOrder, pageN, limitN, 10)
@@ -374,9 +389,9 @@ router.get('/groups/:orderGroupId', JwtAuth, async (req, res, next) => {
         }
 
         return res.json({
-            orderGroupId: req.params.orderGroupId, orders: result, 
-            total: result.reduce((pre, cur) => pre + cur.total, 0), 
-            totalQty: result.reduce((pre, cur) => pre + cur.order_details.reduce((pre1,cur1)=>pre1 + cur1.qtyOrder,0), 0)
+            orderGroupId: req.params.orderGroupId, orders: result,
+            total: result.reduce((pre, cur) => pre + cur.total, 0),
+            totalQty: result.reduce((pre, cur) => pre + cur.order_details.reduce((pre1, cur1) => pre1 + cur1.qtyOrder, 0), 0)
         })
     } catch (err) {
         next(err)
@@ -590,7 +605,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
         }
 
         let orderGroup = await verifyOrderGroupId(orderGroupId)
-        
+
         let result = []
         for (order of orderGroup) {
             order.order_details = await Promise.all(order.order_details.map(async od => {
@@ -605,7 +620,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
             result.push(orderConverter(order))
         }
 
-        return res.status(201).json({orderGroupId: orderGroupId, orders: result, total: result.reduce((pre, cur) => pre + cur.total, 0)})
+        return res.status(201).json({ orderGroupId: orderGroupId, orders: result, total: result.reduce((pre, cur) => pre + cur.total, 0) })
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
