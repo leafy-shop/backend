@@ -24,7 +24,7 @@ const validateStr = (prop = '', value = '', length = 0, isEmpty = false) => {
 const validateUsername = (prop = '', value = '', length = 0) => {
     console.log("validate string of " + prop)
     // validate is null or null value or negative value
-    if (!isEmpty && (value == undefined || value.length == 0)) {
+    if (value == undefined || value.length == 0) {
         validatError(`${prop} is null`)
     }
     // validate string format
