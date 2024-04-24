@@ -224,7 +224,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
             contentModel.contentOwner = req.user.username
         }
 
-        console.log(contentModel)
+        // console.log(contentModel)
 
         // create content with username owner
         let input = await prisma.contents.create({
