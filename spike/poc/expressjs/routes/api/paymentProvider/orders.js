@@ -695,6 +695,9 @@ router.post('/no_cart', JwtAuth, async (req, res, next) => {
             }
         })
 
+        order_detail.priceEach = Number(order_detail.priceEach)
+        order_detail.subTotal = order_detail.priceEach * order_detail.qtyOrder
+
         // map model
         orderInput.order_details = []
         orderInput.order_details.push(order_detail)
