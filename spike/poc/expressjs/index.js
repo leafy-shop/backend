@@ -57,7 +57,7 @@ app.use('/api/addresses',require('./routes/api/accountProvider/addresses.js'))
 app.use('/api/payments',require('./routes/api/accountProvider/payments.js'))
 app.use('/api/orders',require('./routes/api/paymentProvider/orders.js'))
 
-app.use('/chat',require('./routes/socket/chat.js').router)
+// app.use('/chat',require('./routes/socket/chat.js').router)
 
 // use ejs for rendering
 app.set('view engine', 'ejs');
@@ -95,7 +95,7 @@ const PORT =process.env.PORT || 5001
 // }
 
 // socket connection
-initializeSocket(server)
+// initializeSocket(server)
 
 // Fallback Middleware function for returning 
 // 404 error for undefined paths
