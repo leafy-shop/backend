@@ -215,7 +215,7 @@ router.get('/:id', JwtAuth, async (req, res, next) => {
 
         // image for product
         let path = findImagePath("users", user.userId)
-        user.image = await listFirstImage(res, path)
+        user.image = await listFirstImage(path, "main.png")
 
         return res.json(user)
     } catch (err) {
@@ -256,7 +256,7 @@ router.get('/views/:username', async (req, res, next) => {
 
         // image for product
         let path = findImagePath("users", user.userId)
-        user.image = await listFirstImage(res, path)
+        user.image = await listFirstImage(path, "main.png")
 
         return res.json(user)
     } catch (err) {
