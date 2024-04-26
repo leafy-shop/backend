@@ -57,7 +57,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
             })
             order.supplierId = user.userId
             order.itemOwner = order.orderId.split("-")[0]
-            order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
+            
             order.isOutStock = true
             order.address = undefined
 
@@ -65,6 +65,9 @@ router.get('/', JwtAuth, async (req, res, next) => {
                 let item = await verifyItemId(od.itemId)
                 od.itemname = item.name
                 od.priceEach = Number(od.priceEach)
+                let itemReview = await verifyReviewId(od.orderId, od.itemId, od.itemStyle, od.itemSize)
+                od.rating = itemReview ? (itemReview.PQrating + itemReview.SSrating + itemReview.DSrating) / 3 : 0
+                od.subTotal = od.priceEach * od.qtyOrder
                 od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
                 let itemDetail = await verifyId(od.itemId, od.itemSize, od.itemStyle)
                 if (itemDetail !== null && itemDetail.stock > 0) {
@@ -92,9 +95,11 @@ router.get('/', JwtAuth, async (req, res, next) => {
             orderModel.orderGroupId = groupOrderId
             orderModel.orders = orders.filter(od => od.orderGroupId === groupOrderId)
             if (orderModel.orders.every(order => order.status === ORDERSTATUS.REQUIRED)) {
+                orderModel.total = orderModel.orders.reduce((pre,cur) => pre + cur.order_details.reduce((pre,order) => pre + order.subTotal, 0), 0)
                 resultOrder.push(orderModel)
             } else {
                 orderModel.orders.forEach(order => {
+                    order.total = order.order_details.reduce((pre,cur) => pre + cur.subTotal, 0)
                     resultOrder.push(order)
                 })
             }
@@ -163,7 +168,7 @@ router.get('/count/:status', JwtAuth, async (req, res, next) => {
         orders = orders.filter(order => {
             return order.customerName === req.user.username
         })
-        console.log(orders)
+        // console.log(orders)
 
         return res.json({ count: orders.length })
     } catch (err) {
@@ -212,13 +217,14 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
         if (orders.length !== 0) {
             orders = await Promise.all(orders.map(async order => {
                 // console.log(order)
-                order.total = order.order_details.reduce((pre, order) => pre + order.priceEach * order.qtyOrder, 0)
                 order.order_details = await Promise.all(order.order_details.map(async od => {
                     let item = await verifyItemId(od.itemId)
                     od.priceEach = Number(od.priceEach)
+                    od.subTotal = od.priceEach * od.qtyOrder
                     od.itemname = item.name
                     return od
                 }))
+                order.total = order.order_details.reduce((pre, order) => pre + order.subTotal, 0)
                 return orderConverter(order)
             }))
         }
@@ -341,23 +347,14 @@ router.get('/:orderId', JwtAuth, async (req, res, next) => {
             let item = await verifyItemId(od.itemId)
             od.itemname = item.name
             od.priceEach = Number(od.priceEach)
-            let itemReview = await prisma.item_reviews.findFirst({
-                where: {
-                    AND: [
-                        {orderId: od.orderId},
-                        {itemId: od.itemId},
-                        {style: od.itemStyle},
-                        {size: od.itemSize}
-                    ]
-                }
-            })
+            let itemReview = await verifyReviewId(od.orderId, od.itemId, od.itemStyle, od.itemSize)
             od.rating = itemReview ? (itemReview.PQrating + itemReview.SSrating + itemReview.DSrating) / 3 : 0
-            od.totalPrice = od.priceEach * od.qtyOrder
+            od.subTotal = od.priceEach * od.qtyOrder
             od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
             return od
         }))
         order.itemOwner = order.orderId.split("-")[0]
-        order.total = order.order_details.reduce((pre, order) => pre + Number(order.totalPrice), 0)
+        order.total = order.order_details.reduce((pre, order) => pre + Number(order.subTotal), 0)
 
         return res.json(orderConverter(order))
     } catch (err) {
@@ -385,17 +382,17 @@ router.get('/groups/:orderGroupId', JwtAuth, async (req, res, next) => {
                 let item = await verifyItemId(od.itemId)
                 od.itemname = item.name
                 od.priceEach = Number(od.priceEach)
-                od.totalPrice = od.priceEach * od.qtyOrder
+                od.subTotal = od.priceEach * od.qtyOrder
                 return od
             }))
             order.itemOwner = order.orderId.split("-")[0]
-            order.total = order.order_details.reduce((pre, order) => pre + Number(order.totalPrice), 0)
+            // order.subTotal = order.order_details.reduce((pre, order) => pre + Number(order.subTotal), 0)
             result.push(orderConverter(order))
         }
 
         return res.json({
             orderGroupId: req.params.orderGroupId, orders: result,
-            total: result.reduce((pre, cur) => pre + cur.total, 0),
+            total: result.reduce((pre, cur) => pre + cur.order_details.reduce((pre, order) => pre + Number(order.subTotal), 0), 0),
             totalQty: result.reduce((pre, cur) => pre + cur.order_details.reduce((pre1, cur1) => pre1 + cur1.qtyOrder, 0), 0)
         })
     } catch (err) {
@@ -618,15 +615,15 @@ router.post('/', JwtAuth, async (req, res, next) => {
                 let item = await verifyItemId(od.itemId)
                 od.itemname = item.name
                 od.priceEach = Number(od.priceEach)
-                od.totalPrice = od.priceEach * od.qtyOrder
+                od.subTotal = od.priceEach * od.qtyOrder
                 return od
             }))
             order.itemOwner = order.orderId.split("-")[0]
-            order.total = order.order_details.reduce((pre, order) => pre + Number(order.totalPrice), 0)
+            // order.total = order.order_details.reduce((pre, order) => pre + Number(order.subTotal), 0)
             result.push(orderConverter(order))
         }
 
-        return res.status(201).json({ orderGroupId: orderGroupId, orders: result, total: result.reduce((pre, cur) => pre + cur.total, 0) })
+        return res.status(201).json({ orderGroupId: orderGroupId, orders: result, total: result.reduce((pre, cur) => pre + cur.order_details.reduce((pre1, order) => pre1 + order.subTotal, 0) , 0) })
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
@@ -963,6 +960,20 @@ const verifyOrderGroupId = async (groupId) => {
     })
     if (order.length === 0) notFoundError("order group id " + groupId + " does not exist")
     return order
+}
+
+const verifyReviewId = async (orderId, itemId, itemStyle, itemSize) => {
+    let itemReview = await prisma.item_reviews.findFirst({
+        where: {
+            AND: [
+                {orderId: orderId},
+                {itemId: itemId},
+                {style: itemStyle},
+                {size: itemSize}
+            ]
+        }
+    })
+    return itemReview
 }
 
 const verifyPayment = async (username) => {

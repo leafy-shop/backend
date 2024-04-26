@@ -505,7 +505,7 @@ router.get('/:id', UnstrictJwtAuth, async (req, res, next) => {
         // console.log(item.image)
 
         // add on event
-        if (req.user !== undefined) {
+        if (req.user !== undefined && (req.user.role === ROLE.Supplier && item.itemOwner !== req.user.username)) {
             let event = {
                 userId: req.user.id,
                 itemId: item.itemId,

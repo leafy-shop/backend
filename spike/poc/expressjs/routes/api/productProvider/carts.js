@@ -47,7 +47,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
                 // console.log(sessionGroup)
                 return ownerCart.itemOwner === sessionGroup
             })
-            console.log(cartFilterOwner.length)
+            // console.log(cartFilterOwner.length)
 
             // store all cart in item group like their image, price
             cartFilterOwner = await Promise.all(cartFilterOwner.map(async cart => {
@@ -59,7 +59,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
                 let itemname = await verifyItemOwner(cart.itemId)
                 cart.itemName = itemname.name
                 cart.stock = product.stock
-                cart.totalItemQty = product.price * cart.qty
+                cart.subTotal = product.price * cart.qty
                 return timeConverter(cart)
             }))
 
@@ -70,7 +70,7 @@ router.get('/', JwtAuth, async (req, res, next) => {
         }
 
         // declare value for return on my cart session
-        resultSession.total = resultSession.carts.reduce((pre, cur) => pre + cur.cartOwner.reduce((pre2, cur2) => pre2 + Number(cur2.totalItemQty), 0), 0)
+        resultSession.total = resultSession.carts.reduce((pre, cur) => pre + cur.cartOwner.reduce((pre2, cur2) => pre2 + cur2.subTotal, 0), 0)
         resultSession.shipping = 0;
         resultSession.tax = 0;
         return res.json(timeConverter(resultSession));
