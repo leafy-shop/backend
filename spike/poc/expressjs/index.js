@@ -108,4 +108,4 @@ const invalidPathHandler = (request, response, next) => {
 // function which sends back the response for invalid paths)
 app.use(invalidPathHandler)
 
-server.listen(PORT,()=>console.log(`server is run on port ${PORT}`))
+app.listen(PORT,()=>console.log(`server is run on port ${PORT}`))
