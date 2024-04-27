@@ -1280,6 +1280,11 @@ router.post('/:prodId/reviews', JwtAuth, async (req, res, next) => {
         // find item id
         let item = await verifyId(validateInt("validate itemId", req.params.prodId))
         let order = await verifyOrderDetailId(orderId, item.itemId, style, size)
+        
+        if (order.customerName !== req.user.username) {
+            forbiddenError("you cannot review other receive item in order")
+        }
+
         let itemReview = await prisma.item_reviews.findMany({
             where: {
                 AND: [
@@ -1629,8 +1634,13 @@ const verifyDetailId = async (id, sty, size) => {
 }
 
 const verifyOrderDetailId = async (orderId, itemId, itemStyle, itemSize) => {
+    let order = await prisma.orders.findFirst({
+        where: {
+            orderId: orderId
+        }
+    })
     // find user by account username
-    let order = await prisma.order_details.findFirst({
+    let orderdetail = await prisma.order_details.findFirst({
         where: {
             AND: [
                 { orderId: orderId },
@@ -1641,7 +1651,9 @@ const verifyOrderDetailId = async (orderId, itemId, itemStyle, itemSize) => {
         }
     })
     // check user exist
-    if (order == null) notFoundError("your order " + orderId + " with detail of item id " + itemId + " sku style " + itemStyle + " and size " + itemSize + " does not exist")
+    if (orderdetail == null) notFoundError("your order " + orderId + " with detail of item id " + itemId + " sku style " + itemStyle + " and size " + itemSize + " does not exist")
+    order.order_details = orderdetail
+
     return order
 }
 
