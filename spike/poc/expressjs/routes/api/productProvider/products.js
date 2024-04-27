@@ -698,6 +698,7 @@ router.post('/', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (req, res
 
         // create item sku mapping and item details
         await Promise.all(styles.map(async (sty) => {
+            console.log(sty)
             let sku = await prisma.item_sku.create({
                 data: {
                     itemId: input.itemId,
