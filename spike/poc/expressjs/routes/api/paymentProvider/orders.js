@@ -96,10 +96,12 @@ router.get('/', JwtAuth, async (req, res, next) => {
             orderModel.orders = orders.filter(od => od.orderGroupId === groupOrderId)
             if (orderModel.orders.every(order => order.status === ORDERSTATUS.REQUIRED)) {
                 orderModel.total = orderModel.orders.reduce((pre,cur) => pre + cur.order_details.reduce((pre,order) => pre + order.subTotal, 0), 0)
+                orderModel.totalQty = orderModel.orders.reduce((pre, cur) => pre + cur.order_details.reduce((pre,order) => pre + order.qtyOrder, 0), 0)
                 resultOrder.push(orderModel)
             } else {
                 orderModel.orders.forEach(order => {
                     order.total = order.order_details.reduce((pre,cur) => pre + cur.subTotal, 0)
+                    order.totalQty = order.order_details.reduce((pre, order) => pre + order.qtyOrder, 0)
                     resultOrder.push(order)
                 })
             }
@@ -213,6 +215,7 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
             return order.orderId.split("-")[0] === req.user.username
         })
 
+        let sum = 0
         // order format
         if (orders.length !== 0) {
             orders = await Promise.all(orders.map(async order => {
@@ -222,6 +225,8 @@ router.get('/supplier', JwtAuth, verifyRole(ROLE.Admin, ROLE.Supplier), async (r
                     od.priceEach = Number(od.priceEach)
                     od.subTotal = od.priceEach * od.qtyOrder
                     od.itemname = item.name
+                    od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
+                    sum += od.qtyOrder
                     return od
                 }))
                 order.total = order.order_details.reduce((pre, order) => pre + order.subTotal, 0)
@@ -616,6 +621,7 @@ router.post('/', JwtAuth, async (req, res, next) => {
                 od.itemname = item.name
                 od.priceEach = Number(od.priceEach)
                 od.subTotal = od.priceEach * od.qtyOrder
+                od.image = await listFirstImage(findImagePath("products", od.itemId), "main.png")
                 return od
             }))
             order.itemOwner = order.orderId.split("-")[0]
