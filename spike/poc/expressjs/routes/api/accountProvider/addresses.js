@@ -23,12 +23,14 @@ router.get('/:username', JwtAuth, async (req, res, next) => {
         })
 
         // check role and same user name
-        if (req.user.role !== ROLE.Admin && user.username !== req.user.username) forbiddenError('This user can see yourself only')
+        if (req.user.role !== ROLE.Admin && req.params.username !== user.username) forbiddenError('This user can see yourself only')
+
+        // console.log(user.username)
 
         // find all address of user
         let addresses = await prisma.addresses.findMany({
             where: {
-                username: user.username
+                username: req.params.username
             }
         })
 
