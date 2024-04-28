@@ -851,7 +851,7 @@ router.put('/isFav/:id', JwtAuth, verifyRole(ROLE.Admin, ROLE.User), async (req,
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // The .code property can be accessed in a type-safe manner
             if (err.code === 'P2002') {
-                err.message = "product of user is duplicated"
+                err.message = "product favorite of user is duplicated"
             }
         }
         next(err)

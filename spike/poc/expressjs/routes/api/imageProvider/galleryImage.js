@@ -13,8 +13,8 @@ const { notFoundError } = require("../../model/error/error");
 const upload = multer({
   storage: galleryStorage,
   limits: { 
-    fileSize: 1024 * 1024 * 2,
-    files: 1 
+    fileSize: 1024 * 1024 * 5,
+    files: 1
   },
   async fileFilter(req, file, cb) {
     if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
